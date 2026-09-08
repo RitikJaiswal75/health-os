@@ -1,0 +1,3 @@
+-keep class com.healthos.alarm.** { *; }
+-keepclassmembers class com.healthos.alarm.MedicationAlarmReceiver { *; }
+-keepclassmembers class com.healthos.alarm.MedicationAlarmModule { *; }

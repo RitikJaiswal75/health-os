@@ -1,23 +1,43 @@
 {
   "expo": {
-    "name": "_scaffold",
-    "slug": "_scaffold",
+    "name": "Health OS",
+    "slug": "health-os",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "scaffold",
-    "userInterfaceStyle": "automatic",
+    "scheme": "healthos",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.healthos.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch"],
+        "NSCameraUsageDescription": "Health OS uses the camera to photograph your pill for easy identification.",
+        "NSPhotoLibraryUsageDescription": "Health OS uses your photo library to pick a pill image."
+      }
     },
     "android": {
+      "package": "com.healthos.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#121212",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "USE_FULL_SCREEN_INTENT",
+        "SYSTEM_ALERT_WINDOW",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -26,17 +46,42 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#121212"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Health OS uses your photos to pick a pill image.",
+          "cameraPermission": "Health OS uses the camera to photograph your pill."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#121212",
+          "defaultChannel": "medication-reminders"
+        }
+      ],
+      "./modules/medication-alarm/app.plugin.js",
+      "./plugins/withRnCompatibilityShim.js",
+      "./plugins/withDevClientMainApplication.js",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "health-os-local"
+      }
     }
   }
 }

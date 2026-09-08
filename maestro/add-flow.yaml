@@ -1,0 +1,10 @@
+appId: com.healthos.app
+---
+- launchApp
+- tapOn:
+    id: "add-medication"
+    optional: true
+- tapOn: "+"
+- inputText: "Test Medicine"
+- tapOn: "Add custom medication"
+- tapOn: "Continue"
