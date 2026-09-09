@@ -1,4 +1,4 @@
-appId: com.healthos.app
+appId: com.health.os
 ---
 - launchApp
 - tapOn:

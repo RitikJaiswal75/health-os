@@ -9,12 +9,19 @@ import { DoseEventRepository, MedicationRepository } from '@/src/features/medica
 import type { Medication } from '@/src/db/schema';
 import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillShapeIcon';
 import { RefillQuantityDialog } from '@/src/core/components/RefillQuantityDialog';
-import { getMedicationTypeLabel } from '@/src/core/types/domain';
+import { formatStrengthSubtitle, getMedicationTypeLabel } from '@/src/core/types/domain';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 function formatStrengthLine(med: Medication): string {
-  if (med.strengthValue != null && med.strengthUnit) {
-    return `${med.strengthValue} ${med.strengthUnit}`;
+  const subtitle = formatStrengthSubtitle(
+    med.medicationType,
+    med.strengthValue ?? undefined,
+    med.strengthUnit ?? undefined,
+    med.doseUnitValue ?? undefined,
+    med.doseUnitUnit ?? undefined,
+  );
+  if (subtitle !== 'Set medication info') {
+    return subtitle;
   }
   return getMedicationTypeLabel(med.medicationType);
 }

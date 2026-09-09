@@ -5,20 +5,19 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
-import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.healthos.app.MainActivity
+import com.health.os.MainActivity
 
 class MedicationAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED -> {
-                val reschedule = Intent("com.healthos.app.BOOT_RESCHEDULE").apply {
+                val reschedule = Intent("com.health.os.BOOT_RESCHEDULE").apply {
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(reschedule)
@@ -29,7 +28,15 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                 val scheduledAt = intent.getStringExtra("scheduledAt") ?: ""
                 val doseEventId = intent.getStringExtra("doseEventId")
 
-                AlarmSoundController.start(context)
+                PendingReminderStore.enqueue(
+                    context,
+                    medicationId,
+                    alarmId,
+                    scheduledAt,
+                    doseEventId,
+                )
+
+                AlarmFireService.startAlarm(context, alarmId)
 
                 val activityIntent = buildReminderActivityIntent(
                     context,
@@ -39,24 +46,16 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                     doseEventId,
                 )
 
-                var activityStarted = false
                 try {
                     context.startActivity(activityIntent)
-                    activityStarted = true
                 } catch (_: Exception) {
-                    // Full-screen notification remains as fallback.
+                    // Notification remains as fallback.
                 }
 
-                val keyguardManager =
-                    context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                val deviceLocked = keyguardManager.isKeyguardLocked
-                if (activityStarted && !deviceLocked) {
-                    return
-                }
-
+                val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
                 val fullScreenPendingIntent = PendingIntent.getActivity(
                     context,
-                    alarmId.hashCode(),
+                    requestCode,
                     activityIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
@@ -79,14 +78,14 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                     .setVibrate(longArrayOf(0, 400, 200, 400))
                     .build()
 
-                notificationManager.notify(alarmId.hashCode(), notification)
+                notificationManager.notify(requestCode, notification)
             }
         }
     }
 
     companion object {
         private const val CHANNEL_ID = "medication-reminders-native-v2"
-        private const val ACTION_ALARM_FIRE = "com.healthos.app.ALARM_FIRE"
+        private const val ACTION_ALARM_FIRE = "com.health.os.ALARM_FIRE"
         private const val PREFS_NAME = "medication_alarm_prefs"
         private const val KEY_SCHEDULED_IDS = "scheduled_alarm_ids"
 
@@ -151,6 +150,7 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             doseEventId: String? = null,
         ) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
             val intent = Intent(context, MedicationAlarmReceiver::class.java).apply {
                 action = ACTION_ALARM_FIRE
                 putExtra("medicationId", medicationId)
@@ -160,7 +160,7 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             }
             val pending = PendingIntent.getBroadcast(
                 context,
-                alarmId.hashCode(),
+                requestCode,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
@@ -168,27 +168,34 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             alarmManager.setAlarmClock(info, pending)
         }
 
-        fun dismissNotification(context: Context, alarmId: String) {
-            AlarmSoundController.stop()
+        fun dismissNotification(context: Context, alarmId: String, medicationId: String? = null) {
+            AlarmFireService.stopAlarm(context, alarmId)
+            PendingReminderStore.remove(context, alarmId)
+            if (!medicationId.isNullOrBlank()) {
+                PendingReminderStore.removeByMedicationId(context, medicationId)
+            }
+            val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
             val notificationManager =
                 context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.cancel(alarmId.hashCode())
+            notificationManager.cancel(requestCode)
         }
 
         fun cancel(context: Context, alarmId: String) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
             val intent = Intent(context, MedicationAlarmReceiver::class.java).apply {
                 action = ACTION_ALARM_FIRE
             }
             val pending = PendingIntent.getBroadcast(
                 context,
-                alarmId.hashCode(),
+                requestCode,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             alarmManager.cancel(pending)
             dismissNotification(context, alarmId)
             removeScheduledId(context, alarmId)
+            AlarmRequestCodes.release(context, alarmId)
         }
 
         private fun removeScheduledId(context: Context, alarmId: String) {

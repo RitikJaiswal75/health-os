@@ -1,18 +1,22 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
+import * as SplashScreen from 'expo-splash-screen';
+import { AppLaunchScreen } from '@/src/core/components/AppLaunchScreen';
 import { useDatabaseBootstrap } from './DbProvider';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 export function DbBootstrapGate({ children }: { children: ReactNode }) {
   const dbState = useDatabaseBootstrap();
 
+  useEffect(() => {
+    if (dbState.status === 'ready' || dbState.status === 'error') {
+      void SplashScreen.hideAsync();
+    }
+  }, [dbState.status]);
+
   if (dbState.status === 'loading') {
-    return (
-      <View style={styles.center}>
-        <Text>Loading Health OS…</Text>
-      </View>
-    );
+    return <AppLaunchScreen />;
   }
 
   if (dbState.status === 'error') {

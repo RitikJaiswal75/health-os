@@ -130,12 +130,35 @@ export async function cancelAlarm(alarmId: string): Promise<void> {
   }
 }
 
+export async function dismissReminderNotification(
+  alarmId: string,
+  medicationId?: string,
+): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  try {
+    const MedicationAlarm = require('../../../modules/medication-alarm');
+    if (MedicationAlarm?.dismissReminderNotification) {
+      await MedicationAlarm.dismissReminderNotification(alarmId, medicationId ?? null);
+    }
+  } catch {
+    // stub
+  }
+}
+
 export async function scheduleSnoozeAt(
   medicationId: string,
   medicationName: string,
   scheduledAt: string,
   doseEventId?: string,
+  db?: SQLiteDatabase,
 ): Promise<void> {
+  if (db) {
+    const reconciler = new ReminderReconciler(db);
+    await scheduleAlarms(reconciler.reconcile(7));
+    return;
+  }
+
   await scheduleAlarms([
     {
       id: `snooze:${medicationId}:${doseEventId ?? Date.now()}`,

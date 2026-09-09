@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { DoseEvent } from '../../db/schema';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
 import type { DoseStatus } from '../../core/types/domain';
+import { inventoryDeductAmount } from '../../core/types/domain';
 
 export interface InventoryChangeResult {
   previousQty: number;
@@ -9,10 +10,8 @@ export interface InventoryChangeResult {
   changed: boolean;
 }
 
-function takenDeductAmount(dose: DoseEvent): number {
-  const raw = dose.doseAmount;
-  const parsed = typeof raw === 'number' && Number.isFinite(raw) ? raw : 1;
-  return Math.max(1, Math.ceil(parsed));
+function takenDeductAmount(dose: DoseEvent, medicationType?: string): number {
+  return inventoryDeductAmount(dose.doseAmount, medicationType);
 }
 
 function asQuantity(value: unknown): number {
@@ -91,7 +90,7 @@ export class InventoryService {
       this.clearTakenTransaction(doseEventId);
     }
 
-    const amount = takenDeductAmount(dose);
+    const amount = takenDeductAmount(dose, med.medicationType);
     const previousQty = asQuantity(med.currentQuantity);
     const newQty = Math.max(0, previousQty - amount);
     const now = new Date().toISOString();
@@ -138,7 +137,7 @@ export class InventoryService {
     const med = this.medications.getById(dose.medicationId);
     if (!med) return { previousQty: 0, newQty: 0, changed: false };
 
-    const amount = takenDeductAmount(dose);
+    const amount = takenDeductAmount(dose, med.medicationType);
     const previousQty = asQuantity(med.currentQuantity);
     const newQty = previousQty + amount;
     const now = new Date().toISOString();

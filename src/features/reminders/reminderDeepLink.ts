@@ -1,9 +1,5 @@
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import {
-  clearReminderNavigationState,
-  shouldNavigateToReminder,
-} from './reminderNavigationDedupe';
+import { completeCurrentReminder, pushReminder } from './reminderQueue';
 import type { ReminderRouteParams } from './reminderRouteParams';
 
 export type { ReminderRouteParams } from './reminderRouteParams';
@@ -23,13 +19,7 @@ function paramsFromQuery(queryParams: Linking.QueryParams | null): ReminderRoute
 }
 
 function navigateToReminder(params: ReminderRouteParams): boolean {
-  if (!shouldNavigateToReminder(params)) return false;
-
-  router.replace({
-    pathname: '/reminder',
-    params,
-  });
-  return true;
+  return pushReminder(params);
 }
 
 export function openReminderFromData(data: Record<string, unknown> | undefined): boolean {
@@ -53,7 +43,6 @@ export function openReminderFromDeepLink(url: string | null | undefined): boolea
   return navigateToReminder(params);
 }
 
-export function exitReminderScreen(): void {
-  clearReminderNavigationState();
-  router.replace('/(tabs)');
+export async function exitReminderScreen(handled?: ReminderRouteParams): Promise<boolean> {
+  return completeCurrentReminder(handled);
 }

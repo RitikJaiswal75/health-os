@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button, Dialog, Portal, Switch, Text, TextInput } from 'react-native-paper';
 import { router } from 'expo-router';
@@ -11,6 +20,7 @@ import {
   formatStrengthSubtitle,
   FREQUENCY_OPTIONS,
   getDefaultDoseAmount,
+  getInventoryQuantityPrompt,
   supportsDualColor,
   type ScheduleType,
 } from '@/src/core/types/domain';
@@ -81,6 +91,38 @@ export function MedicationReviewView() {
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldOffsets = useRef<Record<string, number>>({});
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  const registerFieldOffset = (key: string, y: number) => {
+    fieldOffsets.current[key] = y;
+  };
+
+  const scrollFieldIntoView = (key: string) => {
+    const scroll = () => {
+      const y = fieldOffsets.current[key];
+      if (y == null) return;
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true });
+    };
+    requestAnimationFrame(scroll);
+    if (Platform.OS === 'android') {
+      setTimeout(scroll, 100);
+    }
+  };
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardInset(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const isEditing = !!editingMedicationId;
 
@@ -111,6 +153,7 @@ export function MedicationReviewView() {
     doseUnitUnit: draft.doseUnitUnit,
   };
   const defaultDoseAmount = getDefaultDoseAmount(draft.medicationType, doseLabelOptions);
+  const quantityPrompt = getInventoryQuantityPrompt(draft.medicationType);
 
   const canSave =
     !!draft.name &&
@@ -183,7 +226,18 @@ export function MedicationReviewView() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={[styles.content, { paddingBottom: 32 + keyboardInset }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View style={styles.previewCard}>
         <View style={styles.previewCircleWrap}>
           <View style={styles.previewCircle}>
@@ -282,18 +336,22 @@ export function MedicationReviewView() {
         ) : null}
       </View>
 
-      <View style={styles.card}>
+      <View
+        style={styles.card}
+        onLayout={(event) => registerFieldOffset('quantity', event.nativeEvent.layout.y)}
+      >
         <Text style={styles.cardTitle}>Quantity</Text>
         <TextInput
-          placeholder="Number of remaining pills"
+          placeholder={quantityPrompt}
           value={quantity}
           onChangeText={setQuantity}
+          onFocus={() => scrollFieldIntoView('quantity')}
           keyboardType="numeric"
           mode="flat"
           style={styles.quantityInput}
           underlineColor={healthOsTheme.colors.outline}
           activeUnderlineColor={healthOsTheme.colors.primary}
-          accessibilityLabel="Number of remaining pills"
+          accessibilityLabel={quantityPrompt}
         />
         <View style={styles.refillRow}>
           <Text style={styles.refillLabel}>Refill reminder</Text>
@@ -320,29 +378,38 @@ export function MedicationReviewView() {
         ) : null}
       </View>
 
-      <TextInput
-        placeholder="Medication nickname"
-        value={nickname}
-        onChangeText={setNickname}
-        mode="outlined"
-        left={<TextInput.Icon icon="pill" />}
-        style={styles.fieldInput}
-        accessibilityLabel="Medication nickname"
-      />
-      <Text style={styles.nicknameHint}>
-        If you set a nickname, the nickname will be used throughout the Medication tracker.
-      </Text>
+      <View
+        style={styles.nicknameSection}
+        onLayout={(event) => registerFieldOffset('nickname', event.nativeEvent.layout.y)}
+      >
+        <TextInput
+          placeholder="Medication nickname"
+          value={nickname}
+          onChangeText={setNickname}
+          onFocus={() => scrollFieldIntoView('nickname')}
+          mode="outlined"
+          left={<TextInput.Icon icon="pill" />}
+          style={styles.fieldInput}
+          accessibilityLabel="Medication nickname"
+        />
+        <Text style={styles.nicknameHint}>
+          If you set a nickname, the nickname will be used throughout the Medication tracker.
+        </Text>
+      </View>
 
-      <TextInput
-        placeholder="Notes"
-        value={notes}
-        onChangeText={setNotes}
-        mode="outlined"
-        multiline
-        left={<TextInput.Icon icon="note-text-outline" />}
-        style={styles.fieldInput}
-        accessibilityLabel="Notes"
-      />
+      <View onLayout={(event) => registerFieldOffset('notes', event.nativeEvent.layout.y)}>
+        <TextInput
+          placeholder="Notes"
+          value={notes}
+          onChangeText={setNotes}
+          onFocus={() => scrollFieldIntoView('notes')}
+          mode="outlined"
+          multiline
+          left={<TextInput.Icon icon="note-text-outline" />}
+          style={[styles.fieldInput, styles.notesInput]}
+          accessibilityLabel="Notes"
+        />
+      </View>
 
       <Button
         mode="contained"
@@ -413,10 +480,15 @@ export function MedicationReviewView() {
         </Dialog>
       </Portal>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: healthOsTheme.colors.background,
+  },
   content: {
     padding: 16,
     gap: 12,
@@ -560,11 +632,16 @@ const styles = StyleSheet.create({
   fieldInput: {
     backgroundColor: healthOsTheme.colors.surface,
   },
+  notesInput: {
+    minHeight: 120,
+  },
+  nicknameSection: {
+    gap: 8,
+  },
   nicknameHint: {
     color: healthOsTheme.colors.onSurfaceVariant,
     fontSize: 13,
     lineHeight: 18,
-    marginTop: -4,
     marginBottom: 4,
   },
   saveBtn: {

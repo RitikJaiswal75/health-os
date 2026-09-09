@@ -81,12 +81,33 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun dismissReminderNotification(alarmId: String, promise: Promise) {
+    fun dismissReminderNotification(alarmId: String, medicationId: String?, promise: Promise) {
         try {
-            MedicationAlarmReceiver.dismissNotification(reactContext, alarmId)
+            MedicationAlarmReceiver.dismissNotification(reactContext, alarmId, medicationId)
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("DISMISS_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun getPendingReminders(promise: Promise) {
+        try {
+            val reminders = PendingReminderStore.snapshot(reactContext)
+            val array = Arguments.createArray()
+            for (reminder in reminders) {
+                val map = Arguments.createMap()
+                map.putString("medicationId", reminder.medicationId)
+                map.putString("alarmId", reminder.alarmId)
+                map.putString("scheduledAt", reminder.scheduledAt)
+                if (reminder.doseEventId != null) {
+                    map.putString("doseEventId", reminder.doseEventId)
+                }
+                array.pushMap(map)
+            }
+            promise.resolve(array)
+        } catch (e: Exception) {
+            promise.reject("PENDING_ERROR", e.message, e)
         }
     }
 

@@ -178,6 +178,63 @@ describe('reminderService', () => {
   });
 });
 
+jest.mock('expo-router', () => ({
+  router: { replace: jest.fn() },
+}));
+
+describe('reminderQueue', () => {
+  it('queues a second reminder while one is active', async () => {
+    const { resetReminderQueueForTests, pushReminder, completeCurrentReminder } =
+      require('../src/features/reminders/reminderQueue');
+    const { resetReminderNavigationForTests } =
+      require('../src/features/reminders/reminderNavigationDedupe');
+
+    resetReminderQueueForTests();
+    resetReminderNavigationForTests();
+
+    const first = {
+      medicationId: 'med-1',
+      alarmId: 'alarm-1',
+      scheduledAt: '2026-09-08T08:00:00',
+    };
+    const second = {
+      medicationId: 'med-2',
+      alarmId: 'alarm-2',
+      scheduledAt: '2026-09-08T08:00:00',
+    };
+
+    expect(pushReminder(first)).toBe(true);
+    expect(pushReminder(second)).toBe(false);
+    await expect(completeCurrentReminder()).resolves.toBe(true);
+  });
+
+  it('does not re-show a reminder that was already handled', () => {
+    const { resetReminderQueueForTests, pushReminder, markReminderHandled } =
+      require('../src/features/reminders/reminderQueue');
+    const { resetReminderNavigationForTests } =
+      require('../src/features/reminders/reminderNavigationDedupe');
+
+    resetReminderQueueForTests();
+    resetReminderNavigationForTests();
+
+    const whey = {
+      medicationId: 'med-whey',
+      alarmId: 'alarm-whey',
+      scheduledAt: '2026-09-08T08:00:00',
+    };
+    const creatine = {
+      medicationId: 'med-creatine',
+      alarmId: 'alarm-creatine',
+      scheduledAt: '2026-09-08T08:00:00',
+    };
+
+    expect(pushReminder(whey)).toBe(true);
+    markReminderHandled(whey);
+    expect(pushReminder(whey)).toBe(false);
+    expect(pushReminder(creatine)).toBe(false);
+  });
+});
+
 describe('reminderNavigationDedupe', () => {
   beforeEach(() => {
     const { resetReminderNavigationForTests } = require('../src/features/reminders/reminderNavigationDedupe');
@@ -295,11 +352,39 @@ describe('formatDoseLabel', () => {
   });
 });
 
+describe('getInventoryQuantityPrompt', () => {
+  const { getInventoryQuantityPrompt } = require('../src/core/types/domain');
+
+  it('uses form-specific stock labels on the review screen', () => {
+    expect(getInventoryQuantityPrompt('powder')).toBe('Number of remaining scoops');
+    expect(getInventoryQuantityPrompt('liquid')).toBe('Number of remaining doses');
+    expect(getInventoryQuantityPrompt('inhaler')).toBe('Number of remaining uses');
+    expect(getInventoryQuantityPrompt('tablet')).toBe('Number of remaining tablets');
+  });
+});
+
+describe('inventoryDeductAmount', () => {
+  const { inventoryDeductAmount } = require('../src/core/types/domain');
+
+  it('deducts one serving for powder and liquid regardless of gram/ml dose', () => {
+    expect(inventoryDeductAmount(35, 'powder')).toBe(1);
+    expect(inventoryDeductAmount(17.5, 'powder')).toBe(1);
+    expect(inventoryDeductAmount(10, 'liquid')).toBe(1);
+  });
+
+  it('deducts dose count for solid forms', () => {
+    expect(inventoryDeductAmount(1, 'tablet')).toBe(1);
+    expect(inventoryDeductAmount(2, 'capsule')).toBe(2);
+    expect(inventoryDeductAmount(1.5, 'tablet')).toBe(2);
+  });
+});
+
 describe('getDefaultDoseAmount', () => {
   const { getDefaultDoseAmount } = require('../src/core/types/domain');
 
   it('prefers scoop size for powder and strength for liquid', () => {
     expect(getDefaultDoseAmount('powder', { doseUnitValue: 35, strengthValue: 25 })).toBe(35);
+    expect(getDefaultDoseAmount('powder', { strengthValue: 25 })).toBe(1);
     expect(getDefaultDoseAmount('liquid', { strengthValue: 5 })).toBe(5);
     expect(getDefaultDoseAmount('tablet')).toBe(1);
   });
@@ -308,9 +393,13 @@ describe('getDefaultDoseAmount', () => {
 describe('formatStrengthSubtitle', () => {
   const { formatStrengthSubtitle } = require('../src/core/types/domain');
 
-  it('shows protein and scoop size separately for powder supplements', () => {
+  it('shows scoop size and strength separately for powder', () => {
     expect(formatStrengthSubtitle('powder', 25, 'g', 35, 'g')).toBe(
-      'Powder, 25 g protein, 35 g per scoop',
+      'Powder, 35 g per scoop, 25 g strength',
+    );
+    expect(formatStrengthSubtitle('powder', 5, 'g')).toBe('Powder, 5 g strength');
+    expect(formatStrengthSubtitle('powder', undefined, undefined, 10, 'g')).toBe(
+      'Powder, 10 g per scoop',
     );
   });
 });
@@ -915,7 +1004,7 @@ describe('InventoryService', () => {
     });
     jest.spyOn(MedicationRepository.prototype, 'getById').mockImplementation((id: unknown) => {
       if (id !== 'med-1') return null;
-      return { id: 'med-1', currentQuantity: state.med.current_quantity };
+      return { id: 'med-1', currentQuantity: state.med.current_quantity, medicationType: 'tablet' };
     });
     jest.spyOn(MedicationRepository.prototype, 'getDefaultVariant').mockReturnValue({
       id: 'var-1',
@@ -944,6 +1033,109 @@ describe('InventoryService', () => {
     expect(result.changed).toBe(true);
     expect(state.med.current_quantity).toBe(9);
     expect(state.variant.current_quantity).toBe(9);
+  });
+
+  it('decrements powder and liquid stock by one serving, not gram/ml dose', () => {
+    const state = {
+      dose: {
+        id: 'dose-powder',
+        medication_id: 'med-powder',
+        dose_amount: 35,
+        status: 'pending',
+        variant_id: null,
+      },
+      med: {
+        id: 'med-powder',
+        current_quantity: 20,
+      },
+      variant: {
+        id: 'var-powder',
+        medication_id: 'med-powder',
+        current_quantity: 20,
+        is_default: 1,
+      },
+    };
+
+    const mockDb = {
+      execSync: jest.fn(),
+      runSync: jest.fn((sql: string, params?: unknown[]) => {
+        if (sql.includes('UPDATE medications SET current_quantity')) {
+          state.med.current_quantity = params?.[0] as number;
+        }
+        if (sql.includes('UPDATE medication_variants SET current_quantity')) {
+          state.variant.current_quantity = params?.[0] as number;
+        }
+      }),
+      getFirstSync: jest.fn((sql: string) => {
+        if (sql.includes('inventory_transactions') && sql.includes('dose_taken')) {
+          return null;
+        }
+        if (sql.includes('FROM dose_events')) {
+          return state.dose;
+        }
+        if (sql.includes('FROM medications')) {
+          return state.med;
+        }
+        if (sql.includes('medication_variants') && sql.includes('is_default')) {
+          return state.variant;
+        }
+        return null;
+      }),
+      getAllSync: jest.fn((sql: string, params?: unknown[]) => {
+        if (sql.includes('medication_variants') && params?.[0] === 'med-powder') {
+          return [state.variant];
+        }
+        return [];
+      }),
+    };
+
+    const { InventoryService } = require('../src/features/inventory/inventoryService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(DoseEventRepository.prototype, 'getById').mockImplementation((id: unknown) => {
+      if (id !== 'dose-powder') return null;
+      return {
+        id: 'dose-powder',
+        medicationId: 'med-powder',
+        doseAmount: 35,
+        status: 'pending',
+        variantId: null,
+      };
+    });
+    jest.spyOn(MedicationRepository.prototype, 'getById').mockImplementation((id: unknown) => {
+      if (id !== 'med-powder') return null;
+      return {
+        id: 'med-powder',
+        currentQuantity: state.med.current_quantity,
+        medicationType: 'powder',
+      };
+    });
+    jest.spyOn(MedicationRepository.prototype, 'getDefaultVariant').mockReturnValue({
+      id: 'var-powder',
+      medicationId: 'med-powder',
+      currentQuantity: state.variant.current_quantity,
+      isDefault: true,
+    });
+    jest.spyOn(MedicationRepository.prototype, 'getVariants').mockReturnValue([
+      {
+        id: 'var-powder',
+        medicationId: 'med-powder',
+        currentQuantity: state.variant.current_quantity,
+        isDefault: true,
+      },
+    ]);
+    jest.spyOn(MedicationRepository.prototype, 'recordInventoryTransaction').mockImplementation(() => {});
+
+    const inventory = new InventoryService(
+      mockDb,
+      new MedicationRepository(mockDb),
+      new DoseEventRepository(mockDb),
+    );
+
+    const result = inventory.decrementOnTaken('dose-powder');
+    expect(result.newQty).toBe(19);
+    expect(state.med.current_quantity).toBe(19);
+    expect(state.variant.current_quantity).toBe(19);
   });
 
   it('does not double-decrement when taken is recorded twice', () => {

@@ -5,7 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository, DoseEventRepository } from '@/src/features/medications/medicationRepository';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
-import { scheduleSnoozeAt, cancelAlarm } from '@/src/features/reminders/reminderService';
+import { scheduleSnoozeAt, dismissReminderNotification } from '@/src/features/reminders/reminderService';
 import { exitReminderScreen } from '@/src/features/reminders/reminderDeepLink';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { formatLocalDateTime } from '@/src/core/dates/dateUtils';
@@ -43,8 +43,16 @@ export default function ReminderScreen() {
   };
 
   const dismiss = async () => {
-    if (alarmId) await cancelAlarm(alarmId);
-    exitReminderScreen();
+    const handled = {
+      medicationId: medicationId ?? '',
+      alarmId: alarmId ?? '',
+      scheduledAt,
+      doseEventId,
+    };
+    if (alarmId) {
+      await dismissReminderNotification(alarmId, medicationId);
+    }
+    await exitReminderScreen(handled);
   };
 
   const completeTaken = (variantId?: string) => {
@@ -85,9 +93,15 @@ export default function ReminderScreen() {
       doseRepo.snooze(dose.id, snoozedUntil, originalSlot);
       deletePendingAtSlot(doseRepo, dose.scheduleId, originalSlot);
       cleanupSnoozeConflicts(dbState.db);
-      await scheduleSnoozeAt(med.id, med.nickname ?? med.name, snoozedUntil, dose.id);
+      await scheduleSnoozeAt(
+        med.id,
+        med.nickname ?? med.name,
+        snoozedUntil,
+        dose.id,
+        dbState.db,
+      );
     } else {
-      await scheduleSnoozeAt(med.id, med.nickname ?? med.name, snoozedUntil);
+      await scheduleSnoozeAt(med.id, med.nickname ?? med.name, snoozedUntil, undefined, dbState.db);
     }
 
     setSnoozeDialog(false);

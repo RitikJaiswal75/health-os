@@ -11,6 +11,7 @@ const {
 const RECEIVER_CLASS = 'com.healthos.alarm.MedicationAlarmReceiver';
 const PACKAGE_IMPORT = 'import com.healthos.alarm.MedicationAlarmPackage';
 const PACKAGE_ADD = 'add(MedicationAlarmPackage())';
+const PACKAGE_REGISTERED = PACKAGE_ADD;
 
 function copyAlarmSources(projectRoot) {
   const src = path.join(projectRoot, 'modules/medication-alarm/android/src/main/java/com/healthos/alarm');
@@ -47,17 +48,14 @@ function withMedicationAlarmPackage(config) {
         contents = `${PACKAGE_IMPORT}\n${contents}`;
       }
     }
-    if (!contents.includes('MedicationAlarmPackage')) {
+    if (!contents.includes(PACKAGE_REGISTERED)) {
       if (contents.includes('PackageList(this).packages.apply')) {
         contents = contents.replace(
           /PackageList\(this\)\.packages\.apply\s*\{/,
           `PackageList(this).packages.apply {\n          ${PACKAGE_ADD}`,
         );
       } else if (contents.includes('return packages')) {
-        contents = contents.replace(
-          /return packages/,
-          `${PACKAGE_ADD}\n          return packages`,
-        );
+        contents = contents.replace(/return packages/, `${PACKAGE_ADD}\n          return packages`);
       }
     }
     config.modResults.contents = contents;
@@ -120,7 +118,7 @@ function withMedicationAlarmManifest(config) {
         },
         'intent-filter': [
           { action: [{ $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } }] },
-          { action: [{ $: { 'android:name': 'com.healthos.app.ALARM_FIRE' } }] },
+          { action: [{ $: { 'android:name': 'com.health.os.ALARM_FIRE' } }] },
         ],
       });
     }
@@ -142,6 +140,20 @@ function withMedicationAlarmManifest(config) {
       });
     }
 
+    if (!application.service) application.service = [];
+    const hasAlarmService = application.service.some(
+      (s) => s.$?.['android:name'] === 'com.healthos.alarm.AlarmFireService',
+    );
+    if (!hasAlarmService) {
+      application.service.push({
+        $: {
+          'android:name': 'com.healthos.alarm.AlarmFireService',
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'mediaPlayback',
+        },
+      });
+    }
+
     if (!manifest['uses-permission']) manifest['uses-permission'] = [];
     const perms = [
       'android.permission.SCHEDULE_EXACT_ALARM',
@@ -151,6 +163,8 @@ function withMedicationAlarmManifest(config) {
       'android.permission.WAKE_LOCK',
       'android.permission.VIBRATE',
       'android.permission.POST_NOTIFICATIONS',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
     ];
     for (const perm of perms) {
       if (!manifest['uses-permission'].some((p) => p.$?.['android:name'] === perm)) {
@@ -170,4 +184,4 @@ function withMedicationAlarm(config) {
   return config;
 }
 
-module.exports = createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.4.0');
+module.exports = createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.5.0');

@@ -46,3 +46,7 @@ yarn-error.*
 # user data (never commit)
 *.db
 !assets/catalog/india.db
+
+docs/PLAN.md
+*.keystore
+*.jks

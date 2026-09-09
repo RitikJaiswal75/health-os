@@ -102,17 +102,6 @@ export default function ConfigureScreen() {
         <>
           <Button
             mode="outlined"
-            onPress={() => setStrengthDialog(true)}
-            style={styles.field}
-            accessibilityLabel="Set protein per scoop"
-          >
-            Protein:{' '}
-            {draft.strengthValue
-              ? `${draft.strengthValue} ${draft.strengthUnit ?? 'g'}`
-              : 'Set protein per scoop (optional)'}
-          </Button>
-          <Button
-            mode="outlined"
             onPress={() => setDoseUnitDialog(true)}
             style={styles.field}
             accessibilityLabel="Set scoop size"
@@ -120,7 +109,18 @@ export default function ConfigureScreen() {
             Scoop size:{' '}
             {draft.doseUnitValue
               ? `${draft.doseUnitValue} ${draft.doseUnitUnit ?? 'g'}`
-              : 'Set grams per scoop (optional)'}
+              : 'Set scoop / serving size (optional)'}
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={() => setStrengthDialog(true)}
+            style={styles.field}
+            accessibilityLabel="Set strength"
+          >
+            Strength:{' '}
+            {draft.strengthValue
+              ? `${draft.strengthValue} ${draft.strengthUnit ?? 'g'}`
+              : 'Set active ingredient per scoop (optional)'}
           </Button>
         </>
       ) : (
@@ -156,8 +156,8 @@ export default function ConfigureScreen() {
 
       <StrengthDialog
         visible={strengthDialog}
-        title={isPowder ? 'Protein per scoop' : 'Set strength'}
-        label={isPowder ? 'Protein amount' : 'Amount'}
+        title={isPowder ? 'Strength per scoop' : 'Set strength'}
+        label={isPowder ? 'Active ingredient amount' : 'Amount'}
         initialValue={draft.strengthValue}
         initialUnit={draft.strengthUnit ?? (isPowder ? 'g' : 'mg')}
         onDismiss={() => setStrengthDialog(false)}
@@ -166,8 +166,8 @@ export default function ConfigureScreen() {
 
       <StrengthDialog
         visible={doseUnitDialog}
-        title="Powder per scoop"
-        label="Scoop size"
+        title="Scoop / serving size"
+        label="Powder amount per scoop"
         initialValue={draft.doseUnitValue}
         initialUnit={draft.doseUnitUnit ?? 'g'}
         onDismiss={() => setDoseUnitDialog(false)}

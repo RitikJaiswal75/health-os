@@ -10,8 +10,16 @@ object AlarmSoundController {
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
-    fun start(context: Context) {
-        stop()
+    fun ensurePlaying(context: Context) {
+        if (mediaPlayer?.isPlaying == true) {
+            acquireWakeLock(context.applicationContext)
+            return
+        }
+        start(context)
+    }
+
+    private fun start(context: Context) {
+        stopPlaybackOnly()
         val appContext = context.applicationContext
         acquireWakeLock(appContext)
 
@@ -34,6 +42,14 @@ object AlarmSoundController {
     }
 
     fun stop() {
+        stopPlaybackOnly()
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
+        wakeLock = null
+    }
+
+    private fun stopPlaybackOnly() {
         mediaPlayer?.run {
             try {
                 if (isPlaying) stop()
@@ -47,14 +63,10 @@ object AlarmSoundController {
             }
         }
         mediaPlayer = null
-
-        wakeLock?.let {
-            if (it.isHeld) it.release()
-        }
-        wakeLock = null
     }
 
     private fun acquireWakeLock(context: Context) {
+        if (wakeLock?.isHeld == true) return
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,

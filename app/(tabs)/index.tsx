@@ -120,10 +120,13 @@ export default function HomeScreen() {
     deletePendingAtSlot(doseRepo, snoozeDose.scheduleId, originalSlot);
     cleanupSnoozeConflicts(dbState.db);
 
-    await scheduleSnoozeAt(med.id, med.nickname ?? med.name, snoozedUntil, snoozeDose.id);
-
-    const reconciler = new ReminderReconciler(dbState.db);
-    await scheduleAlarms(reconciler.reconcile(7));
+    await scheduleSnoozeAt(
+      med.id,
+      med.nickname ?? med.name,
+      snoozedUntil,
+      snoozeDose.id,
+      dbState.db,
+    );
     setSnoozeDose(null);
     refresh();
   };

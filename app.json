@@ -4,25 +4,31 @@
     "slug": "health-os",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/images/Logo-adaptive.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.healthos.app",
+      "bundleIdentifier": "com.health.os",
       "infoPlist": {
-        "UIBackgroundModes": ["fetch"],
+        "UIBackgroundModes": [
+          "fetch"
+        ],
         "NSCameraUsageDescription": "Health OS uses the camera to photograph your pill for easy identification.",
         "NSPhotoLibraryUsageDescription": "Health OS uses your photo library to pick a pill image."
       }
     },
     "android": {
-      "package": "com.healthos.app",
+      "package": "com.health.os",
       "adaptiveIcon": {
-        "backgroundColor": "#121212",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/images/Logo-adaptive.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
@@ -45,16 +51,17 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "expo-dev-client",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/Logo-adaptive.png",
+          "imageWidth": 140,
           "resizeMode": "contain",
-          "backgroundColor": "#121212"
+          "backgroundColor": "#000000"
         }
       ],
+      "expo-router",
+      "expo-dev-client",
       [
         "expo-image-picker",
         {
@@ -71,16 +78,17 @@
         }
       ],
       "./modules/medication-alarm/app.plugin.js",
-      "./plugins/withRnCompatibilityShim.js",
       "./plugins/withDevClientMainApplication.js",
+      "./plugins/withReleaseApkOptimization.js",
       "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "health-os-local"
+        "projectId": "ea5dc786-653a-4c63-9010-89a818f92267"
       }
     }
   }

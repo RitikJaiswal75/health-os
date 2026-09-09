@@ -166,7 +166,7 @@ export const SNOOZE_OPTIONS = [
 export interface DoseLabelOptions {
   strengthValue?: number;
   strengthUnit?: StrengthUnit | string;
-  /** Grams/ml per scoop or serving — reference only (configure screen), not multiplied into dose. */
+  /** Grams per scoop / consumption size — default dose amount for powder, not multiplied. */
   doseUnitValue?: number;
   doseUnitUnit?: StrengthUnit | string;
 }
@@ -176,12 +176,47 @@ export function usesDirectMeasuredDose(medicationType?: MedicationType | string)
   return medicationType === 'powder' || medicationType === 'liquid';
 }
 
+/** Inventory counts servings for powder/syrup; other forms use dose count. */
+export function inventoryDeductAmount(
+  doseAmount: number | undefined | null,
+  medicationType?: MedicationType | string,
+): number {
+  if (usesDirectMeasuredDose(medicationType)) {
+    return 1;
+  }
+  const parsed = typeof doseAmount === 'number' && Number.isFinite(doseAmount) ? doseAmount : 1;
+  return Math.max(1, Math.ceil(parsed));
+}
+
+/** Review / inventory prompt for how many units are left in stock. */
+export function getInventoryQuantityPrompt(medicationType?: MedicationType | string): string {
+  switch (medicationType) {
+    case 'powder':
+      return 'Number of remaining scoops';
+    case 'liquid':
+      return 'Number of remaining doses';
+    case 'inhaler':
+      return 'Number of remaining uses';
+    case 'drops':
+      return 'Number of remaining doses';
+    case 'gummy':
+      return 'Number of remaining gummies';
+    case 'tablet':
+      return 'Number of remaining tablets';
+    case 'capsule':
+    case 'softgel_capsule':
+      return 'Number of remaining capsules';
+    default:
+      return 'Number of remaining doses';
+  }
+}
+
 export function getDefaultDoseAmount(
   medicationType?: MedicationType | string,
   options?: DoseLabelOptions,
 ): number {
   if (medicationType === 'powder') {
-    return options?.doseUnitValue ?? options?.strengthValue ?? 1;
+    return options?.doseUnitValue ?? 1;
   }
   if (medicationType === 'liquid') {
     return options?.strengthValue ?? 1;
@@ -200,16 +235,16 @@ export function formatStrengthSubtitle(
   const parts: string[] = [];
   if (typeLabel) parts.push(typeLabel);
 
-  if (strengthValue != null && strengthUnit) {
-    const strengthPart =
-      medicationType === 'powder' && doseUnitValue != null
-        ? `${strengthValue} ${strengthUnit} protein`
-        : `${strengthValue} ${strengthUnit}`;
-    parts.push(strengthPart);
-  }
-
   if (medicationType === 'powder' && doseUnitValue != null && doseUnitUnit) {
     parts.push(`${doseUnitValue} ${doseUnitUnit} per scoop`);
+  }
+
+  if (strengthValue != null && strengthUnit) {
+    const strengthPart =
+      medicationType === 'powder'
+        ? `${strengthValue} ${strengthUnit} strength`
+        : `${strengthValue} ${strengthUnit}`;
+    parts.push(strengthPart);
   }
 
   if (parts.length > 0) return parts.join(', ');

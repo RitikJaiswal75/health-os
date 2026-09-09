@@ -22,6 +22,23 @@ npm run ingest-cdci   # build bundled India catalog
 npx expo start
 ```
 
+### Shareable Android APK
+
+The default release build targets **arm64 phones only** (~41 MB), without the dev client:
+
+```bash
+npm run android:apk
+# → dist/health-os-release.apk
+```
+
+After a shareable build, restore the dev-client native project before `npm run android`:
+
+```bash
+npm run prebuild:android
+```
+
+A universal APK (all CPU ABIs, ~118 MB) is available as `npm run android:apk:universal` if you need emulator x86 support.
+
 ## Platform notes
 
 - **Android:** FSI-first alarm auto-open via native `AlarmManager.setAlarmClock`. Notification fallback only when FSI cannot be granted.
