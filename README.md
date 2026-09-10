@@ -164,7 +164,19 @@ npm run android:bundle                                   # local EAS build → r
 npm run android:apk:local   # local EAS build → releases/health-os-release.apk
 ```
 
-See [`eas.json`](eas.json) for build profiles.
+### CI release (GitHub Actions)
+
+Pushes to `main` that touch app code trigger [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml):
+
+1. Run `npm run android:apk` (arm64 shareable sideload APK)
+2. Commit `releases/health-os-release.apk` to `main`
+3. Publish a **GitHub Release** tagged `v{version}` with the APK attached
+
+Bump `version` in `app.json` (and `package.json` / this README) before pushing when you want a new tagged download.
+
+No Play Store signing or secrets required — this is for direct GitHub downloads only.
+
+See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 
 ---
 
