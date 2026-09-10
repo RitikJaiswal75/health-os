@@ -6,6 +6,7 @@ export interface AlarmOccurrence {
   medicationName: string;
   scheduledAt: string;
   doseAmount: number;
+  doseEventId?: string;
 }
 
 export interface NativePermissionState {

@@ -20,6 +20,7 @@
     "android:apk": "npm run prebuild:shareable && cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a && mkdir -p ../dist && cp app/build/outputs/apk/release/app-release.apk ../dist/health-os-release.apk && ls -lh ../dist/health-os-release.apk",
     "android:apk:universal": "cd android && ./gradlew assembleRelease && mkdir -p ../dist && cp app/build/outputs/apk/release/app-release.apk ../dist/health-os-universal.apk && ls -lh ../dist/health-os-universal.apk",
     "android:bundle": "eas build --platform android --profile production --local",
+    "android:apk:local": "eas build --platform android --profile production-apk --local",
     "prebuild": "expo prebuild --platform android --clean",
     "postinstall": "node scripts/patch-rn-compat.js",
     "verify-android-manifest": "node scripts/verify-android-manifest.js",

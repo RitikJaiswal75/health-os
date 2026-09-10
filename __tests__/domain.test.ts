@@ -151,9 +151,38 @@ describe('occurrenceExpander', () => {
   });
 });
 
+describe('alarmGrouping', () => {
+  it('groups multiple medications at the same minute into one slot alarm', () => {
+    const { groupToSlotAlarms, slotAlarmId } = require('../src/features/reminders/alarmGrouping');
+    const at = '2026-09-08T15:00:00';
+
+    const slots = groupToSlotAlarms([
+      {
+        id: 'sched-1:2026-09-08-15-00',
+        medicationId: 'med-1',
+        medicationName: 'A',
+        scheduledAt: at,
+        doseAmount: 1,
+      },
+      {
+        id: 'sched-2:2026-09-08-15-00',
+        medicationId: 'med-2',
+        medicationName: 'B',
+        scheduledAt: at,
+        doseAmount: 1,
+      },
+    ]);
+
+    expect(slots).toHaveLength(1);
+    expect(slots[0].id).toBe(slotAlarmId(at));
+    expect(slots[0].scheduledAt).toBe(at);
+    expect(slots[0].medicationId).toBe('med-1');
+  });
+});
+
 describe('reminderService', () => {
   it('dedupes alarms for the same medication minute slot', () => {
-    const { dedupeAlarms } = require('../src/features/reminders/alarmDedupe');
+    const { dedupeAlarms } = require('../src/features/reminders/alarmGrouping');
     const deduped = dedupeAlarms([
       {
         id: 'dose:1',
@@ -182,14 +211,34 @@ jest.mock('expo-router', () => ({
   router: { replace: jest.fn() },
 }));
 
+jest.mock('expo-linking', () => ({
+  parse: (url: string) => {
+    const query = url.split('?')[1] ?? '';
+    const queryParams: Record<string, string> = {};
+    for (const part of query.split('&')) {
+      const [key, value] = part.split('=');
+      if (key) queryParams[key] = decodeURIComponent(value ?? '');
+    }
+    return { queryParams };
+  },
+}));
+
 describe('reminderQueue', () => {
-  it('queues a second reminder while one is active', async () => {
-    const { resetReminderQueueForTests, pushReminder, completeCurrentReminder } =
+  beforeEach(() => {
+    const { resetReminderQueueForTests, setReminderRouterReady } =
       require('../src/features/reminders/reminderQueue');
+    const { resetReminderRouterReadyForTests } =
+      require('../src/features/reminders/reminderRouterReady');
+    resetReminderQueueForTests();
+    resetReminderRouterReadyForTests();
+    setReminderRouterReady(true);
+  });
+
+  it('queues a second reminder while one is active', async () => {
+    const { pushReminder, completeCurrentReminder } = require('../src/features/reminders/reminderQueue');
     const { resetReminderNavigationForTests } =
       require('../src/features/reminders/reminderNavigationDedupe');
 
-    resetReminderQueueForTests();
     resetReminderNavigationForTests();
 
     const first = {
@@ -209,12 +258,10 @@ describe('reminderQueue', () => {
   });
 
   it('does not re-show a reminder that was already handled', () => {
-    const { resetReminderQueueForTests, pushReminder, markReminderHandled } =
-      require('../src/features/reminders/reminderQueue');
+    const { pushReminder, markReminderHandled } = require('../src/features/reminders/reminderQueue');
     const { resetReminderNavigationForTests } =
       require('../src/features/reminders/reminderNavigationDedupe');
 
-    resetReminderQueueForTests();
     resetReminderNavigationForTests();
 
     const whey = {

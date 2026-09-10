@@ -14,6 +14,7 @@ import { healthOsNavigationTheme } from '@/src/core/theme/navigationTheme';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { DbBootstrapGate } from '@/src/db/DbBootstrapGate';
 import { ReminderNotificationBootstrap } from '@/src/features/reminders/ReminderNotificationBootstrap';
+import { ReminderRouterReadyGate } from '@/src/features/reminders/ReminderRouterReadyGate';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -36,7 +37,6 @@ export default function RootLayout() {
         <ThemeProvider value={healthOsNavigationTheme}>
           <PaperProvider theme={healthOsTheme}>
             <DbBootstrapGate>
-              <ReminderNotificationBootstrap />
               <Stack
                 screenOptions={{
                   headerShown: false,
@@ -49,6 +49,8 @@ export default function RootLayout() {
               <Stack.Screen name="about" options={{ presentation: 'modal', headerShown: true, title: 'About' }} />
               <Stack.Screen name="reliability" options={{ presentation: 'modal', headerShown: true, title: 'Reminder permissions' }} />
               </Stack>
+              <ReminderRouterReadyGate />
+              <ReminderNotificationBootstrap />
             </DbBootstrapGate>
           </PaperProvider>
         </ThemeProvider>

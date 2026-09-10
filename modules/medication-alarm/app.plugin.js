@@ -184,4 +184,4 @@ function withMedicationAlarm(config) {
   return config;
 }
 
-module.exports = createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.5.0');
+module.exports = createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.7.0');

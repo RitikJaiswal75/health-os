@@ -6,14 +6,20 @@ export type { ReminderRouteParams } from './reminderRouteParams';
 
 function paramsFromQuery(queryParams: Linking.QueryParams | null): ReminderRouteParams | null {
   if (!queryParams) return null;
-  const medicationId = queryParams.medicationId;
   const alarmId = queryParams.alarmId;
-  if (typeof medicationId !== 'string' || typeof alarmId !== 'string') return null;
+  if (typeof alarmId !== 'string' || !alarmId) return null;
+
+  const scheduledAt =
+    typeof queryParams.scheduledAt === 'string' ? queryParams.scheduledAt : undefined;
+  const medicationId =
+    typeof queryParams.medicationId === 'string' ? queryParams.medicationId : undefined;
+
+  if (!medicationId && !scheduledAt) return null;
 
   return {
-    medicationId,
+    ...(medicationId ? { medicationId } : {}),
     alarmId,
-    scheduledAt: typeof queryParams.scheduledAt === 'string' ? queryParams.scheduledAt : undefined,
+    scheduledAt,
     doseEventId: typeof queryParams.doseEventId === 'string' ? queryParams.doseEventId : undefined,
   };
 }

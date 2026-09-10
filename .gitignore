@@ -56,3 +56,4 @@ docs/PLAN.md
 *.jks
 *credentials.md
 *.aab
+!releases/*.aab

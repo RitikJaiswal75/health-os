@@ -3,18 +3,11 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { parseScheduledAt, formatLocalDateTime } from '../../core/dates/dateUtils';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from './notificationSetup';
-import { dedupeAlarms } from './alarmDedupe';
+import { dedupeAlarms, groupToSlotAlarms, type AlarmScheduleInput } from './alarmGrouping';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { DoseEventRepository, MedicationRepository } from '../medications/medicationRepository';
 
-export interface AlarmScheduleInput {
-  id: string;
-  medicationId: string;
-  medicationName: string;
-  scheduledAt: string;
-  doseAmount: number;
-  doseEventId?: string;
-}
+export type { AlarmScheduleInput } from './alarmGrouping';
 
 export class ReminderReconciler {
   constructor(private readonly db: SQLiteDatabase) {}
@@ -94,27 +87,29 @@ async function scheduleExpoNotifications(occurrences: AlarmScheduleInput[]): Pro
 async function scheduleNativeAlarms(occurrences: AlarmScheduleInput[]): Promise<void> {
   if (Platform.OS !== 'android') return;
 
+  const slotAlarms = groupToSlotAlarms(occurrences);
+
   try {
     const MedicationAlarm = require('../../../modules/medication-alarm');
     if (MedicationAlarm?.scheduleAlarms) {
-      await MedicationAlarm.scheduleAlarms(occurrences);
+      await MedicationAlarm.scheduleAlarms(slotAlarms);
     }
-  } catch {
-    // Native module optional in some dev builds.
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[scheduleNativeAlarms]', error);
+    }
   }
 }
 
 export async function scheduleAlarms(occurrences: AlarmScheduleInput[]): Promise<void> {
-  const unique = dedupeAlarms(occurrences);
-  if (unique.length === 0) return;
-
   if (Platform.OS === 'android') {
     await Notifications.cancelAllScheduledNotificationsAsync();
-    await scheduleNativeAlarms(unique);
+    await scheduleNativeAlarms(occurrences);
     return;
   }
 
-  await scheduleExpoNotifications(unique);
+  if (occurrences.length === 0) return;
+  await scheduleExpoNotifications(dedupeAlarms(occurrences));
 }
 
 export async function cancelAlarm(alarmId: string): Promise<void> {

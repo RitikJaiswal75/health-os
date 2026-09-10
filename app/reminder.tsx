@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useLocalSearchParams } from 'expo-router';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
@@ -7,6 +7,7 @@ import { MedicationRepository, DoseEventRepository } from '@/src/features/medica
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
 import { scheduleSnoozeAt, dismissReminderNotification } from '@/src/features/reminders/reminderService';
 import { exitReminderScreen } from '@/src/features/reminders/reminderDeepLink';
+import { ReminderMedicationRow } from '@/src/features/reminders/ReminderMedicationRow';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { formatLocalDateTime } from '@/src/core/dates/dateUtils';
 import { parseSnoozedFromNotes } from '@/src/features/medications/doseSlotUtils';
@@ -15,14 +16,17 @@ import {
   deletePendingAtSlot,
 } from '@/src/features/medications/snoozeCleanupService';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
-import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillShapeIcon';
-import { formatTakeDoseInstruction, supportsDualColor, type PillShape } from '@/src/core/types/domain';
-import type { Medication } from '@/src/db/schema';
+import type { DoseEvent, Medication } from '@/src/db/schema';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+
+type ReminderItem = {
+  medication: Medication;
+  dose: DoseEvent;
+};
 
 export default function ReminderScreen() {
   const { medicationId, alarmId, doseEventId, scheduledAt } = useLocalSearchParams<{
-    medicationId: string;
+    medicationId?: string;
     alarmId: string;
     doseEventId?: string;
     scheduledAt?: string;
@@ -31,20 +35,39 @@ export default function ReminderScreen() {
   const [snoozeDialog, setSnoozeDialog] = useState(false);
 
   const medRepo = dbState.status === 'ready' ? new MedicationRepository(dbState.db) : null;
-  const med = medicationId && medRepo ? medRepo.getById(medicationId) : null;
-  const variants = medicationId && medRepo ? medRepo.getVariants(medicationId) : [];
-  const totalStock = variants.reduce((sum, v) => sum + v.currentQuantity, 0);
 
-  const resolveDose = (): ReturnType<DoseEventRepository['getById']> => {
-    if (dbState.status !== 'ready' || !medicationId) return null;
+  const items = useMemo((): ReminderItem[] => {
+    if (dbState.status !== 'ready' || !medRepo) return [];
+
     const doseRepo = new DoseEventRepository(dbState.db);
-    if (doseEventId) return doseRepo.getById(doseEventId);
-    return doseRepo.findPendingForMedication(medicationId, scheduledAt ?? new Date().toISOString());
-  };
+    const slotAt = scheduledAt ?? new Date().toISOString();
+
+    if (scheduledAt) {
+      const doses = doseRepo.findPendingDosesAtMinute(scheduledAt);
+      const loaded: ReminderItem[] = [];
+      for (const dose of doses) {
+        const medication = medRepo.getById(dose.medicationId);
+        if (medication) loaded.push({ medication, dose });
+      }
+      if (loaded.length > 0) return loaded;
+    }
+
+    if (medicationId) {
+      const medication = medRepo.getById(medicationId);
+      if (!medication) return [];
+      let dose = doseEventId ? doseRepo.getById(doseEventId) : null;
+      if (!dose) {
+        dose = doseRepo.findPendingForMedication(medicationId, slotAt);
+      }
+      if (dose) return [{ medication, dose }];
+    }
+
+    return [];
+  }, [dbState.status, dbState.status === 'ready' ? dbState.db : null, medRepo, medicationId, doseEventId, scheduledAt]);
 
   const dismiss = async () => {
     const handled = {
-      medicationId: medicationId ?? '',
+      ...(medicationId ? { medicationId } : {}),
       alarmId: alarmId ?? '',
       scheduledAt,
       doseEventId,
@@ -55,60 +78,87 @@ export default function ReminderScreen() {
     await exitReminderScreen(handled);
   };
 
-  const completeTaken = (variantId?: string) => {
-    if (dbState.status !== 'ready' || !medicationId || !medRepo) return;
+  const completeTaken = (item: ReminderItem, variantId?: string) => {
+    if (dbState.status !== 'ready' || !medRepo) return;
     const doseRepo = new DoseEventRepository(dbState.db);
-    let dose = resolveDose();
+    let dose = item.dose;
     if (!dose) {
       dose = doseRepo.createPending({
-        medicationId,
+        medicationId: item.medication.id,
         scheduledAt: scheduledAt ?? new Date().toISOString(),
       });
     }
     markDoseAsTaken(dbState.db, dose.id, variantId);
+
+    if (scheduledAt) {
+      const remaining = doseRepo.findPendingDosesAtMinute(scheduledAt);
+      if (remaining.length === 0) void dismiss();
+      return;
+    }
+
     void dismiss();
   };
 
-  const { requestTaken, sheet: variantSheet } = useVariantTakenFlow(
+  const { requestTaken, sheet: variantSheet } = useVariantTakenFlow<ReminderItem>(
     (id) => medRepo?.getVariants(id) ?? [],
-    (variantId) => completeTaken(variantId || undefined),
+    (variantId, context) => {
+      if (context) completeTaken(context, variantId || undefined);
+    },
   );
 
-  const handleSkip = () => {
-    if (dbState.status !== 'ready' || !medicationId) return;
-    const doseRepo = new DoseEventRepository(dbState.db);
-    const dose = resolveDose();
-    if (dose) doseRepo.updateStatus(dose.id, 'skipped');
+  const handleTakeAll = () => {
+    const multiVariant = items.find(
+      (item) => (medRepo?.getVariants(item.medication.id) ?? []).length > 1,
+    );
+    if (multiVariant) {
+      requestTaken(multiVariant.medication.id, multiVariant);
+      return;
+    }
+
+    if (dbState.status !== 'ready') return;
+    for (const item of items) {
+      const variants = medRepo?.getVariants(item.medication.id) ?? [];
+      markDoseAsTaken(dbState.db, item.dose.id, variants[0]?.id);
+    }
     void dismiss();
   };
 
-  const handleSnooze = async (snoozeUntil: Date) => {
-    if (!med || dbState.status !== 'ready') return;
+  const handleSkipAll = () => {
+    if (dbState.status !== 'ready') return;
     const doseRepo = new DoseEventRepository(dbState.db);
-    const dose = resolveDose();
+    for (const item of items) {
+      doseRepo.updateStatus(item.dose.id, 'skipped');
+    }
+    void dismiss();
+  };
+
+  const handleSnoozeAll = async (snoozeUntil: Date) => {
+    if (dbState.status !== 'ready' || !medRepo) return;
+    const doseRepo = new DoseEventRepository(dbState.db);
     const snoozedUntil = formatLocalDateTime(snoozeUntil);
 
-    if (dose) {
+    for (const item of items) {
+      const dose = item.dose;
       const originalSlot = parseSnoozedFromNotes(dose.notes) ?? dose.scheduledAt;
       doseRepo.snooze(dose.id, snoozedUntil, originalSlot);
       deletePendingAtSlot(doseRepo, dose.scheduleId, originalSlot);
-      cleanupSnoozeConflicts(dbState.db);
-      await scheduleSnoozeAt(
-        med.id,
-        med.nickname ?? med.name,
-        snoozedUntil,
-        dose.id,
-        dbState.db,
-      );
-    } else {
-      await scheduleSnoozeAt(med.id, med.nickname ?? med.name, snoozedUntil, undefined, dbState.db);
     }
 
+    cleanupSnoozeConflicts(dbState.db);
+    if (items[0]) {
+      await scheduleSnoozeAt(
+        items[0].medication.id,
+        items[0].medication.nickname ?? items[0].medication.name,
+        snoozedUntil,
+        items[0].dose.id,
+        dbState.db,
+      );
+    }
     setSnoozeDialog(false);
     void dismiss();
   };
 
-  if (!med) {
+  if (items.length === 0) {
     return (
       <View style={styles.container}>
         <Text>Loading reminder…</Text>
@@ -116,61 +166,44 @@ export default function ReminderScreen() {
     );
   }
 
-  const activeDose = dbState.status === 'ready' ? resolveDose() : null;
-  const doseAmount = activeDose?.doseAmount ?? 1;
-  const takeInstruction = formatTakeDoseInstruction(
-    doseAmount,
-    med.medicationType,
-    med.strengthValue ?? undefined,
-    med.strengthUnit ?? undefined,
-    med.doseUnitValue ?? undefined,
-    med.doseUnitUnit ?? undefined,
-  );
-  const previewColor = med.pillColor ?? SHAPE_PREVIEW_COLOR;
-  const previewShape = (med.pillShape as PillShape | null) ?? 'capsule_divided';
-  const showDualTone = supportsDualColor(previewShape) && med.pillColor2 != null;
+  const isGrouped = items.length > 1;
 
   return (
     <View style={styles.container} accessibilityLabel="Medication reminder">
-      <View style={styles.previewCircle}>
-        {med.photoUri ? (
-          <Image
-            source={{ uri: med.photoUri }}
-            style={styles.previewPhoto}
-            accessibilityIgnoresInvertColors
-            accessibilityLabel={`Photo of ${med.nickname ?? med.name}`}
-          />
-        ) : (
-          <PillShapeIcon
-            shape={previewShape}
-            color={previewColor}
-            color2={showDualTone ? med.pillColor2 ?? undefined : undefined}
-            size={96}
-          />
-        )}
-      </View>
-      <Text variant="headlineMedium" style={styles.medName}>
-        {med.nickname ?? med.name}
-      </Text>
-      <Text variant="titleLarge" style={styles.takeInstruction}>
-        {takeInstruction}
-      </Text>
-      <Text variant="bodyLarge" style={styles.meta}>
-        {totalStock} remaining
+      <Text variant="headlineSmall" style={styles.heading}>
+        {isGrouped ? 'Medications due' : 'Medication due'}
       </Text>
 
+      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+        {items.map((item) => (
+          <ReminderMedicationRow
+            key={item.dose.id}
+            medication={item.medication}
+            doseAmount={item.dose.doseAmount}
+            showTakenButton={!isGrouped}
+            onTaken={() => requestTaken(item.medication.id, item)}
+          />
+        ))}
+      </ScrollView>
+
       <View style={styles.actions}>
-        <Button
-          mode="contained"
-          onPress={() => requestTaken(medicationId!)}
-          accessibilityLabel="Mark taken"
-        >
-          Taken
-        </Button>
+        {isGrouped ? (
+          <Button mode="contained" onPress={handleTakeAll} accessibilityLabel="Take all medications">
+            Take all
+          </Button>
+        ) : (
+          <Button
+            mode="contained"
+            onPress={() => requestTaken(items[0]!.medication.id, items[0])}
+            accessibilityLabel="Mark taken"
+          >
+            Taken
+          </Button>
+        )}
         <Button mode="outlined" onPress={() => setSnoozeDialog(true)} accessibilityLabel="Snooze">
           Snooze
         </Button>
-        <Button mode="text" onPress={handleSkip} accessibilityLabel="Skip dose">
+        <Button mode="text" onPress={handleSkipAll} accessibilityLabel="Skip dose">
           Skip
         </Button>
       </View>
@@ -180,7 +213,7 @@ export default function ReminderScreen() {
       <SnoozeTimeDialog
         visible={snoozeDialog}
         onDismiss={() => setSnoozeDialog(false)}
-        onConfirm={(snoozeUntil) => void handleSnooze(snoozeUntil)}
+        onConfirm={(snoozeUntil) => void handleSnoozeAll(snoozeUntil)}
       />
     </View>
   );
@@ -189,39 +222,20 @@ export default function ReminderScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 24,
     gap: 16,
     backgroundColor: healthOsTheme.colors.background,
   },
-  previewCircle: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    backgroundColor: healthOsTheme.colors.surfaceVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  previewPhoto: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-  },
-  medName: {
+  heading: {
     color: healthOsTheme.colors.onSurface,
     textAlign: 'center',
   },
-  takeInstruction: {
-    color: healthOsTheme.colors.primary,
-    textAlign: 'center',
-    fontWeight: '600',
+  list: {
+    flex: 1,
+    width: '100%',
   },
-  meta: {
-    color: healthOsTheme.colors.onSurfaceVariant,
-    textAlign: 'center',
+  listContent: {
+    paddingBottom: 8,
   },
-  actions: { gap: 12, width: '100%', marginTop: 8 },
+  actions: { gap: 12, width: '100%' },
 });

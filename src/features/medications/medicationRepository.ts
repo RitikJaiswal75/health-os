@@ -505,6 +505,20 @@ export class DoseEventRepository {
     return row ?? null;
   }
 
+  /** All actionable doses at the same clock minute (for grouped reminder screen). */
+  findPendingDosesAtMinute(scheduledAt: string): DoseEvent[] {
+    const doses = this.db
+      .getAllSync(
+        `SELECT * FROM dose_events WHERE status IN ('pending', 'snoozed') ORDER BY scheduled_at ASC`,
+      )
+      .map(mapDoseEventRow)
+      .filter((dose) => slotKeysEqual(dose.scheduledAt, scheduledAt));
+
+    return filterPendingDuplicatingResolved(
+      filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
+    );
+  }
+
   getUpcomingForReminders(fromMillis: number, toMillis: number): DoseEvent[] {
     return this.db
       .getAllSync(

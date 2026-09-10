@@ -6,12 +6,11 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 
-/** Keeps alarm audio alive when the app process is cold-started from AlarmManager. */
+/** Keeps alarm audio alive and opens the reminder screen from a foreground context. */
 class AlarmFireService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -22,6 +21,7 @@ class AlarmFireService : Service() {
                 synchronized(activeAlarmIds) { activeAlarmIds.add(alarmId) }
                 AlarmSoundController.ensurePlaying(applicationContext)
                 startForeground(SERVICE_NOTIFICATION_ID, buildServiceNotification())
+                launchReminderScreen(intent)
             }
             ACTION_STOP -> {
                 val alarmId = intent.getStringExtra(EXTRA_ALARM_ID) ?: return START_NOT_STICKY
@@ -39,6 +39,23 @@ class AlarmFireService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    private fun launchReminderScreen(startIntent: Intent) {
+        val reminderIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            startIntent.getParcelableExtra(EXTRA_REMINDER_INTENT, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            startIntent.getParcelableExtra(EXTRA_REMINDER_INTENT)
+        }
+        if (reminderIntent == null) return
+
+        try {
+            reminderIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(reminderIntent)
+        } catch (_: Exception) {
+            // Notification full-screen intent remains as fallback.
+        }
     }
 
     private fun buildServiceNotification(): Notification {
@@ -69,15 +86,19 @@ class AlarmFireService : Service() {
         private const val ACTION_START = "com.health.os.ALARM_SOUND_START"
         private const val ACTION_STOP = "com.health.os.ALARM_SOUND_STOP"
         private const val EXTRA_ALARM_ID = "alarmId"
+        private const val EXTRA_REMINDER_INTENT = "reminderIntent"
         private const val SERVICE_CHANNEL_ID = "medication-alarm-service"
         private const val SERVICE_NOTIFICATION_ID = 9001
 
         private val activeAlarmIds = mutableSetOf<String>()
 
-        fun startAlarm(context: Context, alarmId: String) {
+        fun startAlarm(context: Context, alarmId: String, reminderIntent: Intent? = null) {
             val intent = Intent(context, AlarmFireService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_ALARM_ID, alarmId)
+                if (reminderIntent != null) {
+                    putExtra(EXTRA_REMINDER_INTENT, reminderIntent)
+                }
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)

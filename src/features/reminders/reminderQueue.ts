@@ -5,11 +5,13 @@ import {
   shouldNavigateToReminder,
 } from './reminderNavigationDedupe';
 import { getNativePendingReminders } from './reminderNativePending';
+import { isReminderRouterReady, setReminderRouterReady as setReadyFlag } from './reminderRouterReady';
 import type { ReminderRouteParams } from './reminderRouteParams';
 
 let activeReminder: ReminderRouteParams | null = null;
 const queuedReminders: ReminderRouteParams[] = [];
 const handledReminderKeys = new Set<string>();
+const deferredShows: ReminderRouteParams[] = [];
 
 function isSameReminder(a: ReminderRouteParams, b: ReminderRouteParams): boolean {
   return reminderNavigationKey(a) === reminderNavigationKey(b);
@@ -17,6 +19,10 @@ function isSameReminder(a: ReminderRouteParams, b: ReminderRouteParams): boolean
 
 function isAlreadyQueued(params: ReminderRouteParams): boolean {
   return queuedReminders.some((item) => isSameReminder(item, params));
+}
+
+function isDeferred(params: ReminderRouteParams): boolean {
+  return deferredShows.some((item) => isSameReminder(item, params));
 }
 
 function handledKeyFor(params: ReminderRouteParams): string {
@@ -39,7 +45,21 @@ function purgeHandledFromQueue(): void {
   }
 }
 
-function showReminder(params: ReminderRouteParams): void {
+function purgeHandledDeferred(): void {
+  for (let i = deferredShows.length - 1; i >= 0; i -= 1) {
+    if (isHandled(deferredShows[i]!)) {
+      deferredShows.splice(i, 1);
+    }
+  }
+}
+
+function deferShowReminder(params: ReminderRouteParams): void {
+  if (!isDeferred(params)) {
+    deferredShows.push(params);
+  }
+}
+
+function showReminderNow(params: ReminderRouteParams): void {
   activeReminder = params;
   router.replace({
     pathname: '/reminder',
@@ -47,7 +67,47 @@ function showReminder(params: ReminderRouteParams): void {
   });
 }
 
+function showReminder(params: ReminderRouteParams): void {
+  if (!isReminderRouterReady()) {
+    activeReminder = params;
+    deferShowReminder(params);
+    return;
+  }
+  showReminderNow(params);
+}
+
+export function setReminderRouterReady(ready: boolean): void {
+  setReadyFlag(ready);
+}
+
+export function flushDeferredReminderNavigation(): void {
+  purgeHandledDeferred();
+
+  if (!isReminderRouterReady() || !activeReminder) {
+    return;
+  }
+
+  const params = activeReminder;
+  if (isHandled(params)) {
+    activeReminder = null;
+    return;
+  }
+  if (!shouldNavigateToReminder(params)) {
+    return;
+  }
+
+  showReminderNow(params);
+  const deferredIndex = deferredShows.findIndex((item) => isSameReminder(item, params));
+  if (deferredIndex >= 0) {
+    deferredShows.splice(deferredIndex, 1);
+  }
+}
+
 async function leaveReminderFlow(): Promise<void> {
+  if (!isReminderRouterReady()) {
+    return;
+  }
+
   router.replace('/(tabs)');
 
   const { BackHandler, InteractionManager, Platform } =
@@ -83,7 +143,7 @@ export function enqueueIfPending(params: ReminderRouteParams): boolean {
   if (activeReminder && isSameReminder(activeReminder, params)) {
     return false;
   }
-  if (isAlreadyQueued(params)) {
+  if (isAlreadyQueued(params) || isDeferred(params)) {
     return false;
   }
 
@@ -118,6 +178,7 @@ export async function completeCurrentReminder(
   }
   activeReminder = null;
   purgeHandledFromQueue();
+  purgeHandledDeferred();
 
   await importNativePendingIntoQueue();
 
@@ -141,9 +202,10 @@ export async function completeCurrentReminder(
 export function resetReminderQueueForTests(): void {
   activeReminder = null;
   queuedReminders.length = 0;
+  deferredShows.length = 0;
   handledReminderKeys.clear();
 }
 
 export function getQueuedReminderCount(): number {
-  return queuedReminders.length + (activeReminder ? 1 : 0);
+  return queuedReminders.length + deferredShows.length + (activeReminder ? 1 : 0);
 }

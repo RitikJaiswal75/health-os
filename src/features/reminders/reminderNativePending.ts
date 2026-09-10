@@ -18,7 +18,7 @@ export async function getNativePendingReminders(): Promise<ReminderRouteParams[]
         scheduledAt: typeof row.scheduledAt === 'string' ? row.scheduledAt : undefined,
         doseEventId: typeof row.doseEventId === 'string' ? row.doseEventId : undefined,
       }))
-      .filter((row) => row.medicationId && row.alarmId);
+      .filter((row) => row.alarmId && (row.medicationId || row.scheduledAt));
   } catch {
     return [];
   }

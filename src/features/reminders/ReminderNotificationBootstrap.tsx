@@ -1,42 +1,60 @@
 import { useEffect } from 'react';
-import { AppState, Linking } from 'react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { ensureNotificationSetup } from './notificationSetup';
-import { openReminderFromData, openReminderFromDeepLink } from './reminderDeepLink';
+import { openReminderFromData } from './reminderDeepLink';
 import { syncPendingNativeReminders } from './pendingReminderSync';
+import { isReminderRouterReady } from './reminderRouterReady';
+
+const ACTIVE_POLL_MS = 1500;
 
 export function ReminderNotificationBootstrap() {
   useEffect(() => {
     void ensureNotificationSetup();
 
-    const openLaunchReminder = async (url: string | null) => {
-      openReminderFromDeepLink(url);
-      await syncPendingNativeReminders();
-    };
-
-    void Linking.getInitialURL().then((url) => openLaunchReminder(url));
-
-    const urlSub = Linking.addEventListener('url', ({ url }) => {
-      void openLaunchReminder(url);
-    });
-
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       openReminderFromData(response.notification.request.content.data);
-      void syncPendingNativeReminders();
-    });
-
-    const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
+      if (isReminderRouterReady()) {
         void syncPendingNativeReminders();
       }
     });
 
-    void syncPendingNativeReminders();
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const startActivePolling = () => {
+      if (pollTimer) return;
+      pollTimer = setInterval(() => {
+        if (!isReminderRouterReady()) return;
+        void syncPendingNativeReminders();
+      }, ACTIVE_POLL_MS);
+    };
+
+    const stopActivePolling = () => {
+      if (!pollTimer) return;
+      clearInterval(pollTimer);
+      pollTimer = null;
+    };
+
+    const handleAppState = (state: AppStateStatus) => {
+      if (state === 'active') {
+        if (isReminderRouterReady()) {
+          void syncPendingNativeReminders();
+        }
+        startActivePolling();
+        return;
+      }
+      stopActivePolling();
+    };
+
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+    if (AppState.currentState === 'active') {
+      startActivePolling();
+    }
 
     return () => {
-      urlSub.remove();
       responseSub.remove();
       appStateSub.remove();
+      stopActivePolling();
     };
   }, []);
 

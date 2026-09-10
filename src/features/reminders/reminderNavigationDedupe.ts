@@ -6,7 +6,7 @@ let lastOpenedKey: string | null = null;
 let lastOpenedAt = 0;
 
 export function reminderNavigationKey(params: ReminderRouteParams): string {
-  return `${params.alarmId}|${params.medicationId}|${params.scheduledAt ?? ''}|${params.doseEventId ?? ''}`;
+  return `${params.alarmId}|${params.medicationId ?? ''}|${params.scheduledAt ?? ''}|${params.doseEventId ?? ''}`;
 }
 
 export function shouldNavigateToReminder(

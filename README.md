@@ -2,7 +2,7 @@
 
 A **local-first** medicine and supplement tracker for Android. Schedule doses, get reliable full-screen reminders, track inventory, and search an India drug catalog — all without an account or cloud sync.
 
-**Package:** `com.health.os` · **Version:** 1.0.0
+**Package:** `com.health.os` · **Version:** 1.0.1
 
 ---
 
@@ -155,7 +155,13 @@ Uses EAS with production signing:
 ```bash
 eas login
 eas build --platform android --profile production        # cloud
-npm run android:bundle                                   # local EAS build
+npm run android:bundle                                   # local EAS build → releases/health-os-release.aab
+```
+
+### Local EAS arm64 APK (shareable, ~41 MB)
+
+```bash
+npm run android:apk:local   # local EAS build → releases/health-os-release.apk
 ```
 
 See [`eas.json`](eas.json) for build profiles.

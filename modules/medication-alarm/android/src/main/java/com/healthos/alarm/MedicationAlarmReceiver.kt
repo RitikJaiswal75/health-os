@@ -8,7 +8,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.health.os.MainActivity
@@ -36,8 +35,6 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                     doseEventId,
                 )
 
-                AlarmFireService.startAlarm(context, alarmId)
-
                 val activityIntent = buildReminderActivityIntent(
                     context,
                     medicationId,
@@ -46,11 +43,7 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                     doseEventId,
                 )
 
-                try {
-                    context.startActivity(activityIntent)
-                } catch (_: Exception) {
-                    // Notification remains as fallback.
-                }
+                AlarmFireService.startAlarm(context, alarmId, activityIntent)
 
                 val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
                 val fullScreenPendingIntent = PendingIntent.getActivity(
@@ -96,18 +89,9 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             scheduledAt: String,
             doseEventId: String? = null,
         ): Intent {
-            val uriBuilder = Uri.parse("healthos://reminder").buildUpon()
-                .appendQueryParameter("medicationId", medicationId)
-                .appendQueryParameter("alarmId", alarmId)
-                .appendQueryParameter("scheduledAt", scheduledAt)
-            if (doseEventId != null) {
-                uriBuilder.appendQueryParameter("doseEventId", doseEventId)
-            }
-            val reminderUri = uriBuilder.build()
-
+            // Do not set intent.data — healthos://reminder makes Expo Router navigate
+            // before the root layout mounts. JS reads PendingReminderStore instead.
             return Intent(context, MainActivity::class.java).apply {
-                action = Intent.ACTION_VIEW
-                data = reminderUri
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
