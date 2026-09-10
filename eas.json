@@ -24,6 +24,9 @@
       }
     },
     "production": {
+      "env": {
+        "SHAREABLE_APK": "1"
+      },
       "android": {
         "buildType": "app-bundle"
       },

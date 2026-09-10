@@ -36,6 +36,10 @@ yarn-error.*
 .env
 .env*.local
 
+# Android signing (never commit)
+credentials.json
+keystore.properties
+
 # typescript
 *.tsbuildinfo
 
@@ -50,3 +54,5 @@ yarn-error.*
 docs/PLAN.md
 *.keystore
 *.jks
+*credentials.md
+*.aab

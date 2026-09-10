@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "Health OS",
-    "slug": "health-os",
+    "owner": "ritikj1",
+    "slug": "health-os-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
@@ -88,7 +89,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ea5dc786-653a-4c63-9010-89a818f92267"
+        "projectId": "7c5d818a-aa53-4103-877e-fd3e546f9c95"
       }
     }
   }

@@ -1,0 +1,14 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+android/
+ios/
+.gradle/
+**/build/
+**/.cxx/
+**/captures/
+node_modules/
+catalog-service/node_modules/
+.expo/
+dist/
+*.db
+*.sqlite
+drizzle/
