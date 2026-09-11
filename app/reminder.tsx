@@ -8,6 +8,7 @@ import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
 import { scheduleSnoozeAt, dismissReminderNotification } from '@/src/features/reminders/reminderService';
 import { exitReminderScreen } from '@/src/features/reminders/reminderDeepLink';
 import { ReminderMedicationRow } from '@/src/features/reminders/ReminderMedicationRow';
+import { ReminderSingleMedicationCard } from '@/src/features/reminders/ReminderSingleMedicationCard';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { formatLocalDateTime } from '@/src/core/dates/dateUtils';
 import { parseSnoozedFromNotes } from '@/src/features/medications/doseSlotUtils';
@@ -174,17 +175,24 @@ export default function ReminderScreen() {
         {isGrouped ? 'Medications due' : 'Medication due'}
       </Text>
 
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-        {items.map((item) => (
-          <ReminderMedicationRow
-            key={item.dose.id}
-            medication={item.medication}
-            doseAmount={item.dose.doseAmount}
-            showTakenButton={!isGrouped}
-            onTaken={() => requestTaken(item.medication.id, item)}
-          />
-        ))}
-      </ScrollView>
+      {isGrouped ? (
+        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+          {items.map((item) => (
+            <ReminderMedicationRow
+              key={item.dose.id}
+              medication={item.medication}
+              doseAmount={item.dose.doseAmount}
+              showTakenButton={false}
+              onTaken={() => requestTaken(item.medication.id, item)}
+            />
+          ))}
+        </ScrollView>
+      ) : (
+        <ReminderSingleMedicationCard
+          medication={items[0]!.medication}
+          doseAmount={items[0]!.dose.doseAmount}
+        />
+      )}
 
       <View style={styles.actions}>
         {isGrouped ? (
@@ -205,6 +213,9 @@ export default function ReminderScreen() {
         </Button>
         <Button mode="text" onPress={handleSkipAll} accessibilityLabel="Skip dose">
           Skip
+        </Button>
+        <Button mode="text" onPress={() => void dismiss()} accessibilityLabel="Dismiss reminder">
+          Dismiss
         </Button>
       </View>
 
