@@ -239,6 +239,14 @@ export function MedicationReviewView() {
         keyboardDismissMode="on-drag"
       >
       <View style={styles.previewCard}>
+        <Pressable
+          style={styles.previewDetailsEditBtn}
+          onPress={() => router.push('/medicine/configure')}
+          accessibilityRole="button"
+          accessibilityLabel="Edit name and strength"
+        >
+          <Text style={styles.editBtnText}>Edit</Text>
+        </Pressable>
         <View style={styles.previewCircleWrap}>
           <View style={styles.previewCircle}>
             {draft.photoUri ? (
@@ -502,6 +510,17 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingBottom: 24,
     paddingHorizontal: 16,
+    position: 'relative',
+  },
+  previewDetailsEditBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: healthOsTheme.colors.surfaceVariant,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    zIndex: 1,
   },
   previewCircleWrap: {
     position: 'relative',

@@ -14,6 +14,7 @@ const TYPE_PATTERNS: ReadonlyArray<{ pattern: RegExp; type: MedicationType }> = 
   { pattern: /\btablet\b|\btablets\b|\btab\b/, type: 'tablet' },
   { pattern: /\bsyrup\b|\bsuspension\b/, type: 'liquid' },
   { pattern: /\bdrops\b|\bdrop\b/, type: 'drops' },
+  { pattern: /\binject(?:able|ion)\b|\bvial\b|\bampoule\b/, type: 'injectable' },
   { pattern: /\binhaler\b/, type: 'inhaler' },
   { pattern: /\bcream\b/, type: 'cream' },
   { pattern: /\bgel\b/, type: 'gel' },

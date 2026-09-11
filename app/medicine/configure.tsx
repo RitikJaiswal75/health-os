@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Button, Dialog, Portal, RadioButton, Text, TextInput } from 'react-native-paper';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { MedicationTypeDialog } from '@/src/core/components/MedicationTypeDialog';
 import {
   getMedicationTypeLabel,
@@ -10,6 +10,7 @@ import {
   type StrengthUnit,
 } from '@/src/core/types/domain';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
+import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 function StrengthDialog({
   visible,
@@ -77,17 +78,44 @@ function StrengthDialog({
 }
 
 export default function ConfigureScreen() {
-  const { draft, setMedicationType, setStrength, setDoseUnit, canProceedConfigure } = useWizardStore();
+  const {
+    draft,
+    setName,
+    setMedicationType,
+    setStrength,
+    setDoseUnit,
+    canProceedConfigure,
+    editingMedicationId,
+  } = useWizardStore();
   const [typeDialog, setTypeDialog] = useState(false);
   const [strengthDialog, setStrengthDialog] = useState(false);
   const [doseUnitDialog, setDoseUnitDialog] = useState(false);
 
   const typeLabel = getMedicationTypeLabel(draft.medicationType);
   const isPowder = draft.medicationType === 'powder';
+  const isEditing = !!editingMedicationId;
+  const canProceed = canProceedConfigure() && draft.name.trim().length > 0;
+
+  const handleNext = () => {
+    if (isEditing && editingMedicationId) {
+      router.push(`/medicine/${editingMedicationId}`);
+      return;
+    }
+    router.push('/medicine/shape');
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Text variant="titleLarge">{draft.name}</Text>
+    <>
+      <Stack.Screen options={{ title: isEditing ? 'Edit details' : 'Set information' }} />
+      <ScrollView contentContainerStyle={styles.content}>
+      <TextInput
+        label="Medication name"
+        value={draft.name}
+        onChangeText={setName}
+        mode="outlined"
+        style={styles.nameInput}
+        accessibilityLabel="Medication name"
+      />
 
       <Button
         mode="outlined"
@@ -137,11 +165,12 @@ export default function ConfigureScreen() {
 
       <Button
         mode="contained"
-        disabled={!canProceedConfigure()}
-        onPress={() => router.push('/medicine/shape')}
+        disabled={!canProceed}
+        onPress={handleNext}
         style={styles.next}
+        accessibilityLabel={isEditing ? 'Done editing details' : 'Next'}
       >
-        Next
+        {isEditing ? 'Done' : 'Next'}
       </Button>
 
       <MedicationTypeDialog
@@ -174,11 +203,15 @@ export default function ConfigureScreen() {
         onSave={setDoseUnit}
       />
     </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 12 },
+  nameInput: {
+    backgroundColor: healthOsTheme.colors.surface,
+  },
   field: { marginTop: 8 },
   next: { marginTop: 24 },
   unitLabel: { marginTop: 16 },

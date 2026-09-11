@@ -10,6 +10,7 @@ export const MEDICATION_TYPES = [
   { value: 'softgel_capsule', label: 'Softgel capsule' },
   { value: 'tablet', label: 'Tablet' },
   { value: 'liquid', label: 'Liquid' },
+  { value: 'injectable', label: 'Injectable' },
   { value: 'topical', label: 'Topical' },
   { value: 'cream', label: 'Cream' },
   { value: 'device', label: 'Device' },
@@ -166,6 +167,8 @@ export function defaultShapeForMedicationType(type?: MedicationType | string): P
       return 'powder';
     case 'inhaler':
       return 'pump';
+    case 'injectable':
+      return 'injection';
     case 'drops':
     case 'liquid':
       return 'dropper';
@@ -190,6 +193,7 @@ export function defaultStrengthUnitForMedicationType(
       return 'g';
     case 'liquid':
     case 'drops':
+    case 'injectable':
       return 'ml';
     default:
       return undefined;
@@ -268,6 +272,8 @@ export function getInventoryQuantityPrompt(medicationType?: MedicationType | str
       return 'Number of remaining uses';
     case 'drops':
       return 'Number of remaining doses';
+    case 'injectable':
+      return 'Number of remaining injections';
     case 'gummy':
       return 'Number of remaining gummies';
     case 'tablet':
@@ -349,6 +355,8 @@ export function formatDoseLabel(
       const unit = strengthUnit ?? 'ml';
       return `${formatDoseQuantity(count)} ${unit}`;
     }
+    case 'injectable':
+      return `${count} ${count === 1 ? 'injection' : 'injections'}`;
     case 'drops':
       if (strengthValue != null && strengthUnit) {
         return formatMeasuredDose(count, strengthValue, strengthUnit, 'ml', 'drop');

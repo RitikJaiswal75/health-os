@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",

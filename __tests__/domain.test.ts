@@ -137,6 +137,11 @@ describe('catalogPrefill', () => {
     expect(inferMedicationTypeFromCatalog('strip of 15 tablets', 'Dolo 650 Tablet')).toBe('tablet');
   });
 
+  it('infers injectable type from injection form labels', () => {
+    expect(inferMedicationTypeFromCatalog('injection', 'Insulin Glargine Injection')).toBe('injectable');
+    expect(inferMedicationTypeFromCatalog('vial', 'B12 Ampoule')).toBe('injectable');
+  });
+
   it('parses strength from Indian catalog composition strings', () => {
     expect(parseStrengthFromCatalog('Paracetamol (650mg)')).toEqual({
       value: 650,
@@ -462,7 +467,7 @@ describe('wizardStore', () => {
 });
 
 describe('formatDoseLabel', () => {
-  const { formatDoseLabel, formatTakeDoseInstruction } = require('../src/core/types/domain');
+  const { formatDoseLabel, formatTakeDoseInstruction, getInventoryQuantityPrompt } = require('../src/core/types/domain');
 
   it('labels solid oral forms by count', () => {
     expect(formatDoseLabel(1, 'tablet')).toBe('1 tablet');
@@ -483,6 +488,13 @@ describe('formatDoseLabel', () => {
   it('labels inhaler doses as pumps', () => {
     expect(formatDoseLabel(1, 'inhaler')).toBe('1 pump');
     expect(formatDoseLabel(2, 'inhaler')).toBe('2 pumps');
+  });
+
+  it('labels injectable doses as injections', () => {
+    expect(formatDoseLabel(1, 'injectable')).toBe('1 injection');
+    expect(formatDoseLabel(2, 'injectable')).toBe('2 injections');
+    expect(formatTakeDoseInstruction(1, 'injectable')).toBe('Take 1 injection');
+    expect(getInventoryQuantityPrompt('injectable')).toBe('Number of remaining injections');
   });
 
   it('labels drops and fallbacks without strength', () => {
