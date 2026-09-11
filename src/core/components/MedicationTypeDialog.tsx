@@ -1,9 +1,9 @@
+import { healthOsTheme, tokens } from '@/src/core/theme/paperTheme';
+import { MEDICATION_TYPES, type MedicationType } from '@/src/core/types/domain';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
-import { MEDICATION_TYPES, type MedicationType } from '@/src/core/types/domain';
-import { healthOsTheme, tokens } from '@/src/core/theme/paperTheme';
 
 interface MedicationTypeDialogProps {
   visible: boolean;
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     marginTop: tokens.spacing.xs,
   },
   listContent: {
-    paddingHorizontal: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.xs,
     paddingVertical: tokens.spacing.md,
     gap: tokens.spacing.sm,
   },

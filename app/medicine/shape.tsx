@@ -12,7 +12,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { v4 as uuidv4 } from 'uuid';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
-import { formatStrengthSubtitle, PILL_SHAPES, supportsDualColor, type PillShape } from '@/src/core/types/domain';
+import {
+  formatStrengthSubtitle,
+  PILL_SHAPE_CATEGORIES,
+  supportsDualColor,
+  type PillShape,
+} from '@/src/core/types/domain';
 import {
   formatShapeLabel,
   PillShapeIcon,
@@ -21,6 +26,7 @@ import {
 } from '@/src/core/components/PillShapeIcon';
 import { copyPhotoToDurableStorage } from '@/src/core/storage/durableStorage';
 import { permissionHelper } from '@/src/core/permissions/permissionHelper';
+import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 const SAMSUNG = {
   bg: '#000000',
@@ -132,36 +138,43 @@ export default function ShapeScreen() {
       </View>
 
       <View style={styles.bottomPanel}>
-        <Text variant="titleMedium" style={styles.panelTitle}>
-          Pill shapes
-        </Text>
-
         <ScrollView
           style={styles.gridScroll}
           contentContainerStyle={styles.gridContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.grid}>
-            {PILL_SHAPES.map((shape) => {
-              const selected = draft.pillShape === shape && !previewUri;
-              return (
-                <Pressable
-                  key={shape}
-                  onPress={() => selectShape(shape)}
-                  style={[
-                    styles.shapeCircle,
-                    { width: tileSize, height: tileSize, borderRadius: tileSize / 2 },
-                    selected && styles.shapeCircleSelected,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Shape ${formatShapeLabel(shape)}`}
-                >
-                  <PillShapeIcon shape={shape} color={SHAPE_GRID_COLOR} size={Math.round(tileSize * 0.52)} />
-                </Pressable>
-              );
-            })}
-          </View>
+          {PILL_SHAPE_CATEGORIES.map((category) => (
+            <View key={category.title} style={styles.categorySection}>
+              <Text variant="titleMedium" style={styles.categoryTitle}>
+                {category.title}
+              </Text>
+              <View style={styles.grid}>
+                {category.shapes.map((shape) => {
+                  const selected = draft.pillShape === shape && !previewUri;
+                  return (
+                    <Pressable
+                      key={shape}
+                      onPress={() => selectShape(shape)}
+                      style={[
+                        styles.shapeCircle,
+                        { width: tileSize, height: tileSize, borderRadius: tileSize / 2 },
+                        selected && styles.shapeCircleSelected,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`Shape ${formatShapeLabel(shape)}`}
+                    >
+                      <PillShapeIcon
+                        shape={shape}
+                        color={SHAPE_GRID_COLOR}
+                        size={Math.round(tileSize * 0.52)}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
         </ScrollView>
 
         <View style={styles.footerActions}>
@@ -248,18 +261,21 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: 20,
   },
-  panelTitle: {
-    color: SAMSUNG.text,
-    fontWeight: '600',
-    paddingHorizontal: GRID_H_PADDING,
-    marginBottom: 12,
-  },
   gridScroll: {
     flex: 1,
   },
   gridContent: {
     paddingHorizontal: GRID_H_PADDING,
+    paddingTop: 4,
     paddingBottom: 96,
+  },
+  categorySection: {
+    marginBottom: 20,
+  },
+  categoryTitle: {
+    color: SAMSUNG.text,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   grid: {
     flexDirection: 'row',
@@ -293,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerBtnPrimary: {
-    backgroundColor: SAMSUNG.text,
+    backgroundColor: healthOsTheme.colors.primary,
   },
   footerBtnText: {
     color: SAMSUNG.text,
@@ -301,7 +317,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footerBtnTextPrimary: {
-    color: SAMSUNG.bg,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 });

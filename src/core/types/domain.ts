@@ -56,39 +56,98 @@ export const STRENGTH_UNITS = [
 
 export type StrengthUnit = (typeof STRENGTH_UNITS)[number];
 
-/** Pill shapes matching Samsung Health picker (4-column grid order). */
-export const PILL_SHAPES = [
-  'capsule_divided',
-  'oval_capsule',
-  'bullet_capsule',
-  'flat_oval',
-  'peanut',
-  'round',
-  'triangle',
-  'rounded_square',
-  'rounded_rectangle',
-  'segmented_bar',
+/** Shape picker groups shown on the choose-shape screen. */
+export const PILL_SHAPE_CATEGORIES = [
+  {
+    title: 'Pill shapes',
+    shapes: [
+      'capsule_divided',
+      'capsule',
+      'oval_capsule',
+      'bullet_capsule',
+      'oblong_tablet',
+      'herbal_capsule',
+      'round',
+      'round_scored',
+      'round_scored_diagonal',
+      'flat_oval',
+      'wide_oval',
+      'rounded_square',
+      'rounded_rectangle',
+      'segmented_bar',
+    ],
+  },
+  {
+    title: 'Other options',
+    shapes: [
+      'powder',
+      'spilled_powder',
+      'vapour',
+      'ointment',
+      'dropper',
+      'injection',
+      'pump',
+      'water_soluble_tablet',
+      'pill_in_glass',
+      'patch',
+      'iu',
+    ],
+  },
+] as const;
+
+export const SELECTABLE_PILL_SHAPES = PILL_SHAPE_CATEGORIES.flatMap((category) => category.shapes);
+
+/** Non-pill form icons — also available in the shape picker. */
+export const FORM_SHAPES = [
+  'powder',
+  'spilled_powder',
+  'vapour',
+  'ointment',
+  'dropper',
+  'injection',
+  'pump',
+  'water_soluble_tablet',
+  'pill_in_glass',
+  'effervescent_tablet',
+  'patch',
+  'iu',
+  'inhaler',
+] as const;
+
+/** Legacy shapes kept for rendering stored medications, not shown in the picker. */
+export const LEGACY_PILL_SHAPES = [
+  'capsule_open',
+  'capsule_split_powder',
+  'capsule_halves',
   'trapezoid',
+  'blister_pack',
+  'blister_strip',
+  'blister_pack_capsule',
+  'blister_strip_capsule',
+  'peanut',
+  'triangle',
   'diamond',
   'pentagon_up',
-  'hexagon',
   'pentagon_down',
+  'hexagon',
   'heptagon',
   'octagon',
-  'apple',
   'semicircle',
+  'apple',
   'clover',
   'heart',
   'bowtie',
-  'inhaler',
-  'vapour',
-  'powder',
 ] as const;
 
-export type PillShape = (typeof PILL_SHAPES)[number];
+export const PILL_SHAPES = [
+  ...SELECTABLE_PILL_SHAPES,
+  ...FORM_SHAPES,
+  ...LEGACY_PILL_SHAPES,
+] as const;
 
-/** Non-pill form icons — single colour only. */
-export const FORM_SHAPES = ['inhaler', 'vapour', 'powder'] as const;
+type SelectablePillShape = (typeof PILL_SHAPE_CATEGORIES)[number]['shapes'][number];
+
+export type PillShape = SelectablePillShape | FormShape | (typeof LEGACY_PILL_SHAPES)[number];
 
 export type FormShape = (typeof FORM_SHAPES)[number];
 
@@ -106,7 +165,17 @@ export function defaultShapeForMedicationType(type?: MedicationType | string): P
     case 'powder':
       return 'powder';
     case 'inhaler':
-      return 'inhaler';
+      return 'pump';
+    case 'drops':
+    case 'liquid':
+      return 'dropper';
+    case 'cream':
+    case 'topical':
+    case 'gel':
+    case 'foam':
+      return 'ointment';
+    case 'device':
+      return 'pump';
     default:
       return 'capsule_divided';
   }
