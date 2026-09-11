@@ -2,7 +2,7 @@
 
 A **local-first** medicine and supplement tracker for Android. Schedule doses, get reliable full-screen reminders, track inventory, and search an India drug catalog — all without an account or cloud sync.
 
-**Package:** `com.health.os` · **Version:** 1.2.0
+**Website:** [healthos.ritik.cc](https://healthos.ritik.cc) · **Package:** `com.health.os` · **Version:** 1.2.0
 
 ---
 
