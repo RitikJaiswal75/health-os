@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { Button, Dialog, List, Portal, Searchbar, Text, ActivityIndicator } from 'react-native-paper';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import {
@@ -12,6 +13,7 @@ import {
   searchRxTerms,
   type CatalogResult,
 } from '@/src/features/catalog/catalogService';
+import { buildCatalogPrefill } from '@/src/features/catalog/catalogPrefill';
 import { searchIndiaCatalogAsync } from '@/src/features/catalog/indiaCatalog';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
@@ -35,8 +37,11 @@ async function loadCachedOrFetch(
   return results;
 }
 
+const KEYBOARD_FOOTER_GAP = 16;
+
 export default function SearchScreen() {
-  const { setName, setCatalogId, reset } = useWizardStore();
+  const { setName, setCatalogId, setMedicationType, setStrength, reset } = useWizardStore();
+  const insets = useSafeAreaInsets();
   const dbState = useDatabaseBootstrap();
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -45,9 +50,24 @@ export default function SearchScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [customDialog, setCustomDialog] = useState(false);
   const [customName, setCustomName] = useState('');
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
   useEffect(() => {
     reset();
   }, [reset]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardInset(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(query), 300);
@@ -100,6 +120,15 @@ export default function SearchScreen() {
   const selectResult = (item: CatalogResult) => {
     setName(item.name);
     setCatalogId(item.id);
+
+    const prefill = buildCatalogPrefill(item);
+    if (prefill?.medicationType) {
+      setMedicationType(prefill.medicationType);
+    }
+    if (prefill?.strengthValue != null && prefill.strengthUnit) {
+      setStrength(prefill.strengthValue, prefill.strengthUnit);
+    }
+
     router.push('/medicine/configure');
   };
 
@@ -110,8 +139,11 @@ export default function SearchScreen() {
     router.push('/medicine/configure');
   };
 
+  const footerPaddingBottom =
+    keyboardInset > 0 ? KEYBOARD_FOOTER_GAP : Math.max(insets.bottom, 16);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, keyboardInset > 0 && { paddingBottom: keyboardInset }]}>
       <Searchbar
         placeholder="Search medicines or supplements"
         value={query}
@@ -131,6 +163,9 @@ export default function SearchScreen() {
         data={results}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <List.Item
             title={item.name}
@@ -141,19 +176,18 @@ export default function SearchScreen() {
             style={styles.resultItem}
           />
         )}
-        ListFooterComponent={
-          <Button
-            mode="outlined"
-            onPress={() => {
-              setCustomName(query.trim());
-              setCustomDialog(true);
-            }}
-            style={styles.custom}
-          >
-            Add custom medication
-          </Button>
-        }
       />
+      <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
+        <Button
+          mode="outlined"
+          onPress={() => {
+            setCustomName(query.trim());
+            setCustomDialog(true);
+          }}
+        >
+          Add custom medication
+        </Button>
+      </View>
       <Portal>
         <Dialog visible={customDialog} onDismiss={() => setCustomDialog(false)}>
           <Dialog.Title>Custom medication</Dialog.Title>
@@ -178,7 +212,20 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    backgroundColor: healthOsTheme.colors.background,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingBottom: 8,
+  },
+  footer: {
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: healthOsTheme.colors.outlineVariant,
     backgroundColor: healthOsTheme.colors.background,
   },
   searchbar: {
@@ -204,5 +251,4 @@ const styles = StyleSheet.create({
   resultDescription: {
     color: healthOsTheme.colors.onSurfaceVariant,
   },
-  custom: { marginTop: 16, marginBottom: 24 },
 });

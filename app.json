@@ -27,6 +27,7 @@
     },
     "android": {
       "package": "com.health.os",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/Logo-adaptive.png",

@@ -2,6 +2,11 @@ import { computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, pa
 import { mergeAndRankResults, CACHE_TTL_HOURS, sanitizeFtsQuery, parseCachedResults } from '../src/features/catalog/catalogService';
 import { mapIndianMedicineRow, parseIndianMedicineJson } from '../src/features/catalog/indiaMedicineParser';
 import { mapIndiaApiResults } from '../src/features/catalog/indiaCatalogApi';
+import {
+  buildCatalogPrefill,
+  inferMedicationTypeFromCatalog,
+  parseStrengthFromCatalog,
+} from '../src/features/catalog/catalogPrefill';
 import { expandOccurrences, computeSnoozeTime, parseTimesOfDay } from '../src/features/reminders/occurrenceExpander';
 import {
   permissionHelper,
@@ -124,6 +129,37 @@ describe('indiaMedicineParser', () => {
     );
 
     expect(drugs).toEqual([{ name: 'Telma 40 Tablet', form: 'allopathy' }]);
+  });
+});
+
+describe('catalogPrefill', () => {
+  it('infers tablet type from pack size label', () => {
+    expect(inferMedicationTypeFromCatalog('strip of 15 tablets', 'Dolo 650 Tablet')).toBe('tablet');
+  });
+
+  it('parses strength from Indian catalog composition strings', () => {
+    expect(parseStrengthFromCatalog('Paracetamol (650mg)')).toEqual({
+      value: 650,
+      unit: 'mg',
+    });
+  });
+
+  it('builds prefill when catalog strength is present', () => {
+    expect(
+      buildCatalogPrefill({
+        name: 'Augmentin 625 Duo Tablet',
+        type: 'strip of 10 tablets',
+        strength: 'Amoxycillin  (500mg) + Clavulanic Acid (125mg)',
+      }),
+    ).toEqual({
+      medicationType: 'tablet',
+      strengthValue: 500,
+      strengthUnit: 'mg',
+    });
+  });
+
+  it('returns null when catalog row has no strength', () => {
+    expect(buildCatalogPrefill({ name: 'Aspirin', type: 'tablet' })).toBeNull();
   });
 });
 
