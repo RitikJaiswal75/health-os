@@ -2,23 +2,23 @@
 
 A **local-first** medicine and supplement tracker for Android. Schedule doses, get reliable full-screen reminders, track inventory, and search an India drug catalog — all without an account or cloud sync.
 
-**Package:** `com.health.os` · **Version:** 1.0.1
+**Package:** `com.health.os` · **Version:** 1.1.0
 
 ---
 
 ## Download (Android)
 
-Install the latest release APK directly — no app store required.
+Install the latest release APK from [GitHub Releases](https://github.com/RitikJaiswal75/health-os/releases) — no app store required.
 
 | | |
 |---|---|
-| **File** | [`releases/health-os-release.apk`](releases/health-os-release.apk) |
+| **File** | `health-os-release.apk` (on the latest release) |
 | **Size** | ~41 MB (arm64 only) |
 | **Requires** | Android 8+ · arm64-v8a phone (most devices from ~2017 onward) |
 
 ### Install steps
 
-1. Download `releases/health-os-release.apk` to your phone.
+1. Open [Releases](https://github.com/RitikJaiswal75/health-os/releases) and download `health-os-release.apk`.
 2. Enable **Install unknown apps** for your browser or file manager (Settings → Apps → Special access).
 3. Open the APK and tap **Install**.
 
@@ -38,7 +38,7 @@ Health OS helps you manage daily medications and supplements in one calm, dark-t
 
 ### Add medication wizard
 
-- Search the bundled **India CDCI catalog** (offline) plus live **RxTerms** and **NIH DSLD** (cached 24 h)
+- Search the **India medicine catalog** (downloaded on first use) plus live **RxTerms** and **NIH DSLD** (cached 24 h)
 - Configure type, strength, pill shape and colour, schedule, nickname, notes, and starting stock
 - Attach a photo from camera or gallery
 
@@ -139,14 +139,10 @@ Excludes the dev client — suitable for sharing with testers:
 
 ```bash
 npm run android:apk
-# output: dist/health-os-release.apk
+# output: dist/health-os-release.apk (gitignored — not committed)
 ```
 
-Copy to `releases/` when publishing a new GitHub download:
-
-```bash
-cp dist/health-os-release.apk releases/health-os-release.apk
-```
+APK and AAB files are never pushed to the repo. Pushes to `main` that touch app code trigger [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml), which builds the APK and publishes it to **GitHub Releases** only.
 
 ### Play Store bundle (AAB)
 
@@ -154,25 +150,22 @@ Uses EAS with production signing:
 
 ```bash
 eas login
-eas build --platform android --profile production        # cloud
-npm run android:bundle                                   # local EAS build → releases/health-os-release.aab
+eas build --platform android --profile production   # cloud
+npm run android:bundle                              # local EAS build (output stays local)
 ```
 
 ### Local EAS arm64 APK (shareable, ~41 MB)
 
 ```bash
-npm run android:apk:local   # local EAS build → releases/health-os-release.apk
+npm run android:apk:local
 ```
 
 ### CI release (GitHub Actions)
 
-Pushes to `main` that touch app code trigger [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml):
+Bump `version` in `app.json` before pushing when you want a new tagged download. The workflow:
 
-1. Run `npm run android:apk` (arm64 shareable sideload APK)
-2. Commit `releases/health-os-release.apk` to `main`
-3. Publish a **GitHub Release** tagged `v{version}` with the APK attached
-
-Bump `version` in `app.json` (and `package.json` / this README) before pushing when you want a new tagged download.
+1. Runs `npm run android:apk` (arm64 shareable sideload APK)
+2. Publishes a **GitHub Release** tagged `v{version}` with `health-os-release.apk` attached
 
 No Play Store signing or secrets required — this is for direct GitHub downloads only.
 
@@ -204,7 +197,7 @@ src/features/         Medications, reminders, inventory, catalog, reliability
 src/db/               Drizzle schema, migrations, repositories
 modules/medication-alarm/   Android alarm native module
 data/                 Indian medicine JSON + generated india.db (hosted on GitHub, not in APK)
-releases/             Published APK for direct download
+dist/                 Local APK output from android:apk (gitignored)
 scripts/              Catalog ingest, RN compat patches, manifest checks
 ```
 

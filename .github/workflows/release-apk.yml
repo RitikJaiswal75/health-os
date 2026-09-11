@@ -58,20 +58,6 @@ jobs:
       - name: Build shareable arm64 APK
         run: npm run android:apk
 
-      - name: Copy APK to releases/
-        run: |
-          mkdir -p releases
-          cp dist/health-os-release.apk releases/health-os-release.apk
-          ls -lh releases/health-os-release.apk
-
-      - name: Commit APK to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add releases/health-os-release.apk
-          git diff --staged --quiet || git commit -m "chore: update releases/health-os-release.apk for v${{ steps.version.outputs.version }} [skip ci]"
-          git push
-
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -80,10 +66,9 @@ jobs:
           body: |
             Direct-download arm64 APK for sideloading (no Play Store).
 
-            - Install from the **health-os-release.apk** asset below
-            - Or download from [`releases/health-os-release.apk`](https://github.com/${{ github.repository }}/blob/main/releases/health-os-release.apk) on `main`
+            Download **health-os-release.apk** from the assets below and install on your phone.
 
             Bump `version` in `app.json` before pushing to publish a new GitHub Release tag.
-          files: releases/health-os-release.apk
+          files: dist/health-os-release.apk
           generate_release_notes: true
           make_latest: true

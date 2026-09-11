@@ -55,5 +55,8 @@ docs/PLAN.md
 *.keystore
 *.jks
 *credentials.md
+
+# build artifacts (never commit — CI publishes to GitHub Releases)
+releases/
+*.apk
 *.aab
-!releases/*.aab
