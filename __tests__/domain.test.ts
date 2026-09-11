@@ -1,5 +1,6 @@
 import { computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
 import { mergeAndRankResults, CACHE_TTL_HOURS, sanitizeFtsQuery, parseCachedResults } from '../src/features/catalog/catalogService';
+import { mapIndianMedicineRow, parseIndianMedicineJson } from '../src/features/catalog/indiaMedicineParser';
 import { expandOccurrences, computeSnoozeTime, parseTimesOfDay } from '../src/features/reminders/occurrenceExpander';
 import {
   permissionHelper,
@@ -84,6 +85,44 @@ describe('catalogService', () => {
   it('parses cached catalog payloads safely', () => {
     expect(parseCachedResults('[]')).toEqual([]);
     expect(parseCachedResults('not-json')).toEqual([]);
+  });
+});
+
+describe('indiaMedicineParser', () => {
+  it('maps active Indian medicine JSON rows', () => {
+    const mapped = mapIndianMedicineRow({
+      name: 'Dolo 650 Tablet',
+      Is_discontinued: 'FALSE',
+      pack_size_label: 'strip of 15 tablets',
+      short_composition1: 'Paracetamol (650mg)',
+      short_composition2: '',
+    });
+
+    expect(mapped).toEqual({
+      name: 'Dolo 650 Tablet',
+      strength: 'Paracetamol (650mg)',
+      form: 'strip of 15 tablets',
+    });
+  });
+
+  it('skips discontinued medicines', () => {
+    expect(
+      mapIndianMedicineRow({
+        name: 'Old Drug',
+        Is_discontinued: 'TRUE',
+      }),
+    ).toBeNull();
+  });
+
+  it('parses JSON arrays', () => {
+    const drugs = parseIndianMedicineJson(
+      JSON.stringify([
+        { name: 'Telma 40 Tablet', Is_discontinued: 'FALSE', type: 'allopathy' },
+        { name: 'Removed Drug', Is_discontinued: 'TRUE' },
+      ]),
+    );
+
+    expect(drugs).toEqual([{ name: 'Telma 40 Tablet', form: 'allopathy' }]);
   });
 });
 

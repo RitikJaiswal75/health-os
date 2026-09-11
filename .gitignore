@@ -49,7 +49,7 @@ keystore.properties
 
 # user data (never commit)
 *.db
-!assets/catalog/india.db
+!data/india.db
 
 docs/PLAN.md
 *.keystore
