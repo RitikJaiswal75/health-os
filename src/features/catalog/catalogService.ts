@@ -141,27 +141,3 @@ export function parseCachedResults(payload: string): CatalogResult[] {
   }
 }
 
-export function searchIndiaLocal(
-  db: SQLiteDatabase,
-  query: string,
-): CatalogResult[] {
-  try {
-    const ftsQuery = sanitizeFtsQuery(query);
-    if (!ftsQuery) return [];
-
-    const rows = db.getAllSync<{ id: string; name: string; strength: string | null; form: string | null }>(
-      `SELECT rowid as id, name, strength, form FROM drug_search WHERE drug_search MATCH ? LIMIT 20`,
-      [ftsQuery],
-    );
-    return rows.map((row, index) => ({
-      id: `india:${row.id}`,
-      name: row.name,
-      source: 'india' as const,
-      strength: row.strength ?? undefined,
-      type: row.form ?? undefined,
-      rank: 30 - index,
-    }));
-  } catch {
-    return [];
-  }
-}

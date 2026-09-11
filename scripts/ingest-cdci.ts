@@ -98,28 +98,8 @@ function buildDatabase(outFile: string, drugs: IndiaDrugRow[]): void {
   console.log(`Built ${outFile} with ${drugs.length} entries`);
 }
 
-function writeCatalogVersion(outFile: string): void {
-  const versionFile = path.join(path.dirname(outFile), 'catalog-version.json');
-  const existing = fs.existsSync(versionFile)
-    ? (JSON.parse(fs.readFileSync(versionFile, 'utf-8')) as { version?: number })
-    : { version: 0 };
-
-  const versionMeta = {
-    version: (existing.version ?? 0) + 1,
-    builtAt: new Date().toISOString(),
-    dbUrl:
-      'https://raw.githubusercontent.com/RitikJaiswal75/health-os/main/data/india.db',
-  };
-
-  fs.writeFileSync(versionFile, `${JSON.stringify(versionMeta, null, 2)}\n`);
-  console.log(`Updated ${versionFile} → version ${versionMeta.version}`);
-}
-
 const outFile = resolveOutFile();
 const drugs =
   CDCI_SOURCE && fs.existsSync(CDCI_SOURCE) ? loadFromSource(CDCI_SOURCE) : SAMPLE_DRUGS;
 
 buildDatabase(outFile, drugs);
-if (CDCI_SOURCE && fs.existsSync(CDCI_SOURCE)) {
-  writeCatalogVersion(outFile);
-}

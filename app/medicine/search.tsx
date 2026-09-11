@@ -12,17 +12,12 @@ import {
   searchRxTerms,
   type CatalogResult,
 } from '@/src/features/catalog/catalogService';
-import {
-  getIndiaCatalogState,
-  prepareIndiaCatalog,
-  searchIndiaCatalogAsync,
-  subscribeIndiaCatalogState,
-} from '@/src/features/catalog/indiaCatalog';
+import { searchIndiaCatalogAsync } from '@/src/features/catalog/indiaCatalog';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 async function loadCachedOrFetch(
   cache: CatalogCacheRepository | null,
-  source: 'rxterms' | 'dsld',
+  source: 'india' | 'rxterms' | 'dsld',
   query: string,
   fetcher: (q: string) => Promise<CatalogResult[]>,
 ): Promise<CatalogResult[]> {
@@ -50,16 +45,9 @@ export default function SearchScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [customDialog, setCustomDialog] = useState(false);
   const [customName, setCustomName] = useState('');
-  const [catalogState, setCatalogState] = useState(getIndiaCatalogState());
-
   useEffect(() => {
     reset();
   }, [reset]);
-
-  useEffect(() => {
-    prepareIndiaCatalog();
-    return subscribeIndiaCatalogState(setCatalogState);
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(query), 300);
@@ -82,7 +70,7 @@ export default function SearchScreen() {
     try {
       const cache = db ? new CatalogCacheRepository(db) : null;
       const [india, rx, dsld] = await Promise.all([
-        searchIndiaCatalogAsync(debounced),
+        loadCachedOrFetch(cache, 'india', debounced, searchIndiaCatalogAsync),
         loadCachedOrFetch(cache, 'rxterms', debounced, searchRxTerms),
         loadCachedOrFetch(cache, 'dsld', debounced, searchDsld),
       ]);
@@ -133,11 +121,6 @@ export default function SearchScreen() {
         style={styles.searchbar}
         inputStyle={styles.searchInput}
       />
-      {catalogState === 'downloading' && (
-        <Text variant="bodySmall" style={styles.hint}>
-          Downloading India medicine catalog for offline search…
-        </Text>
-      )}
       {loading && <ActivityIndicator style={styles.loader} color={healthOsTheme.colors.primary} />}
       {!loading && errorMessage && (
         <Text variant="bodyMedium" style={styles.hint}>

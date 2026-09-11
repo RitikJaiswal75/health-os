@@ -9,7 +9,6 @@ import {
 } from '../core/storage/durableStorage';
 import type { DbBootstrapResult } from './clientTypes';
 import { CatalogCacheRepository } from '../features/catalog/catalogService';
-import { prepareIndiaCatalog } from '../features/catalog/indiaCatalog';
 import { generateUpcomingDoseEvents } from '../features/medications/doseGenerationService';
 import { ReminderReconciler, scheduleAlarms } from '../features/reminders/reminderService';
 
@@ -63,7 +62,6 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
     await scheduleAlarms(reconciler.reconcile(7));
 
     dbInstance = db;
-    prepareIndiaCatalog();
     return { status: 'ready', db };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Database initialization failed';

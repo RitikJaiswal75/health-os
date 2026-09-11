@@ -49,7 +49,10 @@ keystore.properties
 
 # user data (never commit)
 *.db
-!data/india.db
+
+# local catalog source for worker seeding only (see data/README.md)
+data/*
+!data/README.md
 
 docs/PLAN.md
 *.keystore
@@ -60,3 +63,7 @@ docs/PLAN.md
 releases/
 *.apk
 *.aab
+workers/india-catalog/seed/
+workers/india-catalog/seed.sql
+workers/india-catalog/node_modules/
+workers/india-catalog/.wrangler/

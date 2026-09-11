@@ -1,0 +1,13 @@
+name = "health-os-india-catalog"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+[[routes]]
+pattern = "drugs.healthos.ritik.cc"
+custom_domain = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "health-os-india-catalog"
+database_id = "f2f66951-693c-48ef-8f97-a31ba0c6f676"
+migrations_dir = "migrations"

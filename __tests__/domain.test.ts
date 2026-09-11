@@ -1,6 +1,7 @@
 import { computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
 import { mergeAndRankResults, CACHE_TTL_HOURS, sanitizeFtsQuery, parseCachedResults } from '../src/features/catalog/catalogService';
 import { mapIndianMedicineRow, parseIndianMedicineJson } from '../src/features/catalog/indiaMedicineParser';
+import { mapIndiaApiResults } from '../src/features/catalog/indiaCatalogApi';
 import { expandOccurrences, computeSnoozeTime, parseTimesOfDay } from '../src/features/reminders/occurrenceExpander';
 import {
   permissionHelper,
@@ -123,6 +124,30 @@ describe('indiaMedicineParser', () => {
     );
 
     expect(drugs).toEqual([{ name: 'Telma 40 Tablet', form: 'allopathy' }]);
+  });
+});
+
+describe('indiaCatalogApi', () => {
+  it('maps worker search hits to catalog results', () => {
+    const results = mapIndiaApiResults([
+      {
+        id: 42,
+        name: 'Dolo 650 Tablet',
+        strength: 'Paracetamol (650mg)',
+        form: 'strip of 15 tablets',
+      },
+    ]);
+
+    expect(results).toEqual([
+      {
+        id: 'india:42',
+        name: 'Dolo 650 Tablet',
+        source: 'india',
+        strength: 'Paracetamol (650mg)',
+        type: 'strip of 15 tablets',
+        rank: 30,
+      },
+    ]);
   });
 });
 

@@ -38,7 +38,7 @@ Health OS helps you manage daily medications and supplements in one calm, dark-t
 
 ### Add medication wizard
 
-- Search the **India medicine catalog** (downloaded on first use) plus live **RxTerms** and **NIH DSLD** (cached 24 h)
+- Search the **India medicine catalog** (per-query via Cloudflare Worker) plus live **RxTerms** and **NIH DSLD** (cached 24 h)
 - Configure type, strength, pill shape and colour, schedule, nickname, notes, and starting stock
 - Attach a photo from camera or gallery
 
@@ -103,8 +103,10 @@ Daily, every N days, specific weekdays, monthly, or as-needed — with multiple 
 git clone <your-repo-url>
 cd health-os
 npm install
-npm run ingest-cdci   # build searchable India catalog (data/india.db) from data/indian_medicine_data.json
+cp .env.example .env   # optional — defaults to https://drugs.healthos.ritik.cc
 ```
+
+India medicine search hits **`https://drugs.healthos.ritik.cc`** (Cloudflare Worker + D1, per-query). Worker setup: [`workers/india-catalog/README.md`](workers/india-catalog/README.md).
 
 ### Run in development
 
@@ -184,7 +186,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 | Database | expo-sqlite + Drizzle ORM |
 | State | Zustand (wizard draft) |
 | Alarms | Custom `medication-alarm` native module (Android) |
-| Catalog | GitHub-hosted India SQLite (downloaded on first use) + RxTerms + NIH DSLD |
+| Catalog | Cloudflare Worker (India, per-query) + RxTerms + NIH DSLD |
 
 ---
 
@@ -196,7 +198,8 @@ src/core/             Theme, UI primitives, dates, domain types
 src/features/         Medications, reminders, inventory, catalog, reliability
 src/db/               Drizzle schema, migrations, repositories
 modules/medication-alarm/   Android alarm native module
-data/                 Indian medicine JSON + generated india.db (hosted on GitHub, not in APK)
+data/                 Local-only catalog source for worker seeding (gitignored)
+workers/india-catalog/  Cloudflare Worker for per-query India medicine search
 dist/                 Local APK output from android:apk (gitignored)
 scripts/              Catalog ingest, RN compat patches, manifest checks
 ```

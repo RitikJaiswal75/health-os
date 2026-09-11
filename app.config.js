@@ -24,5 +24,14 @@ module.exports = () => {
     plugins: filterPlugins(appJson.expo.plugins, shareable),
   };
 
-  return { expo };
+  return {
+    expo: {
+      ...expo,
+      extra: {
+        ...expo.extra,
+        indiaCatalogUrl:
+          process.env.EXPO_PUBLIC_INDIA_CATALOG_URL ?? 'https://drugs.healthos.ritik.cc',
+      },
+    },
+  };
 };

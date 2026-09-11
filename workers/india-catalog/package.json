@@ -1,0 +1,15 @@
+{
+  "name": "health-os-india-catalog-worker",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "d1:create": "wrangler d1 create health-os-india-catalog",
+    "d1:migrate:local": "wrangler d1 migrations apply health-os-india-catalog --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply health-os-india-catalog --remote",
+    "d1:seed:local": "node scripts/seed-d1.mjs",
+    "d1:seed:remote": "node scripts/seed-d1.mjs --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

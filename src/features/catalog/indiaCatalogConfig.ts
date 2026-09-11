@@ -1,20 +1,16 @@
-export type IndiaCatalogState = 'idle' | 'downloading' | 'ready' | 'error';
+import Constants from 'expo-constants';
 
-/** GitHub-hosted India medicine catalog (not bundled in the app). */
-export const INDIA_CATALOG_GITHUB_REPO = 'RitikJaiswal75/health-os';
-export const INDIA_CATALOG_BRANCH = 'main';
+/** Production India catalog API (Cloudflare Worker + D1). */
+export const DEFAULT_INDIA_CATALOG_API_URL = 'https://drugs.healthos.ritik.cc';
 
-export const INDIA_CATALOG_VERSION_URL =
-  `https://raw.githubusercontent.com/${INDIA_CATALOG_GITHUB_REPO}/${INDIA_CATALOG_BRANCH}/data/catalog-version.json`;
+export function getIndiaCatalogApiUrl(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_INDIA_CATALOG_URL?.trim();
+  if (fromEnv) return fromEnv;
 
-export const INDIA_CATALOG_DB_NAME = 'india-catalog.db';
-export const INDIA_CATALOG_META_FILENAME = 'india-catalog.meta.json';
+  const fromExtra = Constants.expoConfig?.extra?.indiaCatalogUrl;
+  if (typeof fromExtra === 'string' && fromExtra.trim()) {
+    return fromExtra.trim();
+  }
 
-export interface IndiaCatalogVersionMeta {
-  version: number;
-  builtAt: string;
-  dbUrl: string;
+  return DEFAULT_INDIA_CATALOG_API_URL;
 }
-
-export const DEFAULT_INDIA_CATALOG_DB_URL =
-  `https://raw.githubusercontent.com/${INDIA_CATALOG_GITHUB_REPO}/${INDIA_CATALOG_BRANCH}/data/india.db`;
