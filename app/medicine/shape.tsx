@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footerBtnTextPrimary: {
-    color: '#FFFFFF',
+    color: healthOsTheme.colors.onPrimary,
     fontWeight: '600',
   },
 });
