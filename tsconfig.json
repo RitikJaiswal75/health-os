@@ -19,7 +19,6 @@
     "node_modules",
     "scripts",
     "__tests__",
-    "jest.setup.js",
-    "components"
+    "jest.setup.js"
   ]
 }

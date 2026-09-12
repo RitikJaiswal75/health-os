@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Portal, Text, TextInput } from 'react-native-paper';
 import {
   formatDoseLabel,
-  getDefaultDoseAmount,
   usesDirectMeasuredDose,
   type MedicationType,
 } from '@/src/core/types/domain';

@@ -1,17 +1,21 @@
 import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
 
-import { Text, View } from '@/components/Themed';
+import { healthOsTheme, tokens } from '@/src/core/theme/paperTheme';
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Oops!' }} />
       <View style={styles.container}>
-        <Text style={styles.title}>This screen does not exist.</Text>
-
+        <Text variant="titleMedium" style={styles.title}>
+          This screen does not exist.
+        </Text>
         <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
+          <Text variant="bodyMedium" style={styles.linkText}>
+            Go to home screen
+          </Text>
         </Link>
       </View>
     </>
@@ -23,18 +27,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: tokens.spacing.lg,
+    backgroundColor: healthOsTheme.colors.background,
   },
   title: {
-    fontSize: 20,
     fontWeight: 'bold',
+    color: healthOsTheme.colors.onSurface,
   },
   link: {
-    marginTop: 15,
-    paddingVertical: 15,
+    marginTop: tokens.spacing.md,
+    paddingVertical: tokens.spacing.md,
   },
   linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
+    color: healthOsTheme.colors.primary,
   },
 });

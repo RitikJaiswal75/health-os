@@ -8,7 +8,7 @@ import { formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip }
 import { DateStrip, type DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
-import { parseSnoozedFromNotes, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
+import { originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { generateUpcomingDoseEvents, removePendingDuplicatingResolvedDoses, removeDuplicateDoseEvents } from '@/src/features/medications/doseGenerationService';
 import {
   cleanupSnoozeConflicts,

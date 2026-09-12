@@ -53,10 +53,3 @@ export async function copyPhotoToDurableStorage(
   await FileSystem.copyAsync({ from: sourceUri, to: dest });
   return dest;
 }
-
-/** Reopen existing DB after clear-data by checking durable path first. */
-export async function discoverExistingDatabase(): Promise<string | null> {
-  const dbPath = await resolveDatabasePath();
-  const info = await FileSystem.getInfoAsync(dbPath);
-  return info.exists ? dbPath : null;
-}

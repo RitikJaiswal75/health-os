@@ -4,7 +4,6 @@ import {
   Shape3DCapsule,
   Shape3DCircle,
   Shape3DEllipse,
-  Shape3DRect,
   adjustBrightness,
   shapeColors,
 } from './pillShape3d';

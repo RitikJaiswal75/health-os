@@ -3,7 +3,6 @@ import { mapDoseEventRow } from '../../db/rowMappers';
 import { MedicationRepository, DoseEventRepository } from './medicationRepository';
 import { parseTimesOfDay } from '../reminders/occurrenceExpander';
 import {
-  buildSnoozedFromNotes,
   parseSnoozedFromNotes,
   slotKeyFromScheduledAt,
 } from './doseSlotUtils';

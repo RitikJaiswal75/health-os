@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import type { DoseEvent } from '../../db/schema';
-import { formatLocalDateTime, formatDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
+import { formatLocalDateTime, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
 
 const SNOOZE_NOTE_PREFIX = 'snoozedFrom:';
 

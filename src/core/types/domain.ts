@@ -334,7 +334,6 @@ export function formatDoseLabel(
   const count = amount > 0 ? amount : 1;
   const strengthValue = options?.strengthValue;
   const strengthUnit = options?.strengthUnit;
-  const doseUnitValue = options?.doseUnitValue;
   const doseUnitUnit = options?.doseUnitUnit;
 
   switch (medicationType) {

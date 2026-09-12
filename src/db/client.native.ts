@@ -3,7 +3,6 @@ import { MIGRATION_SQL } from './migrations/001_initial';
 import { MIGRATION_SQL as MIGRATION_002 } from './migrations/002_pill_color2';
 import { MIGRATION_SQL as MIGRATION_003 } from './migrations/003_dose_unit';
 import {
-  discoverExistingDatabase,
   resolveHealthOsDirectory,
   DB_FILENAME,
 } from '../core/storage/durableStorage';
@@ -27,12 +26,11 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
 
   try {
     const directory = await resolveHealthOsDirectory();
-    const existing = await discoverExistingDatabase();
 
     const db = SQLite.openDatabaseSync(
       DB_FILENAME,
       { enableChangeListener: true },
-      existing ? directory : directory,
+      directory,
     );
 
     db.execSync('PRAGMA foreign_keys = ON;');
