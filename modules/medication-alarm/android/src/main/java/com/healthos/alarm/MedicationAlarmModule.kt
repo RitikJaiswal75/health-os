@@ -57,13 +57,19 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
                 )
             }
 
+            val ringingAlarmIds = PendingReminderStore.snapshot(reactContext)
+                .map { it.alarmId }
+                .toSet()
+
             for (oldId in previous) {
-                if (oldId !in next) {
+                if (oldId !in next && oldId !in ringingAlarmIds) {
                     MedicationAlarmReceiver.cancel(reactContext, oldId)
                 }
             }
 
-            prefs.edit().putStringSet(KEY_SCHEDULED_IDS, next).apply()
+            val persistedIds = next.toMutableSet()
+            persistedIds.addAll(ringingAlarmIds)
+            prefs.edit().putStringSet(KEY_SCHEDULED_IDS, persistedIds).apply()
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("SCHEDULE_ERROR", e.message, e)
@@ -81,9 +87,9 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun dismissReminderNotification(alarmId: String, medicationId: String?, promise: Promise) {
+    fun dismissReminderNotification(alarmId: String, promise: Promise) {
         try {
-            MedicationAlarmReceiver.dismissNotification(reactContext, alarmId, medicationId)
+            MedicationAlarmReceiver.dismissNotification(reactContext, alarmId)
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("DISMISS_ERROR", e.message, e)

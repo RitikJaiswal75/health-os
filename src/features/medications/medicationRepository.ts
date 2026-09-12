@@ -1,9 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { format } from 'date-fns';
 import type { Medication, MedicationVariant, Schedule, DoseEvent } from '../../db/schema';
 import type { ScheduleType, TimeOfDay, DoseStatus, InventoryTransactionType } from '../../core/types/domain';
-import { parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
+import { parseScheduledAt } from '../../core/dates/dateUtils';
 import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
 import {
   dedupeDoseEvents,
@@ -12,7 +11,6 @@ import {
   filterPendingReplacedBySnooze,
   parseSnoozedFromNotes,
   readScheduledAtFromRow,
-  slotKeyFromScheduledAt,
   slotKeysEqual,
   buildSnoozedFromNotes,
 } from './doseSlotUtils';
@@ -494,14 +492,13 @@ export class DoseEventRepository {
   }
 
   findPendingForMedication(medicationId: string, aroundIso: string): DoseEvent | null {
-    const dayKey = scheduledAtToDateKey(aroundIso);
     const row = this.db
       .getAllSync(
         `SELECT * FROM dose_events WHERE medication_id = ? AND status = 'pending' ORDER BY scheduled_at ASC`,
         [medicationId],
       )
       .map(mapDoseEventRow)
-      .find((dose) => scheduledAtToDateKey(dose.scheduledAt) === dayKey);
+      .find((dose) => slotKeysEqual(dose.scheduledAt, aroundIso));
     return row ?? null;
   }
 

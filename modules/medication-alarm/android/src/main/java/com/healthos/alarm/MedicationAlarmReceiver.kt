@@ -152,12 +152,9 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             alarmManager.setAlarmClock(info, pending)
         }
 
-        fun dismissNotification(context: Context, alarmId: String, medicationId: String? = null) {
+        fun dismissNotification(context: Context, alarmId: String) {
             AlarmFireService.stopAlarm(context, alarmId)
             PendingReminderStore.remove(context, alarmId)
-            if (!medicationId.isNullOrBlank()) {
-                PendingReminderStore.removeByMedicationId(context, medicationId)
-            }
             val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
             val notificationManager =
                 context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

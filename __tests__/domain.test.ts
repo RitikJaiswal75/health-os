@@ -336,6 +336,7 @@ describe('reminderQueue', () => {
       require('../src/features/reminders/reminderRouterReady');
     resetReminderQueueForTests();
     resetReminderRouterReadyForTests();
+    jest.clearAllMocks();
     setReminderRouterReady(true);
   });
 
@@ -360,6 +361,36 @@ describe('reminderQueue', () => {
     expect(pushReminder(first)).toBe(true);
     expect(pushReminder(second)).toBe(false);
     await expect(completeCurrentReminder()).resolves.toBe(true);
+  });
+
+  it('opens a reminder deferred before the router was ready', () => {
+    const {
+      pushReminder,
+      setReminderRouterReady,
+      flushDeferredReminderNavigation,
+    } = require('../src/features/reminders/reminderQueue');
+    const { resetReminderNavigationForTests } =
+      require('../src/features/reminders/reminderNavigationDedupe');
+    const { router } = require('expo-router');
+    const params = {
+      medicationId: 'med-cold-start',
+      alarmId: 'alarm-cold-start',
+      scheduledAt: '2026-09-12T09:45:00',
+    };
+
+    resetReminderNavigationForTests();
+    setReminderRouterReady(false);
+
+    expect(pushReminder(params)).toBe(true);
+    expect(router.replace).not.toHaveBeenCalled();
+
+    setReminderRouterReady(true);
+    flushDeferredReminderNavigation();
+
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: '/reminder',
+      params,
+    });
   });
 
   it('does not re-show a reminder that was already handled', () => {
@@ -670,6 +701,31 @@ describe('doseSlotUtils', () => {
     const repo = new DoseEventRepository(mockDb);
     expect(repo.existsForScheduleAt('sched-1', '2026-09-08T08:00:00')).toBe(true);
     expect(repo.existsForMedicationAt('med-1', '2026-09-08T08:00:00')).toBe(true);
+  });
+
+  it('finds only the pending dose in the reminder minute', () => {
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const row = (id: string, scheduledAt: string) => ({
+      id,
+      medication_id: 'med-1',
+      schedule_id: 'sched-1',
+      scheduled_at: scheduledAt,
+      status: 'pending',
+      notes: null,
+      dose_amount: 1,
+      created_at: '2026-09-08T07:00:00',
+      updated_at: '2026-09-08T07:00:00',
+    });
+    const mockDb = {
+      getAllSync: jest.fn(() => [
+        row('morning-dose', '2026-09-08T08:00:00'),
+        row('evening-dose', '2026-09-08T20:00:00'),
+      ]),
+    };
+    const repo = new DoseEventRepository(mockDb);
+
+    expect(repo.findPendingForMedication('med-1', '2026-09-08T20:00:30')?.id)
+      .toBe('evening-dose');
   });
 
   it('removes pending doses that duplicate a skipped dose', () => {

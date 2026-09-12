@@ -25,7 +25,7 @@ const MedicationAlarmModule = NativeModules.MedicationAlarm ?? {
   cancelAlarm: async (_id: string) => {
     if (__DEV__) console.warn(LINKING_ERROR);
   },
-  dismissReminderNotification: async (_id: string, _medicationId?: string | null) => {
+  dismissReminderNotification: async (_id: string) => {
     if (__DEV__) console.warn(LINKING_ERROR);
   },
   getPendingReminders: async (): Promise<
@@ -57,9 +57,8 @@ export async function cancelAlarm(id: string): Promise<void> {
 
 export async function dismissReminderNotification(
   alarmId: string,
-  medicationId?: string | null,
 ): Promise<void> {
-  return MedicationAlarmModule.dismissReminderNotification(alarmId, medicationId ?? null);
+  return MedicationAlarmModule.dismissReminderNotification(alarmId);
 }
 
 export async function getPendingReminders(): Promise<

@@ -127,14 +127,13 @@ export async function cancelAlarm(alarmId: string): Promise<void> {
 
 export async function dismissReminderNotification(
   alarmId: string,
-  medicationId?: string,
 ): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   try {
     const MedicationAlarm = require('../../../modules/medication-alarm');
     if (MedicationAlarm?.dismissReminderNotification) {
-      await MedicationAlarm.dismissReminderNotification(alarmId, medicationId ?? null);
+      await MedicationAlarm.dismissReminderNotification(alarmId);
     }
   } catch {
     // stub

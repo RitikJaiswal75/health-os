@@ -33,11 +33,6 @@ object PendingReminderStore {
         save(context, list)
     }
 
-    fun removeByMedicationId(context: Context, medicationId: String) {
-        val list = load(context).filter { it.medicationId != medicationId }
-        save(context, list)
-    }
-
     fun snapshot(context: Context): List<PendingReminder> = load(context)
 
     private fun load(context: Context): List<PendingReminder> {

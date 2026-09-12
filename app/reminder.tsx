@@ -34,13 +34,13 @@ export default function ReminderScreen() {
   }>();
   const dbState = useDatabaseBootstrap();
   const [snoozeDialog, setSnoozeDialog] = useState(false);
-
-  const medRepo = dbState.status === 'ready' ? new MedicationRepository(dbState.db) : null;
+  const db = dbState.status === 'ready' ? dbState.db : null;
+  const medRepo = useMemo(() => (db ? new MedicationRepository(db) : null), [db]);
 
   const items = useMemo((): ReminderItem[] => {
-    if (dbState.status !== 'ready' || !medRepo) return [];
+    if (!db || !medRepo) return [];
 
-    const doseRepo = new DoseEventRepository(dbState.db);
+    const doseRepo = new DoseEventRepository(db);
     const slotAt = scheduledAt ?? new Date().toISOString();
 
     if (scheduledAt) {
@@ -64,7 +64,7 @@ export default function ReminderScreen() {
     }
 
     return [];
-  }, [dbState.status, dbState.status === 'ready' ? dbState.db : null, medRepo, medicationId, doseEventId, scheduledAt]);
+  }, [db, medRepo, medicationId, doseEventId, scheduledAt]);
 
   const dismiss = async () => {
     const handled = {
@@ -74,7 +74,7 @@ export default function ReminderScreen() {
       doseEventId,
     };
     if (alarmId) {
-      await dismissReminderNotification(alarmId, medicationId);
+      await dismissReminderNotification(alarmId);
     }
     await exitReminderScreen(handled);
   };
@@ -160,9 +160,41 @@ export default function ReminderScreen() {
   };
 
   if (items.length === 0) {
+    if (dbState.status === 'loading') {
+      return (
+        <View style={styles.container} accessibilityLabel="Loading medication reminder">
+          <Text variant="headlineSmall" style={styles.heading}>
+            Loading reminder…
+          </Text>
+        </View>
+      );
+    }
+
+    if (dbState.status === 'error') {
+      return (
+        <View style={styles.container} accessibilityLabel="Medication reminder unavailable">
+          <Text variant="headlineSmall" style={styles.heading}>
+            Could not load reminder
+          </Text>
+          <Button mode="contained" onPress={dbState.retry} accessibilityLabel="Retry loading reminder">
+            Retry
+          </Button>
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.container}>
-        <Text>Loading reminder…</Text>
+      <View style={styles.container} accessibilityLabel="Medication reminder">
+        <Text variant="headlineSmall" style={styles.heading}>
+          Reminder no longer pending
+        </Text>
+        <Button
+          mode="contained"
+          onPress={() => void dismiss()}
+          accessibilityLabel="Dismiss reminder"
+        >
+          Dismiss
+        </Button>
       </View>
     );
   }

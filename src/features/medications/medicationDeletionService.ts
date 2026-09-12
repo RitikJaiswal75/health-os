@@ -1,7 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { MedicationRepository } from './medicationRepository';
+import { DoseEventRepository, MedicationRepository } from './medicationRepository';
 import { purgeOrphanDoseEvents } from './doseGenerationService';
-import { ReminderReconciler, scheduleAlarms } from '../reminders/reminderService';
+import {
+  dismissReminderNotification,
+  ReminderReconciler,
+  scheduleAlarms,
+} from '../reminders/reminderService';
+import { getNativePendingReminders } from '../reminders/reminderNativePending';
 
 export async function removeMedicationWithReminders(
   db: SQLiteDatabase,
@@ -11,9 +16,24 @@ export async function removeMedicationWithReminders(
   const med = medRepo.getById(medicationId);
   if (!med) return false;
 
+  const ringing = await getNativePendingReminders();
+
   medRepo.delete(medicationId);
 
   purgeOrphanDoseEvents(db);
+  const doseRepo = new DoseEventRepository(db);
+  const ringingForMedication = ringing.filter(
+    (reminder) => reminder.medicationId === medicationId,
+  );
+  for (const reminder of ringingForMedication) {
+    const remainingAtSlot = reminder.scheduledAt
+      ? doseRepo.findPendingDosesAtMinute(reminder.scheduledAt)
+      : [];
+    if (remainingAtSlot.length === 0) {
+      await dismissReminderNotification(reminder.alarmId);
+    }
+  }
+
   const remaining = new ReminderReconciler(db).reconcile(7);
   await scheduleAlarms(remaining);
   return true;

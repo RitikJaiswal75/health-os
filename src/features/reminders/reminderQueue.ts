@@ -67,13 +67,23 @@ function showReminderNow(params: ReminderRouteParams): void {
   });
 }
 
-function showReminder(params: ReminderRouteParams): void {
+function showReminder(params: ReminderRouteParams): boolean {
+  if (isHandled(params)) {
+    return false;
+  }
+
   if (!isReminderRouterReady()) {
     activeReminder = params;
     deferShowReminder(params);
-    return;
+    return true;
   }
+
+  if (!shouldNavigateToReminder(params)) {
+    return false;
+  }
+
   showReminderNow(params);
+  return true;
 }
 
 export function setReminderRouterReady(ready: boolean): void {
@@ -92,14 +102,11 @@ export function flushDeferredReminderNavigation(): void {
     activeReminder = null;
     return;
   }
-  if (!shouldNavigateToReminder(params)) {
-    return;
-  }
-
-  showReminderNow(params);
-  const deferredIndex = deferredShows.findIndex((item) => isSameReminder(item, params));
-  if (deferredIndex >= 0) {
-    deferredShows.splice(deferredIndex, 1);
+  if (showReminder(params)) {
+    const deferredIndex = deferredShows.findIndex((item) => isSameReminder(item, params));
+    if (deferredIndex >= 0) {
+      deferredShows.splice(deferredIndex, 1);
+    }
   }
 }
 
@@ -152,12 +159,7 @@ export function enqueueIfPending(params: ReminderRouteParams): boolean {
     return false;
   }
 
-  if (!shouldNavigateToReminder(params)) {
-    return false;
-  }
-
-  showReminder(params);
-  return true;
+  return showReminder(params);
 }
 
 export function pushReminder(params: ReminderRouteParams): boolean {

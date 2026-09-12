@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 
 /** Keeps alarm audio alive and opens the reminder screen from a foreground context. */
@@ -19,8 +20,12 @@ class AlarmFireService : Service() {
             ACTION_START -> {
                 val alarmId = intent.getStringExtra(EXTRA_ALARM_ID) ?: return START_NOT_STICKY
                 synchronized(activeAlarmIds) { activeAlarmIds.add(alarmId) }
-                AlarmSoundController.ensurePlaying(applicationContext)
                 startForeground(SERVICE_NOTIFICATION_ID, buildServiceNotification())
+                try {
+                    AlarmSoundController.ensurePlaying(applicationContext)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Unable to start alarm sound", error)
+                }
                 launchReminderScreen(intent)
             }
             ACTION_STOP -> {
@@ -35,6 +40,7 @@ class AlarmFireService : Service() {
                         stopForeground(true)
                     }
                     stopSelf()
+                    return START_NOT_STICKY
                 }
             }
         }
@@ -83,6 +89,7 @@ class AlarmFireService : Service() {
     }
 
     companion object {
+        private const val TAG = "AlarmFireService"
         private const val ACTION_START = "com.health.os.ALARM_SOUND_START"
         private const val ACTION_STOP = "com.health.os.ALARM_SOUND_STOP"
         private const val EXTRA_ALARM_ID = "alarmId"
