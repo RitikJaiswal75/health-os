@@ -473,6 +473,150 @@ describe('permissionHelper', () => {
   });
 });
 
+describe('duplicateMedicationService', () => {
+  const {
+    schedulePeriodsOverlap,
+    findDuplicateMedicationConflict,
+    findEarlyDuplicateMedicationConflict,
+    medicationNamesMatch,
+  } = require('../src/features/medications/duplicateMedicationService');
+
+  it('detects overlapping schedule periods', () => {
+    expect(
+      schedulePeriodsOverlap(
+        { startDate: '2026-09-01', endDate: '2026-09-15' },
+        { startDate: '2026-09-10', endDate: '2026-09-20' },
+      ),
+    ).toBe(true);
+    expect(
+      schedulePeriodsOverlap(
+        { startDate: '2026-09-01', endDate: '2026-09-15' },
+        { startDate: '2026-09-16', endDate: '2026-09-30' },
+      ),
+    ).toBe(false);
+  });
+
+  it('matches medication names case-insensitively', () => {
+    expect(medicationNamesMatch('Test 1', 'test 1')).toBe(true);
+  });
+
+  it('finds an active medication with the same name and overlapping dates', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    const conflict = findDuplicateMedicationConflict(medRepo, 'Test 1', {
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    });
+
+    expect(conflict?.medication.id).toBe('med-existing');
+  });
+
+  it('allows the same name when schedule periods do not overlap', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    expect(
+      findDuplicateMedicationConflict(medRepo, 'Test 1', {
+        startDate: '2026-09-16',
+        endDate: '2026-09-30',
+      }),
+    ).toBeNull();
+  });
+
+  it('flags an early duplicate when a same-name medication is active today', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-10T10:00:00'));
+
+    expect(findEarlyDuplicateMedicationConflict(medRepo, 'Test 1')?.medication.id).toBe(
+      'med-existing',
+    );
+
+    jest.useRealTimers();
+  });
+
+  it('ignores the medication being edited', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    expect(
+      findDuplicateMedicationConflict(
+        medRepo,
+        'Test 1',
+        { startDate: '2026-09-10', endDate: '2026-09-20' },
+        'med-existing',
+      ),
+    ).toBeNull();
+  });
+});
+
 describe('wizardStore', () => {
   it('requires medication type to proceed configure', () => {
     const { useWizardStore } = require('../src/features/medications/wizardStore');

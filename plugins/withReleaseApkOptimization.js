@@ -7,6 +7,20 @@ const MINIFY_PROPERTIES = [
   { type: 'property', key: 'android.enableShrinkResourcesInReleaseBuilds', value: 'true' },
 ];
 
+/** EAS/local release Kotlin compile can exhaust the default 512m metaspace cap. */
+const GRADLE_MEMORY_PROPERTIES = [
+  {
+    type: 'property',
+    key: 'org.gradle.jvmargs',
+    value: '-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8',
+  },
+  {
+    type: 'property',
+    key: 'kotlin.daemon.jvmargs',
+    value: '-Xmx2048m -XX:MaxMetaspaceSize=1024m',
+  },
+];
+
 const ALARM_PROGUARD = `
 # medication-alarm native module
 -keep class com.healthos.alarm.** { *; }
@@ -24,7 +38,7 @@ function upsertGradleProperty(modResults, key, value) {
 function withReleaseApkOptimization(config) {
   config = withGradleProperties(config, (config) => {
     let modResults = config.modResults;
-    for (const property of MINIFY_PROPERTIES) {
+    for (const property of [...MINIFY_PROPERTIES, ...GRADLE_MEMORY_PROPERTIES]) {
       modResults = upsertGradleProperty(modResults, property.key, property.value);
     }
     config.modResults = modResults;
