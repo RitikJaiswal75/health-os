@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -12,6 +12,8 @@ import {
 import { permissionHelper, type PermissionKind } from '@/src/core/permissions/permissionHelper';
 import { ensureNotificationSetup } from '@/src/features/reminders/notificationSetup';
 
+const MIN_CHECK_AGAIN_FEEDBACK_MS = 700;
+
 function PermissionRow({ label, granted }: { label: string; granted: boolean }) {
   return (
     <Text style={styles.row}>
@@ -23,6 +25,7 @@ function PermissionRow({ label, granted }: { label: string; granted: boolean }) 
 export default function ReliabilityScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { state, refresh } = usePermissionState();
+  const [checkingAgain, setCheckingAgain] = useState(false);
   const blocked = getBlockedRemindersMessage(state);
   const recommended = getRecommendedRemindersMessage(state);
   const isPreAddFlow = returnTo === ADD_MEDICATION_PATH;
@@ -40,6 +43,18 @@ export default function ReliabilityScreen() {
     (kind: PermissionKind) => runPermissionAction(() => permissionHelper.request(kind)),
     [runPermissionAction],
   );
+
+  const handleCheckAgain = useCallback(async () => {
+    setCheckingAgain(true);
+    try {
+      await Promise.all([
+        refresh(),
+        new Promise<void>((resolve) => setTimeout(resolve, MIN_CHECK_AGAIN_FEEDBACK_MS)),
+      ]);
+    } finally {
+      setCheckingAgain(false);
+    }
+  }, [refresh]);
 
   const handleContinue = () => {
     if (returnTo === ADD_MEDICATION_PATH) {
@@ -129,7 +144,13 @@ export default function ReliabilityScreen() {
               Display over other apps
             </Button>
           )}
-          <Button mode="text" onPress={() => void refresh()} accessibilityLabel="Check permissions again">
+          <Button
+            mode="text"
+            onPress={() => void handleCheckAgain()}
+            loading={checkingAgain}
+            disabled={checkingAgain}
+            accessibilityLabel="Check permissions again"
+          >
             Check again
           </Button>
         </>
