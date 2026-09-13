@@ -1,15 +1,11 @@
 package com.healthos.alarm
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.core.app.NotificationCompat
 
 /** Keeps alarm audio alive and opens the reminder screen from a foreground context. */
 class AlarmFireService : Service() {
@@ -19,14 +15,24 @@ class AlarmFireService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 val alarmId = intent.getStringExtra(EXTRA_ALARM_ID) ?: return START_NOT_STICKY
+                val requestCode = AlarmRequestCodes.requestCodeFor(applicationContext, alarmId)
+                val reminderIntent = readReminderIntent(intent) ?: return START_NOT_STICKY
+
                 synchronized(activeAlarmIds) { activeAlarmIds.add(alarmId) }
-                startForeground(SERVICE_NOTIFICATION_ID, buildServiceNotification())
+
+                val notification = MedicationAlarmReceiver.buildReminderNotification(
+                    applicationContext,
+                    reminderIntent,
+                    requestCode,
+                )
+                startForeground(requestCode, notification)
+
                 try {
                     AlarmSoundController.ensurePlaying(applicationContext)
                 } catch (error: Exception) {
                     Log.e(TAG, "Unable to start alarm sound", error)
                 }
-                launchReminderScreen(intent)
+                launchReminderScreen(reminderIntent)
             }
             ACTION_STOP -> {
                 val alarmId = intent.getStringExtra(EXTRA_ALARM_ID) ?: return START_NOT_STICKY
@@ -47,15 +53,16 @@ class AlarmFireService : Service() {
         return START_STICKY
     }
 
-    private fun launchReminderScreen(startIntent: Intent) {
-        val reminderIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun readReminderIntent(startIntent: Intent): Intent? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             startIntent.getParcelableExtra(EXTRA_REMINDER_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
             startIntent.getParcelableExtra(EXTRA_REMINDER_INTENT)
         }
-        if (reminderIntent == null) return
+    }
 
+    private fun launchReminderScreen(reminderIntent: Intent) {
         try {
             reminderIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(reminderIntent)
@@ -64,38 +71,12 @@ class AlarmFireService : Service() {
         }
     }
 
-    private fun buildServiceNotification(): Notification {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                SERVICE_CHANNEL_ID,
-                "Medication alarm",
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = "Plays medication reminder alarm sound"
-                setSound(null, null)
-            }
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        return NotificationCompat.Builder(this, SERVICE_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Medication reminder")
-            .setContentText("Alarm sounding")
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
-    }
-
     companion object {
         private const val TAG = "AlarmFireService"
         private const val ACTION_START = "com.health.os.ALARM_SOUND_START"
         private const val ACTION_STOP = "com.health.os.ALARM_SOUND_STOP"
         private const val EXTRA_ALARM_ID = "alarmId"
         private const val EXTRA_REMINDER_INTENT = "reminderIntent"
-        private const val SERVICE_CHANNEL_ID = "medication-alarm-service"
-        private const val SERVICE_NOTIFICATION_ID = 9001
 
         private val activeAlarmIds = mutableSetOf<String>()
 

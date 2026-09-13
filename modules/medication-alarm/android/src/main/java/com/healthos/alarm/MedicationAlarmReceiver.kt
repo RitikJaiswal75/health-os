@@ -1,6 +1,7 @@
 package com.healthos.alarm
 
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -44,40 +45,12 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                 )
 
                 AlarmFireService.startAlarm(context, alarmId, activityIntent)
-
-                val requestCode = AlarmRequestCodes.requestCodeFor(context, alarmId)
-                val fullScreenPendingIntent = PendingIntent.getActivity(
-                    context,
-                    requestCode,
-                    activityIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-
-                val notificationManager =
-                    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                ensureChannel(notificationManager)
-
-                val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                    .setContentTitle("Medication due")
-                    .setContentText("Tap to log your dose")
-                    .setPriority(NotificationCompat.PRIORITY_MAX)
-                    .setCategory(NotificationCompat.CATEGORY_ALARM)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    .setAutoCancel(false)
-                    .setOngoing(true)
-                    .setContentIntent(fullScreenPendingIntent)
-                    .setFullScreenIntent(fullScreenPendingIntent, true)
-                    .setVibrate(longArrayOf(0, 400, 200, 400))
-                    .build()
-
-                notificationManager.notify(requestCode, notification)
             }
         }
     }
 
     companion object {
-        private const val CHANNEL_ID = "medication-reminders-native-v2"
+        const val CHANNEL_ID = "medication-reminders-native-v2"
         private const val ACTION_ALARM_FIRE = "com.health.os.ALARM_FIRE"
         private const val PREFS_NAME = "medication_alarm_prefs"
         private const val KEY_SCHEDULED_IDS = "scheduled_alarm_ids"
@@ -92,6 +65,7 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             // Do not set intent.data — healthos://reminder makes Expo Router navigate
             // before the root layout mounts. JS reads PendingReminderStore instead.
             return Intent(context, MainActivity::class.java).apply {
+                action = AlarmLaunchHelper.ACTION_REMINDER_OPEN
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -100,6 +74,37 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                 putExtra("scheduledAt", scheduledAt)
                 if (doseEventId != null) putExtra("doseEventId", doseEventId)
             }
+        }
+
+        fun buildReminderNotification(
+            context: Context,
+            activityIntent: Intent,
+            requestCode: Int,
+        ): Notification {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            ensureChannel(notificationManager)
+
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                requestCode,
+                activityIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            return NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("Medication due")
+                .setContentText("Tap to log your dose")
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setAutoCancel(false)
+                .setOngoing(true)
+                .setContentIntent(fullScreenPendingIntent)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setVibrate(longArrayOf(0, 400, 200, 400))
+                .build()
         }
 
         private fun ensureChannel(notificationManager: NotificationManager) {

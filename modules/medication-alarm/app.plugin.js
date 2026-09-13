@@ -88,6 +88,7 @@ function withAlarmMainActivity(config) {
     super.onNewIntent(intent)
     setIntent(intent)
     AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)
+    com.healthos.alarm.MedicationAlarmModule.captureReminderLaunchFromActivity(intent)
   }
 
 $1`,

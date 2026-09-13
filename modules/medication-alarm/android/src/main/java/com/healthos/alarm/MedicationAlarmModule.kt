@@ -9,16 +9,55 @@ import android.os.Build
 import android.provider.Settings
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.*
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.uimanager.ViewManager
 
 class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
-    ReactContextBaseJavaModule(reactContext) {
+    ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
+
+    init {
+        reactContext.addLifecycleEventListener(this)
+        instance = this
+    }
 
     override fun getName(): String = "MedicationAlarm"
+
+    override fun onHostResume() {
+        captureReminderLaunch(reactContext.currentActivity?.intent)
+    }
+
+    override fun onHostPause() {}
+
+    override fun onHostDestroy() {
+        if (instance === this) {
+            instance = null
+        }
+    }
+
+    private fun captureReminderLaunch(intent: Intent?) {
+        if (!AlarmLaunchHelper.captureReminderLaunch(intent)) return
+        emitPendingLaunch()
+    }
+
+    private fun emitPendingLaunch() {
+        val params = AlarmLaunchHelper.peekReminderLaunch() ?: return
+        reactContext
+            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+            .emit(EVENT_REMINDER_LAUNCH, params)
+    }
 
     companion object {
         private const val PREFS_NAME = "medication_alarm_prefs"
         private const val KEY_SCHEDULED_IDS = "scheduled_alarm_ids"
+        const val EVENT_REMINDER_LAUNCH = "healthos:reminderLaunch"
+
+        @Volatile
+        private var instance: MedicationAlarmModule? = null
+
+        @JvmStatic
+        fun captureReminderLaunchFromActivity(intent: Intent?) {
+            instance?.captureReminderLaunch(intent)
+        }
     }
 
     private fun parseScheduledAtMillis(scheduledAt: String): Long {
@@ -93,6 +132,15 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("DISMISS_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun consumeReminderLaunchIntent(promise: Promise) {
+        try {
+            promise.resolve(AlarmLaunchHelper.consumeReminderLaunch())
+        } catch (e: Exception) {
+            promise.reject("LAUNCH_ERROR", e.message, e)
         }
     }
 
