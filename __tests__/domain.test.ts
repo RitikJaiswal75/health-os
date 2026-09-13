@@ -393,6 +393,29 @@ describe('reminderQueue', () => {
     });
   });
 
+  it('reopens reminder when notification is tapped after backing out', () => {
+    const { pushReminder, forceOpenReminder } = require('../src/features/reminders/reminderQueue');
+    const { resetReminderNavigationForTests } =
+      require('../src/features/reminders/reminderNavigationDedupe');
+    const { router } = require('expo-router');
+
+    resetReminderNavigationForTests();
+
+    const params = {
+      medicationId: 'med-1',
+      alarmId: 'alarm-1',
+      scheduledAt: '2026-09-08T08:00:00',
+    };
+
+    expect(pushReminder(params)).toBe(true);
+    expect(pushReminder(params)).toBe(false);
+    expect(forceOpenReminder(params)).toBe(true);
+    expect(router.replace).toHaveBeenLastCalledWith({
+      pathname: '/reminder',
+      params,
+    });
+  });
+
   it('does not re-show a reminder that was already handled', () => {
     const { pushReminder, markReminderHandled } = require('../src/features/reminders/reminderQueue');
     const { resetReminderNavigationForTests } =
