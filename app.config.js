@@ -1,5 +1,5 @@
 /** @type {import('expo/config').ExpoConfig} */
-const appJson = require('./app.json');
+const appJson = require('./expo.base.json');
 
 /** Plugins stripped from shareable release APKs (no dev menu / network inspector). */
 const DEV_ONLY_PLUGINS = new Set([

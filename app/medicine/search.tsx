@@ -16,6 +16,12 @@ import {
 import { buildCatalogPrefill } from '@/src/features/catalog/catalogPrefill';
 import { searchIndiaCatalogAsync } from '@/src/features/catalog/indiaCatalog';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { MedicationRepository } from '@/src/features/medications/medicationRepository';
+import {
+  findEarlyDuplicateMedicationConflict,
+  type DuplicateMedicationConflict,
+} from '@/src/features/medications/duplicateMedicationService';
+import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 
 async function loadCachedOrFetch(
   cache: CatalogCacheRepository | null,
@@ -51,6 +57,9 @@ export default function SearchScreen() {
   const [customDialog, setCustomDialog] = useState(false);
   const [customName, setCustomName] = useState('');
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateMedicationConflict | null>(
+    null,
+  );
 
   useEffect(() => {
     reset();
@@ -117,26 +126,47 @@ export default function SearchScreen() {
     void search();
   }, [search]);
 
+  const continueWithMedicationName = (
+    name: string,
+    onContinue: () => void,
+  ): boolean => {
+    if (dbState.status === 'ready') {
+      const medRepo = new MedicationRepository(dbState.db);
+      const conflict = findEarlyDuplicateMedicationConflict(medRepo, name);
+      if (conflict) {
+        setDuplicateConflict(conflict);
+        return false;
+      }
+    }
+    onContinue();
+    return true;
+  };
+
   const selectResult = (item: CatalogResult) => {
-    setName(item.name);
-    setCatalogId(item.id);
+    continueWithMedicationName(item.name, () => {
+      setName(item.name);
+      setCatalogId(item.id);
 
-    const prefill = buildCatalogPrefill(item);
-    if (prefill?.medicationType) {
-      setMedicationType(prefill.medicationType);
-    }
-    if (prefill?.strengthValue != null && prefill.strengthUnit) {
-      setStrength(prefill.strengthValue, prefill.strengthUnit);
-    }
+      const prefill = buildCatalogPrefill(item);
+      if (prefill?.medicationType) {
+        setMedicationType(prefill.medicationType);
+      }
+      if (prefill?.strengthValue != null && prefill.strengthUnit) {
+        setStrength(prefill.strengthValue, prefill.strengthUnit);
+      }
 
-    router.push('/medicine/configure');
+      router.push('/medicine/configure');
+    });
   };
 
   const addCustom = () => {
-    if (!customName.trim()) return;
-    setName(customName.trim());
-    setCustomDialog(false);
-    router.push('/medicine/configure');
+    const name = customName.trim();
+    if (!name) return;
+    continueWithMedicationName(name, () => {
+      setName(name);
+      setCustomDialog(false);
+      router.push('/medicine/configure');
+    });
   };
 
   const footerPaddingBottom =
@@ -188,6 +218,20 @@ export default function SearchScreen() {
           Add custom medication
         </Button>
       </View>
+      <DuplicateMedicationDialog
+        visible={duplicateConflict != null}
+        conflict={duplicateConflict}
+        onDismiss={() => setDuplicateConflict(null)}
+        onEditExisting={() => {
+          if (!duplicateConflict) return;
+          const medicationId = duplicateConflict.medication.id;
+          setDuplicateConflict(null);
+          setCustomDialog(false);
+          reset();
+          router.replace(`/medicine/${medicationId}`);
+        }}
+      />
+
       <Portal>
         <Dialog visible={customDialog} onDismiss={() => setCustomDialog(false)}>
           <Dialog.Title>Custom medication</Dialog.Title>

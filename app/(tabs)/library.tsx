@@ -61,11 +61,6 @@ export default function LibraryScreen() {
     <View style={styles.container}>
       <Appbar.Header>
         <Appbar.Content title="Your medications" />
-        <Appbar.Action
-          icon="plus"
-          onPress={() => void navigateToAddMedication()}
-          accessibilityLabel="Add medication"
-        />
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={styles.content}>

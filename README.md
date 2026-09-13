@@ -164,7 +164,7 @@ npm run android:apk:local
 
 ### CI release (GitHub Actions)
 
-Bump `version` in `app.json` before pushing when you want a new tagged download. The workflow:
+Bump `version` in `expo.base.json` before pushing when you want a new tagged download. The workflow:
 
 1. Runs `npm run android:apk` (arm64 shareable sideload APK)
 2. Publishes a **GitHub Release** tagged `v{version}` with `health-os-release.apk` attached
