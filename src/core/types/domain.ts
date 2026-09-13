@@ -31,6 +31,19 @@ export function getMedicationTypeLabel(type?: MedicationType | string): string {
 
 export type DoseStatus = 'pending' | 'taken' | 'skipped' | 'missed' | 'snoozed';
 
+/** Display labels for dose status values (DB stores lowercase `taken`, `pending`, etc.). */
+export const DOSE_STATUS_LABEL: Record<DoseStatus, string> = {
+  pending: 'Pending',
+  taken: 'Taken',
+  skipped: 'Skipped',
+  missed: 'Missed',
+  snoozed: 'Snoozed',
+};
+
+export const DOSE_STATUS_OPTIONS = (
+  Object.entries(DOSE_STATUS_LABEL) as [DoseStatus, string][]
+).map(([value, label]) => ({ value, label }));
+
 export type InventoryTransactionType =
   | 'initial'
   | 'dose_taken'

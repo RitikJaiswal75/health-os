@@ -8,7 +8,8 @@ import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import type { DoseEvent } from '@/src/db/schema';
-import type { DoseStatus } from '@/src/core/types/domain';
+import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
+import { originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 export default function HistoryScreen() {
@@ -75,7 +76,9 @@ export default function HistoryScreen() {
                 <Card.Content>
                   <Text variant="titleMedium">{med?.nickname ?? med?.name}</Text>
                   <Text variant="bodySmall">
-                    {formatScheduledTime(dose.scheduledAt)} — {dose.status}
+                    {dose.status === 'snoozed'
+                      ? `${formatScheduledTime(originalScheduledAt(dose))} — ${DOSE_STATUS_LABEL.snoozed} until ${formatScheduledTime(dose.scheduledAt)}`
+                      : `${formatScheduledTime(dose.scheduledAt)} — ${DOSE_STATUS_LABEL[dose.status as DoseStatus]}`}
                   </Text>
                 </Card.Content>
               </Card>
@@ -89,10 +92,13 @@ export default function HistoryScreen() {
           <Dialog.Title>Edit dose</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
-              <RadioButton.Item label="Taken" value="taken" />
-              <RadioButton.Item label="Skipped" value="skipped" />
-              <RadioButton.Item label="Missed" value="missed" />
-              <RadioButton.Item label="Pending" value="pending" />
+              {DOSE_STATUS_OPTIONS.filter((option) => option.value !== 'snoozed').map((option) => (
+                <RadioButton.Item
+                  key={option.value}
+                  label={option.label}
+                  value={option.value}
+                />
+              ))}
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>

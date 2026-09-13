@@ -83,7 +83,9 @@
       "./modules/medication-alarm/app.plugin.js",
       "./plugins/withDevClientMainApplication.js",
       "./plugins/withReleaseApkOptimization.js",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
