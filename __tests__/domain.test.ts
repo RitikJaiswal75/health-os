@@ -1040,6 +1040,11 @@ describe('doseSlotUtils', () => {
 });
 
 describe('doseGenerationService', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   it('removes pending doses that no longer match the schedule', () => {
     const deletedIds: string[] = [];
     const pendingDoses = [
@@ -1194,6 +1199,357 @@ describe('doseGenerationService', () => {
     const createdAgain = generateUpcomingDoseEvents(mockDb, 7);
     expect(createdAgain).toBe(0);
     expect(createSpy).toHaveBeenCalledTimes(created);
+  });
+
+  it('creates only the remaining pending doses after completed doses for today', () => {
+    const { pendingDosesNeededAfterCompleted } = require('../src/features/medications/doseGenerationService');
+
+    expect(pendingDosesNeededAfterCompleted(2, 3)).toBe(0);
+    expect(pendingDosesNeededAfterCompleted(4, 3)).toBe(1);
+    expect(pendingDosesNeededAfterCompleted(3, 0)).toBe(3);
+    expect(pendingDosesNeededAfterCompleted(3, 1)).toBe(2);
+    expect(pendingDosesNeededAfterCompleted(1, 1)).toBe(0);
+  });
+
+  it('removes extra today pending doses when completed plus pending exceed the new dosage', () => {
+    const deleted: string[] = [];
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const doseRepo = new DoseEventRepository({} as never);
+    jest.spyOn(doseRepo, 'delete').mockImplementation((id: unknown) => {
+      deleted.push(String(id));
+    });
+
+    const { trimExtraPendingDosesForDate } = require('../src/features/medications/doseGenerationService');
+    const remaining = trimExtraPendingDosesForDate(
+      doseRepo,
+      [
+        {
+          id: 'taken-8am',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T08:00:00',
+          status: 'taken',
+        },
+        {
+          id: 'taken-8pm',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T20:00:00',
+          status: 'taken',
+        },
+        {
+          id: 'pending-11am',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T11:00:00',
+          status: 'pending',
+        },
+        {
+          id: 'pending-4pm',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T16:00:00',
+          status: 'pending',
+        },
+        {
+          id: 'pending-11pm',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T23:00:00',
+          status: 'pending',
+        },
+      ],
+      3,
+    );
+
+    expect(deleted).toEqual(['pending-11pm', 'pending-4pm']);
+    expect(remaining.map((dose: { id: string }) => dose.id)).toEqual([
+      'taken-8am',
+      'taken-8pm',
+      'pending-11am',
+    ]);
+  });
+
+  it('does not add today pending doses when completed count already meets the new dosage', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T10:00:00'));
+
+    const created: string[] = [];
+    const takenRows = [
+      {
+        id: 'taken-1',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T08:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-2',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T14:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-3',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T20:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+    ];
+
+    const mockDb = {
+      runSync: jest.fn(),
+      getFirstSync: jest.fn(() => null),
+      getAllSync: jest.fn((sql: string) => {
+        if (sql.includes('NOT IN (SELECT id FROM medications)')) return [];
+        if (sql.includes('FROM dose_events')) return takenRows;
+        if (sql.includes('FROM medications')) return [{ id: 'med-1', name: 'Test' }];
+        if (sql.includes('FROM schedules')) {
+          return [
+            {
+              id: 'sched-1',
+              medication_id: 'med-1',
+              type: 'fixed_daily',
+              times_of_day: JSON.stringify([
+                { hour: 8, minute: 0, doseAmount: 1 },
+                { hour: 20, minute: 0, doseAmount: 1 },
+              ]),
+              start_date: '2026-09-01',
+              is_active: 1,
+              created_at: '2026-09-01',
+            },
+          ];
+        }
+        return [];
+      }),
+    };
+
+    const { generateUpcomingDoseEvents } = require('../src/features/medications/doseGenerationService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(MedicationRepository.prototype, 'getAll').mockReturnValue([{ id: 'med-1' }]);
+    jest.spyOn(MedicationRepository.prototype, 'getActiveSchedules').mockReturnValue([
+      {
+        id: 'sched-1',
+        medicationId: 'med-1',
+        type: 'fixed_daily',
+        timesOfDay: JSON.stringify([
+          { hour: 8, minute: 0, doseAmount: 1 },
+          { hour: 20, minute: 0, doseAmount: 1 },
+        ]),
+        startDate: '2026-09-01',
+        isActive: true,
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
+      created.push((input as { scheduledAt: string }).scheduledAt);
+      return { id: `dose-${created.length}`, status: 'pending' };
+    });
+
+    generateUpcomingDoseEvents(mockDb, 2);
+
+    const todayCreated = created.filter((at: string) => at.startsWith('2026-09-13'));
+    expect(todayCreated).toEqual([]);
+  });
+
+  it('adds only the missing pending dose when today is already partly completed', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T10:00:00'));
+
+    const created: string[] = [];
+    const takenRows = [
+      {
+        id: 'taken-1',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T08:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-2',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T14:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-3',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T20:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+    ];
+
+    const mockDb = {
+      runSync: jest.fn(),
+      getFirstSync: jest.fn(() => null),
+      getAllSync: jest.fn((sql: string) => {
+        if (sql.includes('NOT IN (SELECT id FROM medications)')) return [];
+        if (sql.includes('FROM dose_events')) return takenRows;
+        return [];
+      }),
+    };
+
+    const { generateUpcomingDoseEvents } = require('../src/features/medications/doseGenerationService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(MedicationRepository.prototype, 'getAll').mockReturnValue([{ id: 'med-1' }]);
+    jest.spyOn(MedicationRepository.prototype, 'getActiveSchedules').mockReturnValue([
+      {
+        id: 'sched-1',
+        medicationId: 'med-1',
+        type: 'fixed_daily',
+        timesOfDay: JSON.stringify([
+          { hour: 8, minute: 0, doseAmount: 1 },
+          { hour: 12, minute: 0, doseAmount: 1 },
+          { hour: 16, minute: 0, doseAmount: 1 },
+          { hour: 20, minute: 0, doseAmount: 1 },
+        ]),
+        startDate: '2026-09-01',
+        isActive: true,
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockImplementation(
+      (...args: unknown[]) => {
+        const scheduledAt = String(args[1]);
+        return scheduledAt === '2026-09-13T08:00:00' || scheduledAt === '2026-09-13T20:00:00';
+      },
+    );
+    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
+      created.push((input as { scheduledAt: string }).scheduledAt);
+      return { id: `dose-${created.length}`, status: 'pending' };
+    });
+
+    generateUpcomingDoseEvents(mockDb, 1);
+
+    const todayCreated = created.filter((at: string) => at.startsWith('2026-09-13'));
+    expect(todayCreated).toEqual(['2026-09-13T12:00:00']);
+  });
+
+  it('does not fill remaining new times on a later generate after today is already complete', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T21:00:00'));
+
+    const created: string[] = [];
+    const existingRows = [
+      {
+        id: 'taken-8am',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T08:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-8pm',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T20:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'pending-11am',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T11:00:00',
+        status: 'pending',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+    ];
+
+    const mockDb = {
+      runSync: jest.fn(),
+      getFirstSync: jest.fn(() => null),
+      getAllSync: jest.fn((sql: string) => {
+        if (sql.includes('NOT IN (SELECT id FROM medications)')) return [];
+        if (sql.includes('FROM dose_events')) return existingRows;
+        return [];
+      }),
+    };
+
+    const { generateUpcomingDoseEvents } = require('../src/features/medications/doseGenerationService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(MedicationRepository.prototype, 'getAll').mockReturnValue([{ id: 'med-1' }]);
+    jest.spyOn(MedicationRepository.prototype, 'getActiveSchedules').mockReturnValue([
+      {
+        id: 'sched-1',
+        medicationId: 'med-1',
+        type: 'fixed_daily',
+        timesOfDay: JSON.stringify([
+          { hour: 11, minute: 0, doseAmount: 1 },
+          { hour: 16, minute: 0, doseAmount: 1 },
+          { hour: 23, minute: 0, doseAmount: 1 },
+        ]),
+        startDate: '2026-09-01',
+        isActive: true,
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([
+      {
+        id: 'pending-11am',
+        medicationId: 'med-1',
+        scheduleId: 'sched-1',
+        scheduledAt: '2026-09-13T11:00:00',
+        status: 'pending',
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockImplementation((...args: unknown[]) => {
+      return String(args[1]) === '2026-09-13T11:00:00';
+    });
+    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
+      created.push((input as { scheduledAt: string }).scheduledAt);
+      return { id: `dose-${created.length}`, status: 'pending' };
+    });
+
+    generateUpcomingDoseEvents(mockDb, 1);
+
+    const todayCreated = created.filter((at: string) => at.startsWith('2026-09-13'));
+    expect(todayCreated).toEqual([]);
   });
 });
 

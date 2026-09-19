@@ -139,23 +139,51 @@ export function resyncPendingDosesAfterScheduleUpdate(
   return removed;
 }
 
-function scheduleDayAlreadyResolved(
+/** How many new pending doses a day still needs after existing records. */
+export function pendingDosesNeededAfterCompleted(
+  timesPerDay: number,
+  completedCount: number,
+): number {
+  return Math.max(0, timesPerDay - Math.max(0, completedCount));
+}
+
+function getDosesForMedicationOnDate(
   db: SQLiteDatabase,
   medicationId: string,
-  scheduleId: string,
   dateKey: string,
-): boolean {
+): ReturnType<typeof mapDoseEventRow>[] {
   return db
-    .getAllSync(
-      `SELECT * FROM dose_events WHERE medication_id = ? AND schedule_id = ?`,
-      [medicationId, scheduleId],
-    )
+    .getAllSync(`SELECT * FROM dose_events WHERE medication_id = ?`, [medicationId])
     .map(mapDoseEventRow)
-    .some(
-      (dose) =>
-        doseBelongsToDateKey(dose, dateKey) &&
-        ['taken', 'skipped', 'missed'].includes(dose.status),
+    .filter((dose) => doseBelongsToDateKey(dose, dateKey));
+}
+
+/** Drop extra pending rows when today already has more doses than the new times-per-day. */
+export function trimExtraPendingDosesForDate(
+  doseRepo: DoseEventRepository,
+  dosesForDate: ReturnType<typeof mapDoseEventRow>[],
+  timesPerDay: number,
+): ReturnType<typeof mapDoseEventRow>[] {
+  const surplus = dosesForDate.length - timesPerDay;
+  if (surplus <= 0) return dosesForDate;
+
+  const extraPending = [...dosesForDate]
+    .filter((dose) => dose.status === 'pending')
+    .sort(
+      (a, b) =>
+        parseScheduledAt(b.scheduledAt).getTime() - parseScheduledAt(a.scheduledAt).getTime(),
     );
+
+  const removedIds = new Set<string>();
+  let removed = 0;
+  for (const dose of extraPending) {
+    if (removed >= surplus) break;
+    doseRepo.delete(dose.id);
+    removedIds.add(dose.id);
+    removed += 1;
+  }
+
+  return dosesForDate.filter((dose) => !removedIds.has(dose.id));
 }
 
 /** Remove dose rows whose medication was deleted (legacy DBs without FK cascade). */
@@ -193,17 +221,18 @@ export function generateUpcomingDoseEvents(
       const occurrences = expandOccurrences(schedule, from, to);
       const times = parseTimesOfDay(schedule.timesOfDay);
       pruneStalePendingDoses(doseRepo, schedule.id, occurrences);
+      const remainingToday = trimExtraPendingDosesForDate(
+        doseRepo,
+        getDosesForMedicationOnDate(db, med.id, todayKey),
+        times.length,
+      );
+      const neededToday = pendingDosesNeededAfterCompleted(times.length, remainingToday.length);
+      let createdToday = 0;
       for (const occ of occurrences) {
         const occDateKey = formatDateKey(parseScheduledAt(occ.scheduledAt));
-        if (
-          times.length === 1 &&
-          occDateKey === todayKey &&
-          scheduleDayAlreadyResolved(db, med.id, schedule.id, todayKey)
-        ) {
-          continue;
-        }
         if (doseRepo.existsForScheduleAt(schedule.id, occ.scheduledAt)) continue;
         if (doseRepo.existsForMedicationAt(occ.medicationId, occ.scheduledAt)) continue;
+        if (occDateKey === todayKey && createdToday >= neededToday) continue;
         doseRepo.createPending({
           medicationId: occ.medicationId,
           scheduleId: occ.scheduleId,
@@ -211,6 +240,9 @@ export function generateUpcomingDoseEvents(
           doseAmount: occ.doseAmount,
         });
         created += 1;
+        if (occDateKey === todayKey) {
+          createdToday += 1;
+        }
       }
     }
   }
