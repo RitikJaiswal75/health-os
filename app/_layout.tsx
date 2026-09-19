@@ -56,7 +56,7 @@ export default function RootLayout() {
                 />
                 <Stack.Screen
                   name="reliability"
-                  options={{ presentation: 'modal', headerShown: true, title: 'Reminder permissions' }}
+                  options={{ presentation: 'modal', headerShown: true, title: 'Troubleshooting' }}
                 />
               </Stack>
               <ReminderRouterReadyGate />

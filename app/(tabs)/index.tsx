@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Appbar, Button, Card, Dialog, FAB, Portal, RadioButton, Text } from 'react-native-paper';
+import { Appbar, Button, Card, Dialog, FAB, Menu, Portal, RadioButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { navigateToAddMedication } from '@/src/features/reliability/reliabilityService';
@@ -31,6 +31,7 @@ export default function HomeScreen() {
   const [editStatus, setEditStatus] = useState<DoseStatus>('taken');
   const [snoozeDose, setSnoozeDose] = useState<DoseEvent | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const dateKey = formatDateKey(selectedDate);
 
@@ -164,7 +165,32 @@ export default function HomeScreen() {
       <Appbar.Header>
         <Appbar.Content title="Health OS" />
         <Appbar.Action icon="calendar" onPress={() => router.push('/history')} accessibilityLabel="Open history" />
-        <Appbar.Action icon="dots-vertical" onPress={() => router.push('/about')} accessibilityLabel="Open settings" />
+        <Menu
+          visible={menuVisible}
+          onDismiss={() => setMenuVisible(false)}
+          anchor={
+            <Appbar.Action
+              icon="dots-vertical"
+              onPress={() => setMenuVisible(true)}
+              accessibilityLabel="Open menu"
+            />
+          }
+        >
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(false);
+              router.push('/about');
+            }}
+            title="About"
+          />
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(false);
+              router.push('/reliability');
+            }}
+            title="Troubleshooting"
+          />
+        </Menu>
       </Appbar.Header>
 
       <ReminderPermissionBanner />
