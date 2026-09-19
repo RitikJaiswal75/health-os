@@ -69,6 +69,7 @@ interface WizardStore {
   setInventory: (quantity: number, refillEnabled: boolean, refillThreshold?: number) => void;
   setNicknameNotes: (nickname?: string, notes?: string) => void;
   loadDraftForEdit: (draft: WizardDraft, medicationId: string) => void;
+  beginNewDraft: (partial?: Partial<WizardDraft>) => void;
   reset: () => void;
   canProceedConfigure: () => boolean;
   canProceedSchedule: () => boolean;
@@ -171,6 +172,24 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       editingMedicationId: medicationId,
       editSessionKey: s.editSessionKey + 1,
     })),
+  beginNewDraft: (partial = {}) =>
+    set(() => {
+      let draft: WizardDraft = { ...initialDraft(), ...partial };
+      if (partial.medicationType) {
+        const pillShape = defaultShapeForMedicationType(partial.medicationType);
+        const suggestedUnit = defaultStrengthUnitForMedicationType(partial.medicationType);
+        draft = {
+          ...draft,
+          pillShape,
+          pillColor2: supportsDualColor(pillShape) ? draft.pillColor2 : undefined,
+          strengthUnit: draft.strengthUnit ?? suggestedUnit,
+        };
+      }
+      return {
+        draft,
+        editingMedicationId: undefined,
+      };
+    }),
   reset: () =>
     set({
       draft: initialDraft(),

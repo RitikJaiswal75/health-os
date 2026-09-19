@@ -2,10 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { AppState, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { permissionHelper, type PermissionState } from '../../core/permissions/permissionHelper';
+import { useWizardStore } from '../medications/wizardStore';
 
 export const ADD_MEDICATION_PATH = '/medicine/search';
 
 export function navigateToAddMedication(): void {
+  useWizardStore.getState().reset();
   router.push(ADD_MEDICATION_PATH);
 }
 

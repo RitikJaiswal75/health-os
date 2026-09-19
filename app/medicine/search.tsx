@@ -24,7 +24,7 @@ const KEYBOARD_FOOTER_GAP = 16;
 const SEARCH_DEBOUNCE_MS = 400;
 
 export default function SearchScreen() {
-  const { setName, setCatalogId, setMedicationType, setStrength, reset } = useWizardStore();
+  const { beginNewDraft, reset } = useWizardStore();
   const insets = useSafeAreaInsets();
   const dbState = useDatabaseBootstrap();
   const [query, setQuery] = useState('');
@@ -38,10 +38,6 @@ export default function SearchScreen() {
   const [duplicateConflict, setDuplicateConflict] = useState<DuplicateMedicationConflict | null>(
     null,
   );
-
-  useEffect(() => {
-    reset();
-  }, [reset]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -131,16 +127,15 @@ export default function SearchScreen() {
 
   const selectResult = (item: CatalogResult) => {
     continueWithMedicationName(item.name, () => {
-      setName(item.name);
-      setCatalogId(item.id);
-
       const prefill = buildCatalogPrefill(item);
-      if (prefill?.medicationType) {
-        setMedicationType(prefill.medicationType);
-      }
-      if (prefill?.strengthValue != null && prefill.strengthUnit) {
-        setStrength(prefill.strengthValue, prefill.strengthUnit);
-      }
+      beginNewDraft({
+        name: item.name,
+        catalogId: item.id,
+        ...(prefill?.medicationType ? { medicationType: prefill.medicationType } : {}),
+        ...(prefill?.strengthValue != null && prefill.strengthUnit
+          ? { strengthValue: prefill.strengthValue, strengthUnit: prefill.strengthUnit }
+          : {}),
+      });
 
       router.push('/medicine/configure');
     });
@@ -150,7 +145,7 @@ export default function SearchScreen() {
     const name = customName.trim();
     if (!name) return;
     continueWithMedicationName(name, () => {
-      setName(name);
+      beginNewDraft({ name });
       setCustomDialog(false);
       router.push('/medicine/configure');
     });

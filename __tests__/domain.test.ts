@@ -681,6 +681,30 @@ describe('wizardStore', () => {
     expect(draft.strengthUnit).toBe('g');
   });
 
+  it('reset discards unsaved medication type', () => {
+    const { useWizardStore } = require('../src/features/medications/wizardStore');
+    useWizardStore.getState().reset();
+    useWizardStore.getState().setName('Augmentin');
+    useWizardStore.getState().setMedicationType('tablet');
+    useWizardStore.getState().reset();
+
+    const { draft } = useWizardStore.getState();
+    expect(draft.name).toBe('');
+    expect(draft.medicationType).toBeUndefined();
+  });
+
+  it('beginNewDraft replaces prior unsaved wizard state atomically', () => {
+    const { useWizardStore } = require('../src/features/medications/wizardStore');
+    useWizardStore.getState().reset();
+    useWizardStore.getState().setName('Augmentin');
+    useWizardStore.getState().setMedicationType('tablet');
+    useWizardStore.getState().beginNewDraft({ name: 'Test 3' });
+
+    const { draft } = useWizardStore.getState();
+    expect(draft.name).toBe('Test 3');
+    expect(draft.medicationType).toBeUndefined();
+  });
+
   it('keeps in-memory schedule edits while editing the same medication', () => {
     const { useWizardStore } = require('../src/features/medications/wizardStore');
     useWizardStore.getState().reset();

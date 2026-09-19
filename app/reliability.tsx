@@ -11,6 +11,7 @@ import {
 } from '@/src/features/reliability/reliabilityService';
 import { permissionHelper, type PermissionKind } from '@/src/core/permissions/permissionHelper';
 import { ensureNotificationSetup } from '@/src/features/reminders/notificationSetup';
+import { useWizardStore } from '@/src/features/medications/wizardStore';
 
 const MIN_CHECK_AGAIN_FEEDBACK_MS = 700;
 
@@ -58,6 +59,7 @@ export default function ReliabilityScreen() {
 
   const handleContinue = () => {
     if (returnTo === ADD_MEDICATION_PATH) {
+      useWizardStore.getState().reset();
       router.replace('/medicine/search');
       return;
     }

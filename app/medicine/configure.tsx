@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Button, Dialog, Portal, RadioButton, Text, TextInput } from 'react-native-paper';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useNavigation } from 'expo-router';
 import { MedicationTypeDialog } from '@/src/core/components/MedicationTypeDialog';
 import {
   getMedicationTypeLabel,
@@ -78,6 +78,7 @@ function StrengthDialog({
 }
 
 export default function ConfigureScreen() {
+  const navigation = useNavigation();
   const {
     draft,
     setName,
@@ -86,10 +87,20 @@ export default function ConfigureScreen() {
     setDoseUnit,
     canProceedConfigure,
     editingMedicationId,
+    reset,
   } = useWizardStore();
   const [typeDialog, setTypeDialog] = useState(false);
   const [strengthDialog, setStrengthDialog] = useState(false);
   const [doseUnitDialog, setDoseUnitDialog] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (editingMedicationId) return;
+      if (event.data.action.type !== 'GO_BACK' && event.data.action.type !== 'POP') return;
+      reset();
+    });
+    return unsubscribe;
+  }, [navigation, editingMedicationId, reset]);
 
   const typeLabel = getMedicationTypeLabel(draft.medicationType);
   const isPowder = draft.medicationType === 'powder';
