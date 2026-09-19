@@ -13,6 +13,7 @@ import {
   readScheduledAtFromRow,
   slotKeysEqual,
   buildSnoozedFromNotes,
+  sortDosesForDisplay,
 } from './doseSlotUtils';
 import {
   mapDoseEventRow,
@@ -395,8 +396,10 @@ export class DoseEventRepository {
     const medRepo = new MedicationRepository(this.db);
     const scheduleById = new Map<string, Schedule>();
     const schedulesByMedId = new Map<string, Schedule[]>();
+    const medicationCreatedAt = new Map<string, string>();
 
     for (const med of medRepo.getAll()) {
+      medicationCreatedAt.set(med.id, med.createdAt);
       const schedules = medRepo.getActiveSchedules(med.id);
       schedulesByMedId.set(med.id, schedules);
       for (const schedule of schedules) {
@@ -413,8 +416,11 @@ export class DoseEventRepository {
         doseVisibleForScheduleOnDateKey(dose, dateKey, scheduleById, schedulesByMedId),
       );
 
-    return filterPendingDuplicatingResolved(
-      filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
+    return sortDosesForDisplay(
+      filterPendingDuplicatingResolved(
+        filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
+      ),
+      medicationCreatedAt,
     );
   }
 

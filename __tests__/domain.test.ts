@@ -978,6 +978,65 @@ describe('doseSlotUtils', () => {
     expect(doseBelongsToDateKey(snoozed, '2026-09-07')).toBe(false);
   });
 
+  it('sorts same-time doses with newer medications first', () => {
+    const { sortDosesForDisplay } = require('../src/features/medications/doseSlotUtils');
+    const medicationCreatedAt = new Map([
+      ['med-old', '2026-01-01T00:00:00.000Z'],
+      ['med-new', '2026-09-01T00:00:00.000Z'],
+      ['med-middle', '2026-06-01T00:00:00.000Z'],
+    ]);
+    const doses = [
+      {
+        id: 'dose-old',
+        medicationId: 'med-old',
+        scheduledAt: '2026-09-13T08:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+      {
+        id: 'dose-new',
+        medicationId: 'med-new',
+        scheduledAt: '2026-09-13T08:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+      {
+        id: 'dose-middle',
+        medicationId: 'med-middle',
+        scheduledAt: '2026-09-13T08:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+      {
+        id: 'dose-later',
+        medicationId: 'med-old',
+        scheduledAt: '2026-09-13T20:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+    ];
+
+    const sorted = sortDosesForDisplay(doses, medicationCreatedAt);
+    expect(sorted.map((dose: { id: string }) => dose.id)).toEqual([
+      'dose-new',
+      'dose-middle',
+      'dose-old',
+      'dose-later',
+    ]);
+  });
+
   it('cleans pending doses when a once-daily schedule was snoozed', () => {
     const deleted: string[] = [];
     const mockDb = {

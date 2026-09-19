@@ -114,12 +114,24 @@ export function dedupeDoseEvents(doses: DoseEvent[]): DoseEvent[] {
     bySlot.set(key, group);
   }
 
-  return Array.from(bySlot.values())
-    .map(pickCanonicalDose)
-    .sort(
-      (a, b) =>
-        parseScheduledAt(a.scheduledAt).getTime() - parseScheduledAt(b.scheduledAt).getTime(),
-    );
+  return Array.from(bySlot.values()).map(pickCanonicalDose);
+}
+
+/** Home/history list order: scheduled time ascending, then newest medication first. */
+export function sortDosesForDisplay(
+  doses: DoseEvent[],
+  medicationCreatedAt: ReadonlyMap<string, string>,
+): DoseEvent[] {
+  return [...doses].sort((a, b) => {
+    const timeDiff =
+      parseScheduledAt(effectiveScheduledAt(a)).getTime() -
+      parseScheduledAt(effectiveScheduledAt(b)).getTime();
+    if (timeDiff !== 0) return timeDiff;
+
+    const aCreated = medicationCreatedAt.get(a.medicationId) ?? '';
+    const bCreated = medicationCreatedAt.get(b.medicationId) ?? '';
+    return bCreated.localeCompare(aCreated);
+  });
 }
 
 export function normalizeScheduledAtStorage(iso: string): string {
