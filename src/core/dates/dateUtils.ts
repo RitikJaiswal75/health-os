@@ -64,6 +64,10 @@ export function isToday(date: Date): boolean {
   return isSameDay(date, new Date());
 }
 
+export function isFutureDateKey(dateKey: string, now: Date = new Date()): boolean {
+  return parseDateKey(dateKey).getTime() > startOfDay(now).getTime();
+}
+
 export function computeDonutRatio(taken: number, scheduled: number): number {
   if (scheduled <= 0) return 0;
   return Math.min(1, taken / scheduled);

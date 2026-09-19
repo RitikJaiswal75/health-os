@@ -64,6 +64,14 @@ describe('dateUtils', () => {
     expect(formatDateKey(strip[0])).toBe('2026-09-02');
     expect(formatDateKey(strip[6])).toBe('2026-09-08');
   });
+
+  it('detects future calendar dates', () => {
+    const { isFutureDateKey } = require('../src/core/dates/dateUtils');
+    const today = new Date('2026-09-08T15:00:00');
+    expect(isFutureDateKey('2026-09-07', today)).toBe(false);
+    expect(isFutureDateKey('2026-09-08', today)).toBe(false);
+    expect(isFutureDateKey('2026-09-09', today)).toBe(true);
+  });
 });
 
 describe('catalogService', () => {
@@ -907,6 +915,30 @@ describe('formatStrengthSubtitle', () => {
 });
 
 describe('doseSlotUtils', () => {
+  it('allows logging doses for today and past dates only', () => {
+    const { canLogDoseForTodayOrPast } = require('../src/features/medications/doseSlotUtils');
+    const today = new Date('2026-09-08T15:00:00');
+
+    expect(
+      canLogDoseForTodayOrPast({ scheduledAt: '2026-09-07T08:00:00', notes: null }, today),
+    ).toBe(true);
+    expect(
+      canLogDoseForTodayOrPast({ scheduledAt: '2026-09-08T20:00:00', notes: null }, today),
+    ).toBe(true);
+    expect(
+      canLogDoseForTodayOrPast({ scheduledAt: '2026-09-09T08:00:00', notes: null }, today),
+    ).toBe(false);
+    expect(
+      canLogDoseForTodayOrPast(
+        {
+          scheduledAt: '2026-09-09T09:00:00',
+          notes: 'snoozedFrom:2026-09-08T08:00:00',
+        },
+        today,
+      ),
+    ).toBe(true);
+  });
+
   it('treats UTC and local storage as the same slot', () => {
     const { doseSlotKey, dedupeDoseEvents } = require('../src/features/medications/doseSlotUtils');
 

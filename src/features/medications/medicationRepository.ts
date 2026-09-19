@@ -5,6 +5,7 @@ import type { ScheduleType, TimeOfDay, DoseStatus, InventoryTransactionType } fr
 import { parseScheduledAt } from '../../core/dates/dateUtils';
 import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
 import {
+  canLogDoseForTodayOrPast,
   dedupeDoseEvents,
   doseBelongsToDateKey,
   filterPendingDuplicatingResolved,
@@ -539,6 +540,13 @@ export class DoseEventRepository {
     status: DoseStatus,
     options?: { variantId?: string; takenAt?: string },
   ): DoseEvent {
+    const existing = this.getById(id);
+    if (!existing) {
+      throw new Error('Dose event not found');
+    }
+    if (status === 'taken' && !canLogDoseForTodayOrPast(existing)) {
+      throw new Error('Cannot mark a future dose as taken');
+    }
     const now = new Date().toISOString();
     this.db.runSync(
       `UPDATE dose_events SET status = ?, variant_id = COALESCE(?, variant_id),

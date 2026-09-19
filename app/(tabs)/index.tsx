@@ -8,7 +8,7 @@ import { formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip }
 import { DateStrip, type DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
-import { originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
+import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { generateUpcomingDoseEvents, removePendingDuplicatingResolvedDoses, removeDuplicateDoseEvents } from '@/src/features/medications/doseGenerationService';
 import {
   cleanupSnoozeConflicts,
@@ -89,7 +89,7 @@ export default function HomeScreen() {
   );
 
   const handleTaken = (dose: DoseEvent) => {
-    if (dbState.status !== 'ready' || !medRepo) return;
+    if (dbState.status !== 'ready' || !medRepo || !canLogDoseForTodayOrPast(dose)) return;
 
     const variants = medRepo.getVariants(dose.medicationId);
     if (variants.length > 1) {
@@ -134,6 +134,7 @@ export default function HomeScreen() {
 
   const handleSaveEdit = () => {
     if (!editDose || dbState.status !== 'ready' || !medRepo) return;
+    if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
     if (editStatus === 'taken' && editDose.status !== 'taken') {
       markDoseAsTaken(dbState.db, editDose.id);
     } else {
@@ -183,7 +184,9 @@ export default function HomeScreen() {
               doses.map((dose) => {
                 const med = meds.find((m) => m.id === dose.medicationId);
                 const isLogged = ['taken', 'skipped', 'missed'].includes(dose.status);
-                const isActionable = dose.status === 'pending' || dose.status === 'snoozed';
+                const isActionable =
+                  (dose.status === 'pending' || dose.status === 'snoozed') &&
+                  canLogDoseForTodayOrPast(dose);
                 return (
                   <Card
                     key={dose.id}
@@ -272,7 +275,17 @@ export default function HomeScreen() {
           <Dialog.Title>Edit dose</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
-              {DOSE_STATUS_OPTIONS.filter((option) => option.value !== 'snoozed').map((option) => (
+              {DOSE_STATUS_OPTIONS.filter((option) => {
+                if (option.value === 'snoozed') return false;
+                if (
+                  option.value === 'taken' &&
+                  editDose &&
+                  !canLogDoseForTodayOrPast(editDose)
+                ) {
+                  return false;
+                }
+                return true;
+              }).map((option) => (
                 <RadioButton.Item
                   key={option.value}
                   label={option.label}

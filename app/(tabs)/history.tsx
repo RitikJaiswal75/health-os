@@ -9,7 +9,7 @@ import { DoseEventRepository, MedicationRepository } from '@/src/features/medica
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import type { DoseEvent } from '@/src/db/schema';
 import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
-import { originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
+import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
@@ -34,6 +34,7 @@ export default function HistoryScreen() {
 
   const handleSaveEdit = () => {
     if (!editDose || dbState.status !== 'ready' || !medRepo) return;
+    if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
     const doseRepo = new DoseEventRepository(dbState.db);
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
     inventory.applyStatusChange(editDose.id, editDose.status as DoseStatus, editStatus);
@@ -96,7 +97,17 @@ export default function HistoryScreen() {
           <Dialog.Title>Edit dose</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
-              {DOSE_STATUS_OPTIONS.filter((option) => option.value !== 'snoozed').map((option) => (
+              {DOSE_STATUS_OPTIONS.filter((option) => {
+                if (option.value === 'snoozed') return false;
+                if (
+                  option.value === 'taken' &&
+                  editDose &&
+                  !canLogDoseForTodayOrPast(editDose)
+                ) {
+                  return false;
+                }
+                return true;
+              }).map((option) => (
                 <RadioButton.Item
                   key={option.value}
                   label={option.label}

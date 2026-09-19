@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
+import { canLogDoseForTodayOrPast } from '../medications/doseSlotUtils';
 import type { DoseStatus } from '../../core/types/domain';
 import { InventoryService } from './inventoryService';
 import { notifyRefillIfNeeded } from './refillReminderService';
@@ -15,7 +16,7 @@ export function markDoseAsTaken(
   const inventory = new InventoryService(db, medRepo, doseRepo);
 
   const dose = doseRepo.getById(doseId);
-  if (!dose || dose.status === 'taken') return false;
+  if (!dose || dose.status === 'taken' || !canLogDoseForTodayOrPast(dose)) return false;
 
   const resolvedVariantId = inventory.resolveVariantId(
     dose.medicationId,

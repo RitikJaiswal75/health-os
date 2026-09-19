@@ -1,6 +1,11 @@
 import { format } from 'date-fns';
 import type { DoseEvent } from '../../db/schema';
-import { formatLocalDateTime, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
+import {
+  formatLocalDateTime,
+  isFutureDateKey,
+  parseScheduledAt,
+  scheduledAtToDateKey,
+} from '../../core/dates/dateUtils';
 
 const SNOOZE_NOTE_PREFIX = 'snoozedFrom:';
 
@@ -163,4 +168,12 @@ export function doseBelongsToDateKey(
 
 export function originalScheduledAt(dose: Pick<DoseEvent, 'scheduledAt' | 'notes'>): string {
   return parseSnoozedFromNotes(dose.notes) ?? dose.scheduledAt;
+}
+
+export function canLogDoseForTodayOrPast(
+  dose: Pick<DoseEvent, 'scheduledAt' | 'notes'>,
+  now: Date = new Date(),
+): boolean {
+  const dateKey = scheduledAtToDateKey(originalScheduledAt(dose));
+  return !isFutureDateKey(dateKey, now);
 }
