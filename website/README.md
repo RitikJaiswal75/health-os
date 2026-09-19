@@ -21,17 +21,28 @@ npm run build
 
 Output goes to `website/dist/`.
 
-## Cloudflare Pages (one-time setup)
+## Cloudflare deploy
 
-1. Cloudflare dashboard → **Pages** → Create project → Connect GitHub repo `health-os`
-2. Build settings:
+The site is a static Vite build in `dist/`. `wrangler.jsonc` points Wrangler at that folder.
+
+### Workers (Git-connected build)
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `website` |
+| Build command | `npm ci && npm run build` |
+| Deploy command | `npm run deploy` (or `npx wrangler versions upload`) |
+| Node version | 20+ |
+
+`name` in `wrangler.jsonc` must match your Cloudflare Worker project name.
+
+### Classic Pages (alternative)
 
 | Setting | Value |
 |---------|-------|
 | Root directory | `website` |
 | Build command | `npm ci && npm run build` |
 | Output directory | `dist` |
-| Node version | 20+ |
 
 3. Custom domain → add `healthos.ritik.cc`
 4. Optional: **Build watch paths** → `website/*` so app-only pushes skip rebuilds
