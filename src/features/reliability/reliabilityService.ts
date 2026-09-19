@@ -5,14 +5,12 @@ import { permissionHelper, type PermissionState } from '../../core/permissions/p
 
 export const ADD_MEDICATION_PATH = '/medicine/search';
 
-export async function navigateToAddMedication(): Promise<void> {
-  const state = await permissionHelper.readState();
-  const blocked = getBlockedRemindersMessage(state);
-  if (blocked) {
-    router.push({ pathname: '/reliability', params: { returnTo: ADD_MEDICATION_PATH } });
-    return;
-  }
+export function navigateToAddMedication(): void {
   router.push(ADD_MEDICATION_PATH);
+}
+
+export function navigateToReliabilityScreen(): void {
+  router.push('/reliability');
 }
 
 export function usePermissionState(): {
@@ -58,4 +56,8 @@ export function getRecommendedRemindersMessage(state: PermissionState | null): s
     return 'Allow Health OS to display over other apps for the best reminder experience.';
   }
   return null;
+}
+
+export function shouldShowReminderPermissionBanner(state: PermissionState | null): boolean {
+  return getBlockedRemindersMessage(state) != null || getRecommendedRemindersMessage(state) != null;
 }

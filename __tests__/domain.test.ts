@@ -473,6 +473,36 @@ describe('permissionHelper', () => {
   });
 });
 
+describe('reliabilityService', () => {
+  it('keeps the permission banner visible when overlay is still missing', () => {
+    const {
+      shouldShowReminderPermissionBanner,
+    } = require('../src/features/reliability/reliabilityService');
+
+    expect(
+      shouldShowReminderPermissionBanner({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowReminderPermissionBanner({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: true,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe(false);
+  });
+});
+
 describe('duplicateMedicationService', () => {
   const {
     schedulePeriodsOverlap,

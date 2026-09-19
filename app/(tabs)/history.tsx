@@ -10,6 +10,7 @@ import { InventoryService } from '@/src/features/inventory/inventoryService';
 import type { DoseEvent } from '@/src/db/schema';
 import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
 import { originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
+import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 export default function HistoryScreen() {
@@ -57,6 +58,9 @@ export default function HistoryScreen() {
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="History" />
       </Appbar.Header>
+
+      <ReminderPermissionBanner />
+
       <ScrollView contentContainerStyle={styles.content}>
         <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} mode="past" />
         {doses.length === 0 ? (

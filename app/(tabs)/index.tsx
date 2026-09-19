@@ -21,6 +21,7 @@ import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/c
 import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
+import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 export default function HomeScreen() {
@@ -165,6 +166,8 @@ export default function HomeScreen() {
         <Appbar.Action icon="dots-vertical" onPress={() => router.push('/about')} accessibilityLabel="Open settings" />
       </Appbar.Header>
 
+      <ReminderPermissionBanner />
+
       <ScrollView contentContainerStyle={styles.content}>
         <DateStrip
           selectedDate={selectedDate}
@@ -254,7 +257,7 @@ export default function HomeScreen() {
         </Card>
       </ScrollView>
 
-      <FAB icon="plus" style={styles.fab} onPress={() => void navigateToAddMedication()} accessibilityLabel="Add medication" />
+      <FAB icon="plus" style={styles.fab} onPress={navigateToAddMedication} accessibilityLabel="Add medication" />
 
       {variantSheet}
 
