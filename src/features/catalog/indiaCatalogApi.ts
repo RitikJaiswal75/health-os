@@ -25,12 +25,13 @@ export function mapIndiaApiResults(hits: IndiaCatalogApiHit[]): CatalogResult[] 
 export async function searchIndiaCatalogRemote(
   query: string,
   apiBaseUrl: string,
+  signal?: AbortSignal,
 ): Promise<CatalogResult[]> {
   const base = apiBaseUrl.replace(/\/$/, '');
   if (!base || query.trim().length < 2) return [];
 
   const url = `${base}/search?q=${encodeURIComponent(query.trim())}&limit=20`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal });
   if (!response.ok) return [];
 
   const data = (await response.json()) as IndiaCatalogApiResponse;

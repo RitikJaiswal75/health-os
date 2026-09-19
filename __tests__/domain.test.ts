@@ -67,6 +67,20 @@ describe('dateUtils', () => {
 });
 
 describe('catalogService', () => {
+  it('rethrows aborted catalog fetches', async () => {
+    const { searchRxTerms, isAbortError } = require('../src/features/catalog/catalogService');
+    const fetchMock = jest.spyOn(global, 'fetch').mockRejectedValue(
+      new DOMException('Aborted', 'AbortError'),
+    );
+
+    await expect(searchRxTerms('augmentin', new AbortController().signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(isAbortError(new DOMException('Aborted', 'AbortError'))).toBe(true);
+
+    fetchMock.mockRestore();
+  });
+
   it('merges and ranks results', () => {
     const merged = mergeAndRankResults(
       [

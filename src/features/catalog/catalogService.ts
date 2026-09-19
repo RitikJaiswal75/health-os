@@ -85,10 +85,15 @@ export function mergeAndRankResults(
   return merged.sort((a, b) => b.rank - a.rank);
 }
 
-export async function searchRxTerms(query: string): Promise<CatalogResult[]> {
+export function isAbortError(error: unknown): boolean {
+  if (typeof error !== 'object' || error == null) return false;
+  return (error as { name?: string }).name === 'AbortError';
+}
+
+export async function searchRxTerms(query: string, signal?: AbortSignal): Promise<CatalogResult[]> {
   try {
     const url = `https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search?terms=${encodeURIComponent(query)}&maxList=20`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (!response.ok) return [];
     const data = await response.json();
     const names: string[] = data[1] ?? [];
@@ -98,15 +103,16 @@ export async function searchRxTerms(query: string): Promise<CatalogResult[]> {
       source: 'rxterms' as const,
       rank: 20 - index,
     }));
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) throw error;
     return [];
   }
 }
 
-export async function searchDsld(query: string): Promise<CatalogResult[]> {
+export async function searchDsld(query: string, signal?: AbortSignal): Promise<CatalogResult[]> {
   try {
     const url = `https://api.ods.od.nih.gov/dsld/v9/search?term=${encodeURIComponent(query)}&size=20`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (!response.ok) return [];
     const data = await response.json();
     const hits = data.hits ?? [];
@@ -117,9 +123,62 @@ export async function searchDsld(query: string): Promise<CatalogResult[]> {
       type: 'supplement',
       rank: 15 - index,
     }));
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) throw error;
     return [];
   }
+}
+
+export type CatalogSourceFetcher = (
+  query: string,
+  signal?: AbortSignal,
+) => Promise<CatalogResult[]>;
+
+export async function loadCachedOrFetch(
+  cache: CatalogCacheRepository | null,
+  source: 'india' | 'rxterms' | 'dsld',
+  query: string,
+  fetcher: CatalogSourceFetcher,
+  signal?: AbortSignal,
+): Promise<CatalogResult[]> {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
+  if (cache) {
+    const cached = cache.get(source, query);
+    if (cached) {
+      const parsed = parseCachedResults(cached);
+      if (parsed.length > 0 || cached === '[]') return parsed;
+      cache.delete(source, query);
+    }
+  }
+
+  const results = await fetcher(query, signal);
+  if (!signal?.aborted) {
+    cache?.set(source, query, JSON.stringify(results));
+  }
+  return results;
+}
+
+export async function searchAllCatalogs(
+  query: string,
+  options: {
+    db: SQLiteDatabase | null;
+    signal?: AbortSignal;
+    searchIndia: CatalogSourceFetcher;
+  },
+): Promise<CatalogResult[]> {
+  const cache = options.db ? new CatalogCacheRepository(options.db) : null;
+  const { signal, searchIndia } = options;
+
+  const [india, rx, dsld] = await Promise.all([
+    loadCachedOrFetch(cache, 'india', query, searchIndia, signal),
+    loadCachedOrFetch(cache, 'rxterms', query, searchRxTerms, signal),
+    loadCachedOrFetch(cache, 'dsld', query, searchDsld, signal),
+  ]);
+
+  return mergeAndRankResults([india, rx, dsld], query);
 }
 
 export function sanitizeFtsQuery(query: string): string {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { Button, Dialog, List, Portal, Searchbar, Text, ActivityIndicator } from 'react-native-paper';
 import { router } from 'expo-router';
@@ -6,11 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import {
-  CatalogCacheRepository,
-  mergeAndRankResults,
-  parseCachedResults,
-  searchDsld,
-  searchRxTerms,
+  isAbortError,
+  searchAllCatalogs,
   type CatalogResult,
 } from '@/src/features/catalog/catalogService';
 import { buildCatalogPrefill } from '@/src/features/catalog/catalogPrefill';
@@ -23,27 +20,8 @@ import {
 } from '@/src/features/medications/duplicateMedicationService';
 import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 
-async function loadCachedOrFetch(
-  cache: CatalogCacheRepository | null,
-  source: 'india' | 'rxterms' | 'dsld',
-  query: string,
-  fetcher: (q: string) => Promise<CatalogResult[]>,
-): Promise<CatalogResult[]> {
-  if (cache) {
-    const cached = cache.get(source, query);
-    if (cached) {
-      const parsed = parseCachedResults(cached);
-      if (parsed.length > 0 || cached === '[]') return parsed;
-      cache.delete(source, query);
-    }
-  }
-
-  const results = await fetcher(query);
-  cache?.set(source, query, JSON.stringify(results));
-  return results;
-}
-
 const KEYBOARD_FOOTER_GAP = 16;
+const SEARCH_DEBOUNCE_MS = 400;
 
 export default function SearchScreen() {
   const { setName, setCatalogId, setMedicationType, setStrength, reset } = useWizardStore();
@@ -79,52 +57,61 @@ export default function SearchScreen() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(query), 300);
+    const timer = setTimeout(() => setDebounced(query.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const dbReady = dbState.status === 'ready';
-  const db = dbReady ? dbState.db : null;
+  const db = dbState.status === 'ready' ? dbState.db : null;
 
-  const search = useCallback(async () => {
+  useEffect(() => {
     if (debounced.length < 2) {
       setResults([]);
       setErrorMessage(null);
+      setLoading(false);
       return;
     }
+
+    const controller = new AbortController();
+    const { signal } = controller;
 
     setLoading(true);
     setErrorMessage(null);
 
-    try {
-      const cache = db ? new CatalogCacheRepository(db) : null;
-      const [india, rx, dsld] = await Promise.all([
-        loadCachedOrFetch(cache, 'india', debounced, searchIndiaCatalogAsync),
-        loadCachedOrFetch(cache, 'rxterms', debounced, searchRxTerms),
-        loadCachedOrFetch(cache, 'dsld', debounced, searchDsld),
-      ]);
+    void (async () => {
+      try {
+        const merged = await searchAllCatalogs(debounced, {
+          db,
+          signal,
+          searchIndia: searchIndiaCatalogAsync,
+        });
 
-      const merged = mergeAndRankResults([india, rx, dsld], debounced);
-      setResults(merged);
+        if (signal.aborted) return;
 
-      if (merged.length === 0) {
+        setResults(merged);
+        if (merged.length === 0) {
+          setErrorMessage(
+            'No matches found. Try another spelling, check your connection for online catalogs, or add a custom medication.',
+          );
+        }
+      } catch (error) {
+        if (signal.aborted || isAbortError(error)) return;
+        setResults([]);
         setErrorMessage(
-          'No matches found. Try another spelling, check your connection for online catalogs, or add a custom medication.',
+          error instanceof Error
+            ? error.message
+            : 'Search failed. Please try again or add a custom medication.',
         );
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      setResults([]);
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Search failed. Please try again or add a custom medication.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [debounced, db]);
+    })();
 
-  useEffect(() => {
-    void search();
-  }, [search]);
+    return () => {
+      controller.abort();
+    };
+  }, [debounced, db]);
 
   const continueWithMedicationName = (
     name: string,
