@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
+import { startOfDay } from 'date-fns';
 import { Appbar, Button, Card, Dialog, Portal, RadioButton, Text } from 'react-native-paper';
-import { formatDateKey, formatScheduledTime } from '@/src/core/dates/dateUtils';
-import { DateStrip } from '@/src/core/components/DateStrip';
+import { formatDateKey, formatScheduledTime, parseDateKey } from '@/src/core/dates/dateUtils';
+import { HistoryDateNavigator } from '@/src/core/components/HistoryDateNavigator';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { InventoryService } from '@/src/features/inventory/inventoryService';
@@ -19,6 +20,11 @@ export default function HistoryScreen() {
   const [editStatus, setEditStatus] = useState<DoseStatus>('taken');
   const dbState = useDatabaseBootstrap();
   const dateKey = formatDateKey(selectedDate);
+  const earliestHistoryDate = useMemo(() => {
+    if (dbState.status !== 'ready') return startOfDay(new Date());
+    const earliestKey = new DoseEventRepository(dbState.db).getEarliestHistoryDateKey();
+    return earliestKey ? parseDateKey(earliestKey) : startOfDay(new Date());
+  }, [dbState]);
 
   const doses =
     dbState.status === 'ready'
@@ -63,7 +69,11 @@ export default function HistoryScreen() {
       <ReminderPermissionBanner />
 
       <ScrollView contentContainerStyle={styles.content}>
-        <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} mode="past" />
+        <HistoryDateNavigator
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          minDate={earliestHistoryDate}
+        />
         {doses.length === 0 ? (
           <Text style={styles.empty}>No doses logged for this day.</Text>
         ) : (

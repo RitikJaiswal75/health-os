@@ -68,6 +68,15 @@ export function isFutureDateKey(dateKey: string, now: Date = new Date()): boolea
   return parseDateKey(dateKey).getTime() > startOfDay(now).getTime();
 }
 
+export function clampCalendarDate(date: Date, min: Date, max: Date): Date {
+  const value = startOfDay(date).getTime();
+  const minValue = startOfDay(min).getTime();
+  const maxValue = startOfDay(max).getTime();
+  if (value < minValue) return startOfDay(min);
+  if (value > maxValue) return startOfDay(max);
+  return startOfDay(date);
+}
+
 export function computeDonutRatio(taken: number, scheduled: number): number {
   if (scheduled <= 0) return 0;
   return Math.min(1, taken / scheduled);

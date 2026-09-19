@@ -72,6 +72,24 @@ describe('dateUtils', () => {
     expect(isFutureDateKey('2026-09-08', today)).toBe(false);
     expect(isFutureDateKey('2026-09-09', today)).toBe(true);
   });
+
+  it('clamps calendar dates within a min and max range', () => {
+    const { clampCalendarDate, formatDateKey } = require('../src/core/dates/dateUtils');
+    const min = new Date('2026-01-01T12:00:00');
+    const max = new Date('2026-09-08T08:00:00');
+    expect(formatDateKey(clampCalendarDate(new Date('2025-12-31'), min, max))).toBe('2026-01-01');
+    expect(formatDateKey(clampCalendarDate(new Date('2026-03-15'), min, max))).toBe('2026-03-15');
+    expect(formatDateKey(clampCalendarDate(new Date('2026-10-01'), min, max))).toBe('2026-09-08');
+  });
+
+  it('builds a past date strip ending on the selected day', () => {
+    const { getPastDateStrip, formatDateKey } = require('../src/core/dates/dateUtils');
+    const selected = new Date('2026-03-15T12:00:00');
+    const strip = getPastDateStrip(7, selected);
+    expect(strip).toHaveLength(7);
+    expect(formatDateKey(strip[0])).toBe('2026-03-09');
+    expect(formatDateKey(strip[6])).toBe('2026-03-15');
+  });
 });
 
 describe('catalogService', () => {
@@ -1045,6 +1063,28 @@ describe('doseSlotUtils', () => {
     const repo = new DoseEventRepository(mockDb);
     expect(repo.existsForScheduleAt('sched-1', '2026-09-08T08:00:00')).toBe(true);
     expect(repo.existsForMedicationAt('med-1', '2026-09-08T08:00:00')).toBe(true);
+  });
+
+  it('returns the earliest available history date from doses or medications', () => {
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const doseRepo = new DoseEventRepository({
+      getFirstSync: jest.fn((sql: string) => {
+        if (sql.includes('dose_events')) {
+          return { min_scheduled: '2025-12-10T08:00:00' };
+        }
+        return null;
+      }),
+    });
+    expect(doseRepo.getEarliestHistoryDateKey()).toBe('2025-12-10');
+
+    const medicationOnlyRepo = new DoseEventRepository({
+      getFirstSync: jest.fn((sql: string) => {
+        if (sql.includes('dose_events')) return { min_scheduled: null };
+        if (sql.includes('medications')) return { min_created: '2026-01-05T10:00:00.000Z' };
+        return null;
+      }),
+    });
+    expect(medicationOnlyRepo.getEarliestHistoryDateKey()).toBe('2026-01-05');
   });
 
   it('finds only the pending dose in the reminder minute', () => {

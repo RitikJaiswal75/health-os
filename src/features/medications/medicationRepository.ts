@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Medication, MedicationVariant, Schedule, DoseEvent } from '../../db/schema';
 import type { ScheduleType, TimeOfDay, DoseStatus, InventoryTransactionType } from '../../core/types/domain';
-import { parseScheduledAt } from '../../core/dates/dateUtils';
+import { formatDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
 import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
 import {
   canLogDoseForTodayOrPast,
@@ -391,6 +391,24 @@ export class DoseEventRepository {
   getById(id: string): DoseEvent | null {
     const row = this.db.getFirstSync(`SELECT * FROM dose_events WHERE id = ?`, [id]);
     return row ? mapDoseEventRow(row) : null;
+  }
+
+  getEarliestHistoryDateKey(): string | null {
+    const doseRow = this.db.getFirstSync<{ min_scheduled: string | null }>(
+      `SELECT MIN(scheduled_at) AS min_scheduled FROM dose_events`,
+    );
+    if (doseRow?.min_scheduled) {
+      return scheduledAtToDateKey(doseRow.min_scheduled);
+    }
+
+    const medicationRow = this.db.getFirstSync<{ min_created: string | null }>(
+      `SELECT MIN(created_at) AS min_created FROM medications`,
+    );
+    if (medicationRow?.min_created) {
+      return formatDateKey(parseScheduledAt(medicationRow.min_created));
+    }
+
+    return null;
   }
 
   getForDate(dateKey: string, activeMedicationIds?: Set<string>): DoseEvent[] {
