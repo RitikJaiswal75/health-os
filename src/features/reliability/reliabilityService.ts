@@ -38,6 +38,23 @@ export function usePermissionState(): {
   return { state, refresh };
 }
 
+export type PermissionActionKind =
+  | 'notifications'
+  | 'exact_alarm'
+  | 'full_screen_intent'
+  | 'overlay';
+
+export function getNextPermissionAction(
+  state: PermissionState | null,
+): PermissionActionKind | null {
+  if (!state) return 'notifications';
+  if (!state.notifications) return 'notifications';
+  if (!state.exactAlarm) return 'exact_alarm';
+  if (!state.fullScreenIntent) return 'full_screen_intent';
+  if (!state.overlay) return 'overlay';
+  return null;
+}
+
 export function getBlockedRemindersMessage(state: PermissionState | null): string | null {
   if (Platform.OS !== 'android' || !state) return null;
   if (!state.notifications) {

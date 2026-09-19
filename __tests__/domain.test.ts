@@ -488,6 +488,62 @@ describe('permissionHelper', () => {
 });
 
 describe('reliabilityService', () => {
+  it('returns the first missing permission as the next required action', () => {
+    const { getNextPermissionAction } = require('../src/features/reliability/reliabilityService');
+
+    expect(getNextPermissionAction(null)).toBe('notifications');
+    expect(
+      getNextPermissionAction({
+        notifications: false,
+        exactAlarm: false,
+        fullScreenIntent: false,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('notifications');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: false,
+        fullScreenIntent: false,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('exact_alarm');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: false,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('full_screen_intent');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('overlay');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: true,
+        camera: false,
+        photos: false,
+      }),
+    ).toBeNull();
+  });
+
   it('keeps the permission banner visible when overlay is still missing', () => {
     const {
       shouldShowReminderPermissionBanner,
