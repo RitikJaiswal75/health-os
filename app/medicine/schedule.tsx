@@ -10,6 +10,14 @@ import { formatDateKey, formatDisplayDate, formatTime24, hasScheduleEndDate, par
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { formatDoseLabel, FREQUENCY_OPTIONS, getDefaultDoseAmount, type ScheduleType } from '@/src/core/types/domain';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
+import { useDatabaseBootstrap } from '@/src/db/DbProvider';
+import { MedicationRepository } from '@/src/features/medications/medicationRepository';
+import {
+  findDuplicateMedicationConflict,
+  proposedSchedulePeriod,
+  type DuplicateMedicationConflict,
+} from '@/src/features/medications/duplicateMedicationService';
+import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 
 const WEEKDAYS = [
   { label: 'S', bit: 1 << 0 },
@@ -41,6 +49,10 @@ export default function ScheduleScreen() {
   const [intervalInput, setIntervalInput] = useState(String(draft.intervalDays ?? 2));
   const [dayOfMonthInput, setDayOfMonthInput] = useState(String(draft.dayOfMonth ?? 1));
   const [weekdayMask, setWeekdayMask] = useState(draft.weekdayMask ?? 1 << 1);
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateMedicationConflict | null>(
+    null,
+  );
+  const dbState = useDatabaseBootstrap();
 
   const doseLabelOptions = {
     strengthValue: draft.strengthValue,
@@ -320,6 +332,20 @@ export default function ScheduleScreen() {
         mode="contained"
         disabled={!canNext}
         onPress={() => {
+          if (dbState.status === 'ready' && draft.name) {
+            const medRepo = new MedicationRepository(dbState.db);
+            const conflict = findDuplicateMedicationConflict(
+              medRepo,
+              draft.name,
+              proposedSchedulePeriod(draft.startDate, draft.endDate),
+              editingMedicationId ?? undefined,
+            );
+            if (conflict) {
+              setDuplicateConflict(conflict);
+              return;
+            }
+          }
+
           if (editingMedicationId) {
             router.push(`/medicine/${editingMedicationId}`);
           } else {
@@ -387,6 +413,18 @@ export default function ScheduleScreen() {
           onChange={onDateChange}
         />
       )}
+
+      <DuplicateMedicationDialog
+        visible={duplicateConflict != null}
+        conflict={duplicateConflict}
+        onDismiss={() => setDuplicateConflict(null)}
+        onEditExisting={() => {
+          if (!duplicateConflict) return;
+          const medicationId = duplicateConflict.medication.id;
+          setDuplicateConflict(null);
+          router.replace(`/medicine/${medicationId}`);
+        }}
+      />
     </ScrollView>
   );
 }

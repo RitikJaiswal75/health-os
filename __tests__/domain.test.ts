@@ -64,9 +64,49 @@ describe('dateUtils', () => {
     expect(formatDateKey(strip[0])).toBe('2026-09-02');
     expect(formatDateKey(strip[6])).toBe('2026-09-08');
   });
+
+  it('detects future calendar dates', () => {
+    const { isFutureDateKey } = require('../src/core/dates/dateUtils');
+    const today = new Date('2026-09-08T15:00:00');
+    expect(isFutureDateKey('2026-09-07', today)).toBe(false);
+    expect(isFutureDateKey('2026-09-08', today)).toBe(false);
+    expect(isFutureDateKey('2026-09-09', today)).toBe(true);
+  });
+
+  it('clamps calendar dates within a min and max range', () => {
+    const { clampCalendarDate, formatDateKey } = require('../src/core/dates/dateUtils');
+    const min = new Date('2026-01-01T12:00:00');
+    const max = new Date('2026-09-08T08:00:00');
+    expect(formatDateKey(clampCalendarDate(new Date('2025-12-31'), min, max))).toBe('2026-01-01');
+    expect(formatDateKey(clampCalendarDate(new Date('2026-03-15'), min, max))).toBe('2026-03-15');
+    expect(formatDateKey(clampCalendarDate(new Date('2026-10-01'), min, max))).toBe('2026-09-08');
+  });
+
+  it('builds a past date strip ending on the selected day', () => {
+    const { getPastDateStrip, formatDateKey } = require('../src/core/dates/dateUtils');
+    const selected = new Date('2026-03-15T12:00:00');
+    const strip = getPastDateStrip(7, selected);
+    expect(strip).toHaveLength(7);
+    expect(formatDateKey(strip[0])).toBe('2026-03-09');
+    expect(formatDateKey(strip[6])).toBe('2026-03-15');
+  });
 });
 
 describe('catalogService', () => {
+  it('rethrows aborted catalog fetches', async () => {
+    const { searchRxTerms, isAbortError } = require('../src/features/catalog/catalogService');
+    const fetchMock = jest.spyOn(global, 'fetch').mockRejectedValue(
+      new DOMException('Aborted', 'AbortError'),
+    );
+
+    await expect(searchRxTerms('augmentin', new AbortController().signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(isAbortError(new DOMException('Aborted', 'AbortError'))).toBe(true);
+
+    fetchMock.mockRestore();
+  });
+
   it('merges and ranks results', () => {
     const merged = mergeAndRankResults(
       [
@@ -393,6 +433,29 @@ describe('reminderQueue', () => {
     });
   });
 
+  it('reopens reminder when notification is tapped after backing out', () => {
+    const { pushReminder, forceOpenReminder } = require('../src/features/reminders/reminderQueue');
+    const { resetReminderNavigationForTests } =
+      require('../src/features/reminders/reminderNavigationDedupe');
+    const { router } = require('expo-router');
+
+    resetReminderNavigationForTests();
+
+    const params = {
+      medicationId: 'med-1',
+      alarmId: 'alarm-1',
+      scheduledAt: '2026-09-08T08:00:00',
+    };
+
+    expect(pushReminder(params)).toBe(true);
+    expect(pushReminder(params)).toBe(false);
+    expect(forceOpenReminder(params)).toBe(true);
+    expect(router.replace).toHaveBeenLastCalledWith({
+      pathname: '/reminder',
+      params,
+    });
+  });
+
   it('does not re-show a reminder that was already handled', () => {
     const { pushReminder, markReminderHandled } = require('../src/features/reminders/reminderQueue');
     const { resetReminderNavigationForTests } =
@@ -450,6 +513,236 @@ describe('permissionHelper', () => {
   });
 });
 
+describe('reliabilityService', () => {
+  it('returns the first missing permission as the next required action', () => {
+    const { getNextPermissionAction } = require('../src/features/reliability/reliabilityService');
+
+    expect(getNextPermissionAction(null)).toBe('notifications');
+    expect(
+      getNextPermissionAction({
+        notifications: false,
+        exactAlarm: false,
+        fullScreenIntent: false,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('notifications');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: false,
+        fullScreenIntent: false,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('exact_alarm');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: false,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('full_screen_intent');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe('overlay');
+    expect(
+      getNextPermissionAction({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: true,
+        camera: false,
+        photos: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('keeps the permission banner visible when overlay is still missing', () => {
+    const {
+      shouldShowReminderPermissionBanner,
+    } = require('../src/features/reliability/reliabilityService');
+
+    expect(
+      shouldShowReminderPermissionBanner({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: false,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowReminderPermissionBanner({
+        notifications: true,
+        exactAlarm: true,
+        fullScreenIntent: true,
+        overlay: true,
+        camera: false,
+        photos: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('duplicateMedicationService', () => {
+  const {
+    schedulePeriodsOverlap,
+    findDuplicateMedicationConflict,
+    findEarlyDuplicateMedicationConflict,
+    medicationNamesMatch,
+  } = require('../src/features/medications/duplicateMedicationService');
+
+  it('detects overlapping schedule periods', () => {
+    expect(
+      schedulePeriodsOverlap(
+        { startDate: '2026-09-01', endDate: '2026-09-15' },
+        { startDate: '2026-09-10', endDate: '2026-09-20' },
+      ),
+    ).toBe(true);
+    expect(
+      schedulePeriodsOverlap(
+        { startDate: '2026-09-01', endDate: '2026-09-15' },
+        { startDate: '2026-09-16', endDate: '2026-09-30' },
+      ),
+    ).toBe(false);
+  });
+
+  it('matches medication names case-insensitively', () => {
+    expect(medicationNamesMatch('Test 1', 'test 1')).toBe(true);
+  });
+
+  it('finds an active medication with the same name and overlapping dates', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    const conflict = findDuplicateMedicationConflict(medRepo, 'Test 1', {
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    });
+
+    expect(conflict?.medication.id).toBe('med-existing');
+  });
+
+  it('allows the same name when schedule periods do not overlap', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    expect(
+      findDuplicateMedicationConflict(medRepo, 'Test 1', {
+        startDate: '2026-09-16',
+        endDate: '2026-09-30',
+      }),
+    ).toBeNull();
+  });
+
+  it('flags an early duplicate when a same-name medication is active today', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-10T10:00:00'));
+
+    expect(findEarlyDuplicateMedicationConflict(medRepo, 'Test 1')?.medication.id).toBe(
+      'med-existing',
+    );
+
+    jest.useRealTimers();
+  });
+
+  it('ignores the medication being edited', () => {
+    const medRepo = {
+      getAll: () => [
+        {
+          id: 'med-existing',
+          name: 'Test 1',
+          nickname: null,
+        },
+      ],
+      getActiveSchedules: (id: string) => [
+        {
+          id: 'sched-1',
+          medicationId: id,
+          startDate: '2026-09-01',
+          endDate: '2026-09-15',
+          isActive: true,
+        },
+      ],
+    };
+
+    expect(
+      findDuplicateMedicationConflict(
+        medRepo,
+        'Test 1',
+        { startDate: '2026-09-10', endDate: '2026-09-20' },
+        'med-existing',
+      ),
+    ).toBeNull();
+  });
+});
+
 describe('wizardStore', () => {
   it('requires medication type to proceed configure', () => {
     const { useWizardStore } = require('../src/features/medications/wizardStore');
@@ -468,6 +761,51 @@ describe('wizardStore', () => {
     expect(getMedicationTypeLabel('powder')).toBe('Powder');
     expect(draft.pillShape).toBe('powder');
     expect(draft.strengthUnit).toBe('g');
+  });
+
+  it('reset discards unsaved medication type', () => {
+    const { useWizardStore } = require('../src/features/medications/wizardStore');
+    useWizardStore.getState().reset();
+    useWizardStore.getState().setName('Augmentin');
+    useWizardStore.getState().setMedicationType('tablet');
+    useWizardStore.getState().reset();
+
+    const { draft } = useWizardStore.getState();
+    expect(draft.name).toBe('');
+    expect(draft.medicationType).toBeUndefined();
+  });
+
+  it('requires amount and unit before saving strength', () => {
+    const { validateStrengthFields } = require('../src/features/medications/strengthFieldValidation');
+
+    expect(validateStrengthFields('', 'mg', 'Amount')).toEqual({
+      amountError: 'Enter amount.',
+      unitError: null,
+    });
+    expect(validateStrengthFields('0', 'mg', 'Amount').amountError).toBe(
+      'Enter a valid amount greater than zero.',
+    );
+    expect(validateStrengthFields('500', undefined, 'Amount')).toEqual({
+      amountError: null,
+      unitError: 'Select a unit before saving.',
+    });
+    expect(validateStrengthFields('500', 'mg', 'Amount')).toEqual({
+      amountError: null,
+      unitError: null,
+      value: 500,
+    });
+  });
+
+  it('beginNewDraft replaces prior unsaved wizard state atomically', () => {
+    const { useWizardStore } = require('../src/features/medications/wizardStore');
+    useWizardStore.getState().reset();
+    useWizardStore.getState().setName('Augmentin');
+    useWizardStore.getState().setMedicationType('tablet');
+    useWizardStore.getState().beginNewDraft({ name: 'Test 3' });
+
+    const { draft } = useWizardStore.getState();
+    expect(draft.name).toBe('Test 3');
+    expect(draft.medicationType).toBeUndefined();
   });
 
   it('keeps in-memory schedule edits while editing the same medication', () => {
@@ -595,6 +933,30 @@ describe('formatStrengthSubtitle', () => {
 });
 
 describe('doseSlotUtils', () => {
+  it('allows logging doses for today and past dates only', () => {
+    const { canLogDoseForTodayOrPast } = require('../src/features/medications/doseSlotUtils');
+    const today = new Date('2026-09-08T15:00:00');
+
+    expect(
+      canLogDoseForTodayOrPast({ scheduledAt: '2026-09-07T08:00:00', notes: null }, today),
+    ).toBe(true);
+    expect(
+      canLogDoseForTodayOrPast({ scheduledAt: '2026-09-08T20:00:00', notes: null }, today),
+    ).toBe(true);
+    expect(
+      canLogDoseForTodayOrPast({ scheduledAt: '2026-09-09T08:00:00', notes: null }, today),
+    ).toBe(false);
+    expect(
+      canLogDoseForTodayOrPast(
+        {
+          scheduledAt: '2026-09-09T09:00:00',
+          notes: 'snoozedFrom:2026-09-08T08:00:00',
+        },
+        today,
+      ),
+    ).toBe(true);
+  });
+
   it('treats UTC and local storage as the same slot', () => {
     const { doseSlotKey, dedupeDoseEvents } = require('../src/features/medications/doseSlotUtils');
 
@@ -701,6 +1063,28 @@ describe('doseSlotUtils', () => {
     const repo = new DoseEventRepository(mockDb);
     expect(repo.existsForScheduleAt('sched-1', '2026-09-08T08:00:00')).toBe(true);
     expect(repo.existsForMedicationAt('med-1', '2026-09-08T08:00:00')).toBe(true);
+  });
+
+  it('returns the earliest available history date from doses or medications', () => {
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const doseRepo = new DoseEventRepository({
+      getFirstSync: jest.fn((sql: string) => {
+        if (sql.includes('dose_events')) {
+          return { min_scheduled: '2025-12-10T08:00:00' };
+        }
+        return null;
+      }),
+    });
+    expect(doseRepo.getEarliestHistoryDateKey()).toBe('2025-12-10');
+
+    const medicationOnlyRepo = new DoseEventRepository({
+      getFirstSync: jest.fn((sql: string) => {
+        if (sql.includes('dose_events')) return { min_scheduled: null };
+        if (sql.includes('medications')) return { min_created: '2026-01-05T10:00:00.000Z' };
+        return null;
+      }),
+    });
+    expect(medicationOnlyRepo.getEarliestHistoryDateKey()).toBe('2026-01-05');
   });
 
   it('finds only the pending dose in the reminder minute', () => {
@@ -811,6 +1195,65 @@ describe('doseSlotUtils', () => {
     expect(doseBelongsToDateKey(snoozed, '2026-09-07')).toBe(false);
   });
 
+  it('sorts same-time doses with newer medications first', () => {
+    const { sortDosesForDisplay } = require('../src/features/medications/doseSlotUtils');
+    const medicationCreatedAt = new Map([
+      ['med-old', '2026-01-01T00:00:00.000Z'],
+      ['med-new', '2026-09-01T00:00:00.000Z'],
+      ['med-middle', '2026-06-01T00:00:00.000Z'],
+    ]);
+    const doses = [
+      {
+        id: 'dose-old',
+        medicationId: 'med-old',
+        scheduledAt: '2026-09-13T08:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+      {
+        id: 'dose-new',
+        medicationId: 'med-new',
+        scheduledAt: '2026-09-13T08:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+      {
+        id: 'dose-middle',
+        medicationId: 'med-middle',
+        scheduledAt: '2026-09-13T08:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+      {
+        id: 'dose-later',
+        medicationId: 'med-old',
+        scheduledAt: '2026-09-13T20:00:00',
+        status: 'pending',
+        notes: null,
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+    ];
+
+    const sorted = sortDosesForDisplay(doses, medicationCreatedAt);
+    expect(sorted.map((dose: { id: string }) => dose.id)).toEqual([
+      'dose-new',
+      'dose-middle',
+      'dose-old',
+      'dose-later',
+    ]);
+  });
+
   it('cleans pending doses when a once-daily schedule was snoozed', () => {
     const deleted: string[] = [];
     const mockDb = {
@@ -873,6 +1316,11 @@ describe('doseSlotUtils', () => {
 });
 
 describe('doseGenerationService', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   it('removes pending doses that no longer match the schedule', () => {
     const deletedIds: string[] = [];
     const pendingDoses = [
@@ -1027,6 +1475,357 @@ describe('doseGenerationService', () => {
     const createdAgain = generateUpcomingDoseEvents(mockDb, 7);
     expect(createdAgain).toBe(0);
     expect(createSpy).toHaveBeenCalledTimes(created);
+  });
+
+  it('creates only the remaining pending doses after completed doses for today', () => {
+    const { pendingDosesNeededAfterCompleted } = require('../src/features/medications/doseGenerationService');
+
+    expect(pendingDosesNeededAfterCompleted(2, 3)).toBe(0);
+    expect(pendingDosesNeededAfterCompleted(4, 3)).toBe(1);
+    expect(pendingDosesNeededAfterCompleted(3, 0)).toBe(3);
+    expect(pendingDosesNeededAfterCompleted(3, 1)).toBe(2);
+    expect(pendingDosesNeededAfterCompleted(1, 1)).toBe(0);
+  });
+
+  it('removes extra today pending doses when completed plus pending exceed the new dosage', () => {
+    const deleted: string[] = [];
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const doseRepo = new DoseEventRepository({} as never);
+    jest.spyOn(doseRepo, 'delete').mockImplementation((id: unknown) => {
+      deleted.push(String(id));
+    });
+
+    const { trimExtraPendingDosesForDate } = require('../src/features/medications/doseGenerationService');
+    const remaining = trimExtraPendingDosesForDate(
+      doseRepo,
+      [
+        {
+          id: 'taken-8am',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T08:00:00',
+          status: 'taken',
+        },
+        {
+          id: 'taken-8pm',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T20:00:00',
+          status: 'taken',
+        },
+        {
+          id: 'pending-11am',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T11:00:00',
+          status: 'pending',
+        },
+        {
+          id: 'pending-4pm',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T16:00:00',
+          status: 'pending',
+        },
+        {
+          id: 'pending-11pm',
+          medicationId: 'med-1',
+          scheduledAt: '2026-09-13T23:00:00',
+          status: 'pending',
+        },
+      ],
+      3,
+    );
+
+    expect(deleted).toEqual(['pending-11pm', 'pending-4pm']);
+    expect(remaining.map((dose: { id: string }) => dose.id)).toEqual([
+      'taken-8am',
+      'taken-8pm',
+      'pending-11am',
+    ]);
+  });
+
+  it('does not add today pending doses when completed count already meets the new dosage', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T10:00:00'));
+
+    const created: string[] = [];
+    const takenRows = [
+      {
+        id: 'taken-1',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T08:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-2',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T14:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-3',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T20:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+    ];
+
+    const mockDb = {
+      runSync: jest.fn(),
+      getFirstSync: jest.fn(() => null),
+      getAllSync: jest.fn((sql: string) => {
+        if (sql.includes('NOT IN (SELECT id FROM medications)')) return [];
+        if (sql.includes('FROM dose_events')) return takenRows;
+        if (sql.includes('FROM medications')) return [{ id: 'med-1', name: 'Test' }];
+        if (sql.includes('FROM schedules')) {
+          return [
+            {
+              id: 'sched-1',
+              medication_id: 'med-1',
+              type: 'fixed_daily',
+              times_of_day: JSON.stringify([
+                { hour: 8, minute: 0, doseAmount: 1 },
+                { hour: 20, minute: 0, doseAmount: 1 },
+              ]),
+              start_date: '2026-09-01',
+              is_active: 1,
+              created_at: '2026-09-01',
+            },
+          ];
+        }
+        return [];
+      }),
+    };
+
+    const { generateUpcomingDoseEvents } = require('../src/features/medications/doseGenerationService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(MedicationRepository.prototype, 'getAll').mockReturnValue([{ id: 'med-1' }]);
+    jest.spyOn(MedicationRepository.prototype, 'getActiveSchedules').mockReturnValue([
+      {
+        id: 'sched-1',
+        medicationId: 'med-1',
+        type: 'fixed_daily',
+        timesOfDay: JSON.stringify([
+          { hour: 8, minute: 0, doseAmount: 1 },
+          { hour: 20, minute: 0, doseAmount: 1 },
+        ]),
+        startDate: '2026-09-01',
+        isActive: true,
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
+      created.push((input as { scheduledAt: string }).scheduledAt);
+      return { id: `dose-${created.length}`, status: 'pending' };
+    });
+
+    generateUpcomingDoseEvents(mockDb, 2);
+
+    const todayCreated = created.filter((at: string) => at.startsWith('2026-09-13'));
+    expect(todayCreated).toEqual([]);
+  });
+
+  it('adds only the missing pending dose when today is already partly completed', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T10:00:00'));
+
+    const created: string[] = [];
+    const takenRows = [
+      {
+        id: 'taken-1',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T08:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-2',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T14:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-3',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T20:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+    ];
+
+    const mockDb = {
+      runSync: jest.fn(),
+      getFirstSync: jest.fn(() => null),
+      getAllSync: jest.fn((sql: string) => {
+        if (sql.includes('NOT IN (SELECT id FROM medications)')) return [];
+        if (sql.includes('FROM dose_events')) return takenRows;
+        return [];
+      }),
+    };
+
+    const { generateUpcomingDoseEvents } = require('../src/features/medications/doseGenerationService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(MedicationRepository.prototype, 'getAll').mockReturnValue([{ id: 'med-1' }]);
+    jest.spyOn(MedicationRepository.prototype, 'getActiveSchedules').mockReturnValue([
+      {
+        id: 'sched-1',
+        medicationId: 'med-1',
+        type: 'fixed_daily',
+        timesOfDay: JSON.stringify([
+          { hour: 8, minute: 0, doseAmount: 1 },
+          { hour: 12, minute: 0, doseAmount: 1 },
+          { hour: 16, minute: 0, doseAmount: 1 },
+          { hour: 20, minute: 0, doseAmount: 1 },
+        ]),
+        startDate: '2026-09-01',
+        isActive: true,
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockImplementation(
+      (...args: unknown[]) => {
+        const scheduledAt = String(args[1]);
+        return scheduledAt === '2026-09-13T08:00:00' || scheduledAt === '2026-09-13T20:00:00';
+      },
+    );
+    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
+      created.push((input as { scheduledAt: string }).scheduledAt);
+      return { id: `dose-${created.length}`, status: 'pending' };
+    });
+
+    generateUpcomingDoseEvents(mockDb, 1);
+
+    const todayCreated = created.filter((at: string) => at.startsWith('2026-09-13'));
+    expect(todayCreated).toEqual(['2026-09-13T12:00:00']);
+  });
+
+  it('does not fill remaining new times on a later generate after today is already complete', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T21:00:00'));
+
+    const created: string[] = [];
+    const existingRows = [
+      {
+        id: 'taken-8am',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T08:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'taken-8pm',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T20:00:00',
+        status: 'taken',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+      {
+        id: 'pending-11am',
+        medication_id: 'med-1',
+        schedule_id: 'sched-1',
+        scheduled_at: '2026-09-13T11:00:00',
+        status: 'pending',
+        notes: null,
+        dose_amount: 1,
+        created_at: '2026-09-13',
+        updated_at: '2026-09-13',
+      },
+    ];
+
+    const mockDb = {
+      runSync: jest.fn(),
+      getFirstSync: jest.fn(() => null),
+      getAllSync: jest.fn((sql: string) => {
+        if (sql.includes('NOT IN (SELECT id FROM medications)')) return [];
+        if (sql.includes('FROM dose_events')) return existingRows;
+        return [];
+      }),
+    };
+
+    const { generateUpcomingDoseEvents } = require('../src/features/medications/doseGenerationService');
+    const { MedicationRepository, DoseEventRepository } = require('../src/features/medications/medicationRepository');
+
+    jest.spyOn(MedicationRepository.prototype, 'getAll').mockReturnValue([{ id: 'med-1' }]);
+    jest.spyOn(MedicationRepository.prototype, 'getActiveSchedules').mockReturnValue([
+      {
+        id: 'sched-1',
+        medicationId: 'med-1',
+        type: 'fixed_daily',
+        timesOfDay: JSON.stringify([
+          { hour: 11, minute: 0, doseAmount: 1 },
+          { hour: 16, minute: 0, doseAmount: 1 },
+          { hour: 23, minute: 0, doseAmount: 1 },
+        ]),
+        startDate: '2026-09-01',
+        isActive: true,
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([
+      {
+        id: 'pending-11am',
+        medicationId: 'med-1',
+        scheduleId: 'sched-1',
+        scheduledAt: '2026-09-13T11:00:00',
+        status: 'pending',
+        doseAmount: 1,
+        createdAt: '2026-09-13',
+        updatedAt: '2026-09-13',
+      },
+    ]);
+    jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
+    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockImplementation((...args: unknown[]) => {
+      return String(args[1]) === '2026-09-13T11:00:00';
+    });
+    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
+      created.push((input as { scheduledAt: string }).scheduledAt);
+      return { id: `dose-${created.length}`, status: 'pending' };
+    });
+
+    generateUpcomingDoseEvents(mockDb, 1);
+
+    const todayCreated = created.filter((at: string) => at.startsWith('2026-09-13'));
+    expect(todayCreated).toEqual([]);
   });
 });
 

@@ -2,9 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Medication, MedicationVariant, Schedule, DoseEvent } from '../../db/schema';
 import type { ScheduleType, TimeOfDay, DoseStatus, InventoryTransactionType } from '../../core/types/domain';
-import { parseScheduledAt } from '../../core/dates/dateUtils';
+import { formatDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
 import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
 import {
+  canLogDoseForTodayOrPast,
   dedupeDoseEvents,
   doseBelongsToDateKey,
   filterPendingDuplicatingResolved,
@@ -13,6 +14,7 @@ import {
   readScheduledAtFromRow,
   slotKeysEqual,
   buildSnoozedFromNotes,
+  sortDosesForDisplay,
 } from './doseSlotUtils';
 import {
   mapDoseEventRow,
@@ -391,12 +393,32 @@ export class DoseEventRepository {
     return row ? mapDoseEventRow(row) : null;
   }
 
+  getEarliestHistoryDateKey(): string | null {
+    const doseRow = this.db.getFirstSync<{ min_scheduled: string | null }>(
+      `SELECT MIN(scheduled_at) AS min_scheduled FROM dose_events`,
+    );
+    if (doseRow?.min_scheduled) {
+      return scheduledAtToDateKey(doseRow.min_scheduled);
+    }
+
+    const medicationRow = this.db.getFirstSync<{ min_created: string | null }>(
+      `SELECT MIN(created_at) AS min_created FROM medications`,
+    );
+    if (medicationRow?.min_created) {
+      return formatDateKey(parseScheduledAt(medicationRow.min_created));
+    }
+
+    return null;
+  }
+
   getForDate(dateKey: string, activeMedicationIds?: Set<string>): DoseEvent[] {
     const medRepo = new MedicationRepository(this.db);
     const scheduleById = new Map<string, Schedule>();
     const schedulesByMedId = new Map<string, Schedule[]>();
+    const medicationCreatedAt = new Map<string, string>();
 
     for (const med of medRepo.getAll()) {
+      medicationCreatedAt.set(med.id, med.createdAt);
       const schedules = medRepo.getActiveSchedules(med.id);
       schedulesByMedId.set(med.id, schedules);
       for (const schedule of schedules) {
@@ -413,8 +435,11 @@ export class DoseEventRepository {
         doseVisibleForScheduleOnDateKey(dose, dateKey, scheduleById, schedulesByMedId),
       );
 
-    return filterPendingDuplicatingResolved(
-      filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
+    return sortDosesForDisplay(
+      filterPendingDuplicatingResolved(
+        filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
+      ),
+      medicationCreatedAt,
     );
   }
 
@@ -533,6 +558,13 @@ export class DoseEventRepository {
     status: DoseStatus,
     options?: { variantId?: string; takenAt?: string },
   ): DoseEvent {
+    const existing = this.getById(id);
+    if (!existing) {
+      throw new Error('Dose event not found');
+    }
+    if (status === 'taken' && !canLogDoseForTodayOrPast(existing)) {
+      throw new Error('Cannot mark a future dose as taken');
+    }
     const now = new Date().toISOString();
     this.db.runSync(
       `UPDATE dose_events SET status = ?, variant_id = COALESCE(?, variant_id),

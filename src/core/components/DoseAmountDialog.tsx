@@ -23,8 +23,12 @@ interface DoseAmountDialogProps {
   onConfirm: (amount: number) => void;
 }
 
-function parseDoseInput(input: string, directMeasured: boolean): number {
-  const parsed = directMeasured ? parseFloat(input) : parseInt(input, 10);
+function sanitizeWholeNumberInput(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function parseDoseInput(input: string): number {
+  const parsed = parseInt(input, 10);
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
@@ -51,13 +55,13 @@ export function DoseAmountDialog({
 
   useEffect(() => {
     if (visible) {
-      setInput(String(amount));
+      setInput(Number.isFinite(amount) ? String(Math.trunc(amount)) : '');
     }
   }, [visible, amount]);
 
   if (!visible) return null;
 
-  const parsed = parseDoseInput(input, directMeasured);
+  const parsed = parseDoseInput(input);
   const labelOptions = { strengthValue, strengthUnit, doseUnitValue, doseUnitUnit };
   const preview =
     Number.isFinite(parsed) && parsed > 0
@@ -73,15 +77,14 @@ export function DoseAmountDialog({
           </Text>
           {directMeasured ? (
             <Text style={styles.hint}>
-              Enter the exact amount to take
-              {medicationType === 'powder' ? ' in grams' : ' in millilitres'}.
+              Enter whole {medicationType === 'powder' ? 'grams' : 'millilitres'} to take (no decimals).
             </Text>
           ) : null}
           <TextInput
             label={doseInputLabel(medicationType)}
             value={input}
-            onChangeText={setInput}
-            keyboardType={directMeasured ? 'decimal-pad' : 'numeric'}
+            onChangeText={(value) => setInput(sanitizeWholeNumberInput(value))}
+            keyboardType="number-pad"
             mode="outlined"
             style={styles.input}
             accessibilityLabel={`Dose ${doseIndex + 1} ${doseInputLabel(medicationType)}`}
@@ -95,7 +98,7 @@ export function DoseAmountDialog({
             <Pressable
               style={styles.footerBtn}
               onPress={() => {
-                const next = parseDoseInput(input, directMeasured);
+                const next = parseDoseInput(input);
                 if (next > 0) onConfirm(next);
               }}
               disabled={!(Number.isFinite(parsed) && parsed > 0)}

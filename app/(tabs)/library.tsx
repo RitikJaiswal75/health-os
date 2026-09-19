@@ -10,6 +10,7 @@ import type { Medication } from '@/src/db/schema';
 import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillShapeIcon';
 import { RefillQuantityDialog } from '@/src/core/components/RefillQuantityDialog';
 import { formatStrengthSubtitle, getMedicationTypeLabel } from '@/src/core/types/domain';
+import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 function formatStrengthLine(med: Medication): string {
@@ -61,12 +62,9 @@ export default function LibraryScreen() {
     <View style={styles.container}>
       <Appbar.Header>
         <Appbar.Content title="Your medications" />
-        <Appbar.Action
-          icon="plus"
-          onPress={() => void navigateToAddMedication()}
-          accessibilityLabel="Add medication"
-        />
       </Appbar.Header>
+
+      <ReminderPermissionBanner />
 
       <ScrollView contentContainerStyle={styles.content}>
         {meds.length === 0 ? (
@@ -116,7 +114,7 @@ export default function LibraryScreen() {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() => void navigateToAddMedication()}
+        onPress={navigateToAddMedication}
         accessibilityLabel="Add medication"
       />
 

@@ -166,6 +166,24 @@ export function pushReminder(params: ReminderRouteParams): boolean {
   return enqueueIfPending(params);
 }
 
+/** Open reminder from a notification tap, even if it was shown recently. */
+export function forceOpenReminder(params: ReminderRouteParams): boolean {
+  if (isHandled(params)) {
+    return false;
+  }
+
+  clearReminderNavigationState();
+  activeReminder = params;
+
+  if (!isReminderRouterReady()) {
+    deferShowReminder(params);
+    return true;
+  }
+
+  showReminderNow(params);
+  return true;
+}
+
 export async function completeCurrentReminder(
   handled?: ReminderRouteParams,
 ): Promise<boolean> {

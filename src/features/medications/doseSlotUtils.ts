@@ -1,6 +1,11 @@
 import { format } from 'date-fns';
 import type { DoseEvent } from '../../db/schema';
-import { formatLocalDateTime, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
+import {
+  formatLocalDateTime,
+  isFutureDateKey,
+  parseScheduledAt,
+  scheduledAtToDateKey,
+} from '../../core/dates/dateUtils';
 
 const SNOOZE_NOTE_PREFIX = 'snoozedFrom:';
 
@@ -114,12 +119,24 @@ export function dedupeDoseEvents(doses: DoseEvent[]): DoseEvent[] {
     bySlot.set(key, group);
   }
 
-  return Array.from(bySlot.values())
-    .map(pickCanonicalDose)
-    .sort(
-      (a, b) =>
-        parseScheduledAt(a.scheduledAt).getTime() - parseScheduledAt(b.scheduledAt).getTime(),
-    );
+  return Array.from(bySlot.values()).map(pickCanonicalDose);
+}
+
+/** Home/history list order: scheduled time ascending, then newest medication first. */
+export function sortDosesForDisplay(
+  doses: DoseEvent[],
+  medicationCreatedAt: ReadonlyMap<string, string>,
+): DoseEvent[] {
+  return [...doses].sort((a, b) => {
+    const timeDiff =
+      parseScheduledAt(effectiveScheduledAt(a)).getTime() -
+      parseScheduledAt(effectiveScheduledAt(b)).getTime();
+    if (timeDiff !== 0) return timeDiff;
+
+    const aCreated = medicationCreatedAt.get(a.medicationId) ?? '';
+    const bCreated = medicationCreatedAt.get(b.medicationId) ?? '';
+    return bCreated.localeCompare(aCreated);
+  });
 }
 
 export function normalizeScheduledAtStorage(iso: string): string {
@@ -151,4 +168,12 @@ export function doseBelongsToDateKey(
 
 export function originalScheduledAt(dose: Pick<DoseEvent, 'scheduledAt' | 'notes'>): string {
   return parseSnoozedFromNotes(dose.notes) ?? dose.scheduledAt;
+}
+
+export function canLogDoseForTodayOrPast(
+  dose: Pick<DoseEvent, 'scheduledAt' | 'notes'>,
+  now: Date = new Date(),
+): boolean {
+  const dateKey = scheduledAtToDateKey(originalScheduledAt(dose));
+  return !isFutureDateKey(dateKey, now);
 }

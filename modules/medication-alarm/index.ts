@@ -39,6 +39,15 @@ const MedicationAlarmModule = NativeModules.MedicationAlarm ?? {
     if (__DEV__) console.warn(LINKING_ERROR);
     return [];
   },
+  consumeReminderLaunchIntent: async (): Promise<{
+    medicationId: string;
+    alarmId: string;
+    scheduledAt: string;
+    doseEventId?: string;
+  } | null> => {
+    if (__DEV__) console.warn(LINKING_ERROR);
+    return null;
+  },
   getPermissionState: async (): Promise<NativePermissionState> => ({
     exactAlarm: Platform.OS !== 'android',
     fullScreenIntent: Platform.OS !== 'android',
@@ -70,6 +79,15 @@ export async function getPendingReminders(): Promise<
   }>
 > {
   return MedicationAlarmModule.getPendingReminders();
+}
+
+export async function consumeReminderLaunchIntent(): Promise<{
+  medicationId: string;
+  alarmId: string;
+  scheduledAt: string;
+  doseEventId?: string;
+} | null> {
+  return MedicationAlarmModule.consumeReminderLaunchIntent();
 }
 
 export async function getPermissionState(): Promise<NativePermissionState> {

@@ -11,7 +11,7 @@ on:
       - 'assets/**'
       - 'package.json'
       - 'package-lock.json'
-      - 'app.json'
+      - 'expo.base.json'
       - 'app.config.js'
       - 'scripts/**'
       - '.github/workflows/release-apk.yml'
@@ -53,7 +53,7 @@ jobs:
 
       - name: Read app version
         id: version
-        run: echo "version=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p "require('./expo.base.json').expo.version")" >> "$GITHUB_OUTPUT"
 
       - name: Build shareable arm64 APK
         run: npm run android:apk
@@ -68,7 +68,7 @@ jobs:
 
             Download **health-os-release.apk** from the assets below and install on your phone.
 
-            Bump `version` in `app.json` before pushing to publish a new GitHub Release tag.
+            Bump `version` in `expo.base.json` before pushing to publish a new GitHub Release tag.
           files: dist/health-os-release.apk
           generate_release_notes: true
           make_latest: true

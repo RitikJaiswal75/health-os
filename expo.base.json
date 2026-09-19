@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "1.3.0",
+    "version": "1.6.1",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
@@ -83,7 +83,9 @@
       "./modules/medication-alarm/app.plugin.js",
       "./plugins/withDevClientMainApplication.js",
       "./plugins/withReleaseApkOptimization.js",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

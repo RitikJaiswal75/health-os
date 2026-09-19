@@ -16,7 +16,7 @@ interface DateStripProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   days?: number;
-  /** centered: today ± days/2 (home). past: last N days through today (history). */
+  /** centered: today ± days/2 (home). past: last N days through selectedDate (history). */
   mode?: 'centered' | 'past';
   completionByDate?: Record<string, DateCompletion>;
 }
@@ -28,7 +28,8 @@ export function DateStrip({
   mode = 'centered',
   completionByDate = {},
 }: DateStripProps) {
-  const dates = mode === 'past' ? getPastDateStrip(days) : getDateStrip(days, selectedDate);
+  const dates =
+    mode === 'past' ? getPastDateStrip(days, selectedDate) : getDateStrip(days, selectedDate);
 
   return (
     <View style={styles.container} accessibilityRole="tablist">

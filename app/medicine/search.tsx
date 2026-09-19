@@ -1,46 +1,39 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Keyboard, Platform, StyleSheet, View } from 'react-native';
-import { Button, Dialog, List, Portal, Searchbar, Text, ActivityIndicator } from 'react-native-paper';
+import { useEffect, useRef, useState } from 'react';
+import { FlatList, Keyboard, Platform, StyleSheet, View, type TextInput as RNTextInput } from 'react-native';
+import {
+  Button,
+  Dialog,
+  List,
+  Portal,
+  Searchbar,
+  Text,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native-paper';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import {
-  CatalogCacheRepository,
-  mergeAndRankResults,
-  parseCachedResults,
-  searchDsld,
-  searchRxTerms,
+  isAbortError,
+  searchAllCatalogs,
   type CatalogResult,
 } from '@/src/features/catalog/catalogService';
 import { buildCatalogPrefill } from '@/src/features/catalog/catalogPrefill';
 import { searchIndiaCatalogAsync } from '@/src/features/catalog/indiaCatalog';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
-
-async function loadCachedOrFetch(
-  cache: CatalogCacheRepository | null,
-  source: 'india' | 'rxterms' | 'dsld',
-  query: string,
-  fetcher: (q: string) => Promise<CatalogResult[]>,
-): Promise<CatalogResult[]> {
-  if (cache) {
-    const cached = cache.get(source, query);
-    if (cached) {
-      const parsed = parseCachedResults(cached);
-      if (parsed.length > 0 || cached === '[]') return parsed;
-      cache.delete(source, query);
-    }
-  }
-
-  const results = await fetcher(query);
-  cache?.set(source, query, JSON.stringify(results));
-  return results;
-}
+import { MedicationRepository } from '@/src/features/medications/medicationRepository';
+import {
+  findEarlyDuplicateMedicationConflict,
+  type DuplicateMedicationConflict,
+} from '@/src/features/medications/duplicateMedicationService';
+import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 
 const KEYBOARD_FOOTER_GAP = 16;
+const SEARCH_DEBOUNCE_MS = 400;
 
 export default function SearchScreen() {
-  const { setName, setCatalogId, setMedicationType, setStrength, reset } = useWizardStore();
+  const { beginNewDraft, reset } = useWizardStore();
   const insets = useSafeAreaInsets();
   const dbState = useDatabaseBootstrap();
   const [query, setQuery] = useState('');
@@ -51,10 +44,24 @@ export default function SearchScreen() {
   const [customDialog, setCustomDialog] = useState(false);
   const [customName, setCustomName] = useState('');
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateMedicationConflict | null>(
+    null,
+  );
+  const customNameInputRef = useRef<RNTextInput>(null);
+
+  const openCustomDialog = () => {
+    Keyboard.dismiss();
+    setCustomName(query.trim());
+    setCustomDialog(true);
+  };
 
   useEffect(() => {
-    reset();
-  }, [reset]);
+    if (!customDialog) return;
+    const timer = setTimeout(() => {
+      customNameInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [customDialog]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -70,73 +77,102 @@ export default function SearchScreen() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(query), 300);
+    const timer = setTimeout(() => setDebounced(query.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const dbReady = dbState.status === 'ready';
-  const db = dbReady ? dbState.db : null;
+  const db = dbState.status === 'ready' ? dbState.db : null;
 
-  const search = useCallback(async () => {
+  useEffect(() => {
     if (debounced.length < 2) {
       setResults([]);
       setErrorMessage(null);
+      setLoading(false);
       return;
     }
+
+    const controller = new AbortController();
+    const { signal } = controller;
 
     setLoading(true);
     setErrorMessage(null);
 
-    try {
-      const cache = db ? new CatalogCacheRepository(db) : null;
-      const [india, rx, dsld] = await Promise.all([
-        loadCachedOrFetch(cache, 'india', debounced, searchIndiaCatalogAsync),
-        loadCachedOrFetch(cache, 'rxterms', debounced, searchRxTerms),
-        loadCachedOrFetch(cache, 'dsld', debounced, searchDsld),
-      ]);
+    void (async () => {
+      try {
+        const merged = await searchAllCatalogs(debounced, {
+          db,
+          signal,
+          searchIndia: searchIndiaCatalogAsync,
+        });
 
-      const merged = mergeAndRankResults([india, rx, dsld], debounced);
-      setResults(merged);
+        if (signal.aborted) return;
 
-      if (merged.length === 0) {
+        setResults(merged);
+        if (merged.length === 0) {
+          setErrorMessage(
+            'No matches found. Try another spelling, check your connection for online catalogs, or add a custom medication.',
+          );
+        }
+      } catch (error) {
+        if (signal.aborted || isAbortError(error)) return;
+        setResults([]);
         setErrorMessage(
-          'No matches found. Try another spelling, check your connection for online catalogs, or add a custom medication.',
+          error instanceof Error
+            ? error.message
+            : 'Search failed. Please try again or add a custom medication.',
         );
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      setResults([]);
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Search failed. Please try again or add a custom medication.',
-      );
-    } finally {
-      setLoading(false);
-    }
+    })();
+
+    return () => {
+      controller.abort();
+    };
   }, [debounced, db]);
 
-  useEffect(() => {
-    void search();
-  }, [search]);
+  const continueWithMedicationName = (
+    name: string,
+    onContinue: () => void,
+  ): boolean => {
+    if (dbState.status === 'ready') {
+      const medRepo = new MedicationRepository(dbState.db);
+      const conflict = findEarlyDuplicateMedicationConflict(medRepo, name);
+      if (conflict) {
+        setDuplicateConflict(conflict);
+        return false;
+      }
+    }
+    onContinue();
+    return true;
+  };
 
   const selectResult = (item: CatalogResult) => {
-    setName(item.name);
-    setCatalogId(item.id);
+    continueWithMedicationName(item.name, () => {
+      const prefill = buildCatalogPrefill(item);
+      beginNewDraft({
+        name: item.name,
+        catalogId: item.id,
+        ...(prefill?.medicationType ? { medicationType: prefill.medicationType } : {}),
+        ...(prefill?.strengthValue != null && prefill.strengthUnit
+          ? { strengthValue: prefill.strengthValue, strengthUnit: prefill.strengthUnit }
+          : {}),
+      });
 
-    const prefill = buildCatalogPrefill(item);
-    if (prefill?.medicationType) {
-      setMedicationType(prefill.medicationType);
-    }
-    if (prefill?.strengthValue != null && prefill.strengthUnit) {
-      setStrength(prefill.strengthValue, prefill.strengthUnit);
-    }
-
-    router.push('/medicine/configure');
+      router.push('/medicine/configure');
+    });
   };
 
   const addCustom = () => {
-    if (!customName.trim()) return;
-    setName(customName.trim());
-    setCustomDialog(false);
-    router.push('/medicine/configure');
+    const name = customName.trim();
+    if (!name) return;
+    continueWithMedicationName(name, () => {
+      beginNewDraft({ name });
+      setCustomDialog(false);
+      router.push('/medicine/configure');
+    });
   };
 
   const footerPaddingBottom =
@@ -178,24 +214,36 @@ export default function SearchScreen() {
         )}
       />
       <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
-        <Button
-          mode="outlined"
-          onPress={() => {
-            setCustomName(query.trim());
-            setCustomDialog(true);
-          }}
-        >
+        <Button mode="outlined" onPress={openCustomDialog}>
           Add custom medication
         </Button>
       </View>
+      <DuplicateMedicationDialog
+        visible={duplicateConflict != null}
+        conflict={duplicateConflict}
+        onDismiss={() => setDuplicateConflict(null)}
+        onEditExisting={() => {
+          if (!duplicateConflict) return;
+          const medicationId = duplicateConflict.medication.id;
+          setDuplicateConflict(null);
+          setCustomDialog(false);
+          reset();
+          router.replace(`/medicine/${medicationId}`);
+        }}
+      />
+
       <Portal>
         <Dialog visible={customDialog} onDismiss={() => setCustomDialog(false)}>
           <Dialog.Title>Custom medication</Dialog.Title>
           <Dialog.Content>
-            <Searchbar
+            <TextInput
+              ref={customNameInputRef}
+              label="Medication name"
               placeholder="Enter name"
               value={customName}
               onChangeText={setCustomName}
+              mode="outlined"
+              style={styles.customNameInput}
               accessibilityLabel="Custom medication name"
             />
           </Dialog.Content>
@@ -234,6 +282,9 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     color: healthOsTheme.colors.onSurface,
+  },
+  customNameInput: {
+    backgroundColor: healthOsTheme.colors.surface,
   },
   loader: { marginVertical: 8 },
   hint: {

@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
+import { startOfDay } from 'date-fns';
 import { Appbar, Button, Card, Dialog, Portal, RadioButton, Text } from 'react-native-paper';
-import { formatDateKey, formatScheduledTime } from '@/src/core/dates/dateUtils';
-import { DateStrip } from '@/src/core/components/DateStrip';
+import { formatDateKey, formatScheduledTime, parseDateKey } from '@/src/core/dates/dateUtils';
+import { HistoryDateNavigator } from '@/src/core/components/HistoryDateNavigator';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import type { DoseEvent } from '@/src/db/schema';
-import type { DoseStatus } from '@/src/core/types/domain';
+import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
+import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
+import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 export default function HistoryScreen() {
@@ -17,6 +20,11 @@ export default function HistoryScreen() {
   const [editStatus, setEditStatus] = useState<DoseStatus>('taken');
   const dbState = useDatabaseBootstrap();
   const dateKey = formatDateKey(selectedDate);
+  const earliestHistoryDate = useMemo(() => {
+    if (dbState.status !== 'ready') return startOfDay(new Date());
+    const earliestKey = new DoseEventRepository(dbState.db).getEarliestHistoryDateKey();
+    return earliestKey ? parseDateKey(earliestKey) : startOfDay(new Date());
+  }, [dbState]);
 
   const doses =
     dbState.status === 'ready'
@@ -32,6 +40,7 @@ export default function HistoryScreen() {
 
   const handleSaveEdit = () => {
     if (!editDose || dbState.status !== 'ready' || !medRepo) return;
+    if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
     const doseRepo = new DoseEventRepository(dbState.db);
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
     inventory.applyStatusChange(editDose.id, editDose.status as DoseStatus, editStatus);
@@ -56,8 +65,15 @@ export default function HistoryScreen() {
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="History" />
       </Appbar.Header>
+
+      <ReminderPermissionBanner />
+
       <ScrollView contentContainerStyle={styles.content}>
-        <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} mode="past" />
+        <HistoryDateNavigator
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          minDate={earliestHistoryDate}
+        />
         {doses.length === 0 ? (
           <Text style={styles.empty}>No doses logged for this day.</Text>
         ) : (
@@ -75,7 +91,9 @@ export default function HistoryScreen() {
                 <Card.Content>
                   <Text variant="titleMedium">{med?.nickname ?? med?.name}</Text>
                   <Text variant="bodySmall">
-                    {formatScheduledTime(dose.scheduledAt)} — {dose.status}
+                    {dose.status === 'snoozed'
+                      ? `${formatScheduledTime(originalScheduledAt(dose))} — ${DOSE_STATUS_LABEL.snoozed} until ${formatScheduledTime(dose.scheduledAt)}`
+                      : `${formatScheduledTime(dose.scheduledAt)} — ${DOSE_STATUS_LABEL[dose.status as DoseStatus]}`}
                   </Text>
                 </Card.Content>
               </Card>
@@ -89,10 +107,23 @@ export default function HistoryScreen() {
           <Dialog.Title>Edit dose</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
-              <RadioButton.Item label="Taken" value="taken" />
-              <RadioButton.Item label="Skipped" value="skipped" />
-              <RadioButton.Item label="Missed" value="missed" />
-              <RadioButton.Item label="Pending" value="pending" />
+              {DOSE_STATUS_OPTIONS.filter((option) => {
+                if (option.value === 'snoozed') return false;
+                if (
+                  option.value === 'taken' &&
+                  editDose &&
+                  !canLogDoseForTodayOrPast(editDose)
+                ) {
+                  return false;
+                }
+                return true;
+              }).map((option) => (
+                <RadioButton.Item
+                  key={option.value}
+                  label={option.label}
+                  value={option.value}
+                />
+              ))}
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>

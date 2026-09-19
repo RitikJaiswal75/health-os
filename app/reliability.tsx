@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { Button, Text, type ButtonProps } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import {
@@ -8,9 +8,48 @@ import {
   usePermissionState,
   getBlockedRemindersMessage,
   getRecommendedRemindersMessage,
+  getNextPermissionAction,
+  type PermissionActionKind,
 } from '@/src/features/reliability/reliabilityService';
 import { permissionHelper, type PermissionKind } from '@/src/core/permissions/permissionHelper';
 import { ensureNotificationSetup } from '@/src/features/reminders/notificationSetup';
+import { useWizardStore } from '@/src/features/medications/wizardStore';
+
+const MIN_CHECK_AGAIN_FEEDBACK_MS = 700;
+
+type ReliabilityButtonAction = PermissionActionKind | 'check_again' | 'continue';
+
+function isPrimaryReliabilityAction(
+  action: ReliabilityButtonAction,
+  nextAction: PermissionActionKind | null,
+): boolean {
+  if (action === 'check_again') return false;
+  if (action === 'continue') return nextAction === null;
+  return action === nextAction;
+}
+
+function ReliabilityButton({
+  action,
+  nextAction,
+  style,
+  ...props
+}: ButtonProps & { action: ReliabilityButtonAction; nextAction: PermissionActionKind | null }) {
+  const primary = isPrimaryReliabilityAction(action, nextAction);
+
+  if (primary) {
+    return <Button mode="contained" style={style} {...props} />;
+  }
+
+  return (
+    <Button
+      mode="outlined"
+      buttonColor="#000000"
+      textColor={healthOsTheme.colors.primary}
+      style={[styles.secondaryButton, style]}
+      {...props}
+    />
+  );
+}
 
 function PermissionRow({ label, granted }: { label: string; granted: boolean }) {
   return (
@@ -23,8 +62,10 @@ function PermissionRow({ label, granted }: { label: string; granted: boolean }) 
 export default function ReliabilityScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { state, refresh } = usePermissionState();
+  const [checkingAgain, setCheckingAgain] = useState(false);
   const blocked = getBlockedRemindersMessage(state);
   const recommended = getRecommendedRemindersMessage(state);
+  const nextAction = getNextPermissionAction(state);
   const isPreAddFlow = returnTo === ADD_MEDICATION_PATH;
   const nativeLinked = permissionHelper.isNativeAlarmModuleLinked();
 
@@ -41,8 +82,29 @@ export default function ReliabilityScreen() {
     [runPermissionAction],
   );
 
+  const handleCheckAgain = useCallback(async () => {
+    setCheckingAgain(true);
+    try {
+      await Promise.all([
+        refresh(),
+        new Promise<void>((resolve) => setTimeout(resolve, MIN_CHECK_AGAIN_FEEDBACK_MS)),
+      ]);
+    } finally {
+      setCheckingAgain(false);
+    }
+  }, [refresh]);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)');
+  };
+
   const handleContinue = () => {
     if (returnTo === ADD_MEDICATION_PATH) {
+      useWizardStore.getState().reset();
       router.replace('/medicine/search');
       return;
     }
@@ -94,61 +156,79 @@ export default function ReliabilityScreen() {
       {(blocked || recommended) && (
         <>
           {!state?.notifications && (
-            <Button
-              mode="contained"
+            <ReliabilityButton
+              action="notifications"
+              nextAction={nextAction}
               onPress={() => runPermissionAction(() => ensureNotificationSetup())}
               accessibilityLabel="Enable notifications"
             >
               Enable notifications
-            </Button>
+            </ReliabilityButton>
           )}
           {!state?.exactAlarm && (
-            <Button
-              mode="contained"
+            <ReliabilityButton
+              action="exact_alarm"
+              nextAction={nextAction}
               onPress={() => openNativeSetting('exact_alarm')}
               accessibilityLabel="Enable exact alarms"
             >
               Enable exact alarms
-            </Button>
+            </ReliabilityButton>
           )}
           {!state?.fullScreenIntent && (
-            <Button
-              mode="contained"
+            <ReliabilityButton
+              action="full_screen_intent"
+              nextAction={nextAction}
               onPress={() => openNativeSetting('full_screen_intent')}
               accessibilityLabel="Enable full screen intent"
             >
               Enable full-screen alarms
-            </Button>
+            </ReliabilityButton>
           )}
           {!state?.overlay && (
-            <Button
-              mode="outlined"
+            <ReliabilityButton
+              action="overlay"
+              nextAction={nextAction}
               onPress={() => openNativeSetting('overlay')}
               accessibilityLabel="Open overlay settings"
             >
               Display over other apps
-            </Button>
+            </ReliabilityButton>
           )}
-          <Button mode="text" onPress={() => void refresh()} accessibilityLabel="Check permissions again">
+          <ReliabilityButton
+            action="check_again"
+            nextAction={nextAction}
+            onPress={() => void handleCheckAgain()}
+            loading={checkingAgain}
+            disabled={checkingAgain}
+            accessibilityLabel="Check permissions again"
+          >
             Check again
-          </Button>
+          </ReliabilityButton>
         </>
       )}
 
-      <Button
-        mode={blocked ? 'outlined' : 'contained'}
-        onPress={handleContinue}
-        style={styles.continueBtn}
-        accessibilityLabel={isPreAddFlow ? 'Continue to add medication' : 'Continue to home'}
-      >
-        {isPreAddFlow
-          ? blocked
-            ? 'Add medication anyway'
-            : 'Add medication'
-          : blocked
-            ? 'Continue anyway'
-            : 'Go to home'}
-      </Button>
+      {blocked ? (
+        <ReliabilityButton
+          action="check_again"
+          nextAction={nextAction}
+          onPress={handleBack}
+          style={styles.continueBtn}
+          accessibilityLabel="Go back"
+        >
+          Back
+        </ReliabilityButton>
+      ) : (
+        <ReliabilityButton
+          action="continue"
+          nextAction={nextAction}
+          onPress={handleContinue}
+          style={styles.continueBtn}
+          accessibilityLabel={isPreAddFlow ? 'Continue to add medication' : 'Continue to home'}
+        >
+          {isPreAddFlow ? 'Add medication' : 'Go to home'}
+        </ReliabilityButton>
+      )}
 
       <Text variant="bodySmall" style={styles.note}>
         Force-stop clears all alarms on Android. Re-open Health OS after force-stop to reschedule.
@@ -190,6 +270,10 @@ const styles = StyleSheet.create({
     color: healthOsTheme.colors.onSurfaceVariant,
     fontSize: 14,
     lineHeight: 20,
+  },
+  secondaryButton: {
+    borderColor: healthOsTheme.colors.outline,
+    borderWidth: 1,
   },
   continueBtn: {
     marginTop: 8,

@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { StackHeaderWithBanner } from '@/src/core/components/StackHeaderWithBanner';
 import { healthOsNavigationTheme } from '@/src/core/theme/navigationTheme';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
@@ -8,7 +9,7 @@ export default function MedicineLayout() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerBackTitle: 'Back',
+        header: (props) => <StackHeaderWithBanner {...props} />,
         headerStyle: { backgroundColor: healthOsTheme.colors.surface },
         headerTintColor: healthOsTheme.colors.onSurface,
         headerTitleStyle: { color: healthOsTheme.colors.onSurface },

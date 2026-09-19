@@ -30,6 +30,12 @@ import { MedicationRepository } from '@/src/features/medications/medicationRepos
 import { removeMedicationWithReminders } from '@/src/features/medications/medicationDeletionService';
 import { ReminderReconciler, scheduleAlarms } from '@/src/features/reminders/reminderService';
 import { generateUpcomingDoseEvents, resyncPendingDosesAfterScheduleUpdate } from '@/src/features/medications/doseGenerationService';
+import {
+  findDuplicateMedicationConflict,
+  proposedSchedulePeriod,
+  type DuplicateMedicationConflict,
+} from '@/src/features/medications/duplicateMedicationService';
+import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 
 function getFrequencyLabel(type?: ScheduleType, intervalDays?: number): string {
   if (type === 'interval_days' && intervalDays) {
@@ -91,6 +97,9 @@ export function MedicationReviewView() {
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateMedicationConflict | null>(
+    null,
+  );
   const scrollRef = useRef<ScrollView>(null);
   const fieldOffsets = useRef<Record<string, number>>({});
   const [keyboardInset, setKeyboardInset] = useState(0);
@@ -178,6 +187,16 @@ export function MedicationReviewView() {
     try {
       const input = buildSaveInput(draft, nickname, notes, quantity, refillOn, refillThreshold);
       const medRepo = new MedicationRepository(dbState.db);
+      const conflict = findDuplicateMedicationConflict(
+        medRepo,
+        input.name,
+        proposedSchedulePeriod(input.schedule.startDate, input.schedule.endDate),
+        isEditing ? editingMedicationId : undefined,
+      );
+      if (conflict) {
+        setDuplicateConflict(conflict);
+        return;
+      }
 
       if (isEditing && editingMedicationId) {
         const saved = medRepo.update(editingMedicationId, input);
@@ -463,6 +482,19 @@ export function MedicationReviewView() {
             <Button onPress={() => setRefillDialog(false)}>Done</Button>
           </Dialog.Actions>
         </Dialog>
+
+        <DuplicateMedicationDialog
+          visible={duplicateConflict != null}
+          conflict={duplicateConflict}
+          onDismiss={() => setDuplicateConflict(null)}
+          onEditExisting={() => {
+            if (!duplicateConflict) return;
+            const medicationId = duplicateConflict.medication.id;
+            setDuplicateConflict(null);
+            reset();
+            router.replace(`/medicine/${medicationId}`);
+          }}
+        />
 
         <Dialog visible={deleteDialog} onDismiss={() => !deleting && setDeleteDialog(false)}>
           <Dialog.Title>Delete medication?</Dialog.Title>

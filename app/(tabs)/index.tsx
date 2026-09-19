@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Appbar, Button, Card, Dialog, FAB, Portal, RadioButton, Text } from 'react-native-paper';
+import { Appbar, Button, Card, Dialog, FAB, Menu, Portal, RadioButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { navigateToAddMedication } from '@/src/features/reliability/reliabilityService';
@@ -8,7 +8,7 @@ import { formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip }
 import { DateStrip, type DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
-import { originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
+import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { generateUpcomingDoseEvents, removePendingDuplicatingResolvedDoses, removeDuplicateDoseEvents } from '@/src/features/medications/doseGenerationService';
 import {
   cleanupSnoozeConflicts,
@@ -17,10 +17,11 @@ import {
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
 import type { DoseEvent } from '@/src/db/schema';
-import type { DoseStatus } from '@/src/core/types/domain';
+import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
 import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
+import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 export default function HomeScreen() {
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const [editStatus, setEditStatus] = useState<DoseStatus>('taken');
   const [snoozeDose, setSnoozeDose] = useState<DoseEvent | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const dateKey = formatDateKey(selectedDate);
 
@@ -88,7 +90,7 @@ export default function HomeScreen() {
   );
 
   const handleTaken = (dose: DoseEvent) => {
-    if (dbState.status !== 'ready' || !medRepo) return;
+    if (dbState.status !== 'ready' || !medRepo || !canLogDoseForTodayOrPast(dose)) return;
 
     const variants = medRepo.getVariants(dose.medicationId);
     if (variants.length > 1) {
@@ -133,6 +135,7 @@ export default function HomeScreen() {
 
   const handleSaveEdit = () => {
     if (!editDose || dbState.status !== 'ready' || !medRepo) return;
+    if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
     if (editStatus === 'taken' && editDose.status !== 'taken') {
       markDoseAsTaken(dbState.db, editDose.id);
     } else {
@@ -162,8 +165,35 @@ export default function HomeScreen() {
       <Appbar.Header>
         <Appbar.Content title="Health OS" />
         <Appbar.Action icon="calendar" onPress={() => router.push('/history')} accessibilityLabel="Open history" />
-        <Appbar.Action icon="dots-vertical" onPress={() => router.push('/about')} accessibilityLabel="Open settings" />
+        <Menu
+          visible={menuVisible}
+          onDismiss={() => setMenuVisible(false)}
+          anchor={
+            <Appbar.Action
+              icon="dots-vertical"
+              onPress={() => setMenuVisible(true)}
+              accessibilityLabel="Open menu"
+            />
+          }
+        >
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(false);
+              router.push('/about');
+            }}
+            title="About"
+          />
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(false);
+              router.push('/reliability');
+            }}
+            title="Troubleshooting"
+          />
+        </Menu>
       </Appbar.Header>
+
+      <ReminderPermissionBanner />
 
       <ScrollView contentContainerStyle={styles.content}>
         <DateStrip
@@ -180,7 +210,9 @@ export default function HomeScreen() {
               doses.map((dose) => {
                 const med = meds.find((m) => m.id === dose.medicationId);
                 const isLogged = ['taken', 'skipped', 'missed'].includes(dose.status);
-                const isActionable = dose.status === 'pending' || dose.status === 'snoozed';
+                const isActionable =
+                  (dose.status === 'pending' || dose.status === 'snoozed') &&
+                  canLogDoseForTodayOrPast(dose);
                 return (
                   <Card
                     key={dose.id}
@@ -198,8 +230,8 @@ export default function HomeScreen() {
                       <Text variant="titleMedium">{med?.nickname ?? med?.name ?? 'Medication'}</Text>
                       <Text variant="bodySmall">
                         {dose.status === 'snoozed'
-                          ? `${formatScheduledTime(originalScheduledAt(dose))} — snoozed until ${formatScheduledTime(dose.scheduledAt)}`
-                          : `${formatScheduledTime(dose.scheduledAt)} — ${dose.status}`}
+                          ? `${formatScheduledTime(originalScheduledAt(dose))} — ${DOSE_STATUS_LABEL.snoozed} until ${formatScheduledTime(dose.scheduledAt)}`
+                          : `${formatScheduledTime(dose.scheduledAt)} — ${DOSE_STATUS_LABEL[dose.status as DoseStatus]}`}
                         {med && med.currentQuantity > 0
                           ? ` · ${med.currentQuantity} remaining`
                           : ''}
@@ -254,7 +286,7 @@ export default function HomeScreen() {
         </Card>
       </ScrollView>
 
-      <FAB icon="plus" style={styles.fab} onPress={() => void navigateToAddMedication()} accessibilityLabel="Add medication" />
+      <FAB icon="plus" style={styles.fab} onPress={navigateToAddMedication} accessibilityLabel="Add medication" />
 
       {variantSheet}
 
@@ -269,10 +301,23 @@ export default function HomeScreen() {
           <Dialog.Title>Edit dose</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
-              <RadioButton.Item label="Taken" value="taken" />
-              <RadioButton.Item label="Skipped" value="skipped" />
-              <RadioButton.Item label="Missed" value="missed" />
-              <RadioButton.Item label="Pending" value="pending" />
+              {DOSE_STATUS_OPTIONS.filter((option) => {
+                if (option.value === 'snoozed') return false;
+                if (
+                  option.value === 'taken' &&
+                  editDose &&
+                  !canLogDoseForTodayOrPast(editDose)
+                ) {
+                  return false;
+                }
+                return true;
+              }).map((option) => (
+                <RadioButton.Item
+                  key={option.value}
+                  label={option.label}
+                  value={option.value}
+                />
+              ))}
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>

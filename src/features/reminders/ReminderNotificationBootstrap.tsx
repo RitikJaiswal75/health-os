@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { ensureNotificationSetup } from './notificationSetup';
 import { openReminderFromData } from './reminderDeepLink';
 import { syncPendingNativeReminders } from './pendingReminderSync';
+import { subscribeReminderLaunchIntent } from './reminderLaunchIntent';
 import { isReminderRouterReady } from './reminderRouterReady';
 
 const ACTIVE_POLL_MS = 1500;
@@ -11,6 +12,7 @@ const ACTIVE_POLL_MS = 1500;
 export function ReminderNotificationBootstrap() {
   useEffect(() => {
     void ensureNotificationSetup();
+    const launchSub = subscribeReminderLaunchIntent();
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       openReminderFromData(response.notification.request.content.data);
@@ -52,6 +54,7 @@ export function ReminderNotificationBootstrap() {
     }
 
     return () => {
+      launchSub();
       responseSub.remove();
       appStateSub.remove();
       stopActivePolling();

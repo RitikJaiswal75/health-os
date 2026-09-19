@@ -19,12 +19,8 @@ export default function AboutScreen() {
         US drug names: NLM RxTerms (keyless API). Supplements: NIH DSLD (keyless API).
         NLM and NIH do not endorse this app.
       </Text>
-      <Text variant="titleMedium" style={styles.section}>Quality gate</Text>
-      <Text variant="bodySmall">
-        Run locally before release: npm run typecheck && npm run lint && npm test
-      </Text>
       <Button mode="outlined" onPress={() => router.push('/reliability')} style={styles.section}>
-        Reminder reliability
+        Troubleshoot
       </Button>
     </ScrollView>
   );

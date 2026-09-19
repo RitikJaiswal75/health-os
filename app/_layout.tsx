@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 
 import { healthOsNavigationTheme } from '@/src/core/theme/navigationTheme';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { StackHeaderWithBanner } from '@/src/core/components/StackHeaderWithBanner';
 import { DbBootstrapGate } from '@/src/db/DbBootstrapGate';
 import { ReminderNotificationBootstrap } from '@/src/features/reminders/ReminderNotificationBootstrap';
 import { ReminderRouterReadyGate } from '@/src/features/reminders/ReminderRouterReadyGate';
@@ -41,11 +42,22 @@ export default function RootLayout() {
                   contentStyle: { backgroundColor: healthOsTheme.colors.background },
                 }}
               >
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="medicine" />
-              <Stack.Screen name="reminder" options={{ presentation: 'fullScreenModal' }} />
-              <Stack.Screen name="about" options={{ presentation: 'modal', headerShown: true, title: 'About' }} />
-              <Stack.Screen name="reliability" options={{ presentation: 'modal', headerShown: true, title: 'Reminder permissions' }} />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="medicine" />
+                <Stack.Screen name="reminder" options={{ presentation: 'fullScreenModal' }} />
+                <Stack.Screen
+                  name="about"
+                  options={{
+                    presentation: 'modal',
+                    headerShown: true,
+                    title: 'About',
+                    header: (props) => <StackHeaderWithBanner {...props} />,
+                  }}
+                />
+                <Stack.Screen
+                  name="reliability"
+                  options={{ presentation: 'modal', headerShown: true, title: 'Troubleshooting' }}
+                />
               </Stack>
               <ReminderRouterReadyGate />
               <ReminderNotificationBootstrap />
