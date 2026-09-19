@@ -1,6 +1,15 @@
-import { useEffect, useState } from 'react';
-import { FlatList, Keyboard, Platform, StyleSheet, View } from 'react-native';
-import { Button, Dialog, List, Portal, Searchbar, Text, ActivityIndicator } from 'react-native-paper';
+import { useEffect, useRef, useState } from 'react';
+import { FlatList, Keyboard, Platform, StyleSheet, View, type TextInput as RNTextInput } from 'react-native';
+import {
+  Button,
+  Dialog,
+  List,
+  Portal,
+  Searchbar,
+  Text,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native-paper';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
@@ -38,6 +47,21 @@ export default function SearchScreen() {
   const [duplicateConflict, setDuplicateConflict] = useState<DuplicateMedicationConflict | null>(
     null,
   );
+  const customNameInputRef = useRef<RNTextInput>(null);
+
+  const openCustomDialog = () => {
+    Keyboard.dismiss();
+    setCustomName(query.trim());
+    setCustomDialog(true);
+  };
+
+  useEffect(() => {
+    if (!customDialog) return;
+    const timer = setTimeout(() => {
+      customNameInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [customDialog]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -190,13 +214,7 @@ export default function SearchScreen() {
         )}
       />
       <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
-        <Button
-          mode="outlined"
-          onPress={() => {
-            setCustomName(query.trim());
-            setCustomDialog(true);
-          }}
-        >
+        <Button mode="outlined" onPress={openCustomDialog}>
           Add custom medication
         </Button>
       </View>
@@ -218,10 +236,14 @@ export default function SearchScreen() {
         <Dialog visible={customDialog} onDismiss={() => setCustomDialog(false)}>
           <Dialog.Title>Custom medication</Dialog.Title>
           <Dialog.Content>
-            <Searchbar
+            <TextInput
+              ref={customNameInputRef}
+              label="Medication name"
               placeholder="Enter name"
               value={customName}
               onChangeText={setCustomName}
+              mode="outlined"
+              style={styles.customNameInput}
               accessibilityLabel="Custom medication name"
             />
           </Dialog.Content>
@@ -260,6 +282,9 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     color: healthOsTheme.colors.onSurface,
+  },
+  customNameInput: {
+    backgroundColor: healthOsTheme.colors.surface,
   },
   loader: { marginVertical: 8 },
   hint: {

@@ -693,6 +693,27 @@ describe('wizardStore', () => {
     expect(draft.medicationType).toBeUndefined();
   });
 
+  it('requires amount and unit before saving strength', () => {
+    const { validateStrengthFields } = require('../src/features/medications/strengthFieldValidation');
+
+    expect(validateStrengthFields('', 'mg', 'Amount')).toEqual({
+      amountError: 'Enter amount.',
+      unitError: null,
+    });
+    expect(validateStrengthFields('0', 'mg', 'Amount').amountError).toBe(
+      'Enter a valid amount greater than zero.',
+    );
+    expect(validateStrengthFields('500', undefined, 'Amount')).toEqual({
+      amountError: null,
+      unitError: 'Select a unit before saving.',
+    });
+    expect(validateStrengthFields('500', 'mg', 'Amount')).toEqual({
+      amountError: null,
+      unitError: null,
+      value: 500,
+    });
+  });
+
   it('beginNewDraft replaces prior unsaved wizard state atomically', () => {
     const { useWizardStore } = require('../src/features/medications/wizardStore');
     useWizardStore.getState().reset();

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Keyboard, ScrollView, StyleSheet, type TextInput as RNTextInput } from 'react-native';
 import { Button, Dialog, Portal, RadioButton, Text, TextInput } from 'react-native-paper';
 import { router, Stack, useNavigation } from 'expo-router';
 import { MedicationTypeDialog } from '@/src/core/components/MedicationTypeDialog';
@@ -10,6 +10,7 @@ import {
   type StrengthUnit,
 } from '@/src/core/types/domain';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
+import { validateStrengthFields } from '@/src/features/medications/strengthFieldValidation';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
 function StrengthDialog({
@@ -27,17 +28,32 @@ function StrengthDialog({
   initialValue?: number;
   initialUnit: StrengthUnit;
   onDismiss: () => void;
-  onSave: (value?: number, unit?: StrengthUnit) => void;
+  onSave: (value: number, unit: StrengthUnit) => void;
 }) {
   const [amountInput, setAmountInput] = useState(String(initialValue ?? ''));
   const [unit, setUnit] = useState<StrengthUnit>(initialUnit);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [unitError, setUnitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       setAmountInput(String(initialValue ?? ''));
       setUnit(initialUnit);
+      setAmountError(null);
+      setUnitError(null);
     }
   }, [visible, initialValue, initialUnit]);
+
+  const handleSave = () => {
+    const result = validateStrengthFields(amountInput, unit, label);
+    setAmountError(result.amountError);
+    setUnitError(result.unitError);
+    if (result.amountError || result.unitError || result.value == null || !unit) {
+      return;
+    }
+    onSave(result.value, unit);
+    onDismiss();
+  };
 
   return (
     <Portal>
@@ -47,30 +63,42 @@ function StrengthDialog({
           <TextInput
             label={label}
             value={amountInput}
-            onChangeText={setAmountInput}
+            onChangeText={(value) => {
+              setAmountInput(value);
+              if (amountError) setAmountError(null);
+            }}
             keyboardType="numeric"
             accessibilityLabel={label}
+            error={amountError != null}
           />
+          {amountError ? (
+            <Text variant="bodySmall" style={styles.errorText} accessibilityRole="alert">
+              {amountError}
+            </Text>
+          ) : null}
           <Text variant="labelLarge" style={styles.unitLabel}>
             Unit
           </Text>
-          <RadioButton.Group onValueChange={(v) => setUnit(v as StrengthUnit)} value={unit}>
+          <RadioButton.Group
+            onValueChange={(value) => {
+              setUnit(value as StrengthUnit);
+              if (unitError) setUnitError(null);
+            }}
+            value={unit}
+          >
             {STRENGTH_UNITS.map((u) => (
               <RadioButton.Item key={u} label={u} value={u} />
             ))}
           </RadioButton.Group>
+          {unitError ? (
+            <Text variant="bodySmall" style={styles.errorText} accessibilityRole="alert">
+              {unitError}
+            </Text>
+          ) : null}
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={onDismiss}>Cancel</Button>
-          <Button
-            onPress={() => {
-              const val = parseFloat(amountInput);
-              onSave(isNaN(val) ? undefined : val, unit);
-              onDismiss();
-            }}
-          >
-            Save
-          </Button>
+          <Button onPress={handleSave}>Save</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>
@@ -92,6 +120,12 @@ export default function ConfigureScreen() {
   const [typeDialog, setTypeDialog] = useState(false);
   const [strengthDialog, setStrengthDialog] = useState(false);
   const [doseUnitDialog, setDoseUnitDialog] = useState(false);
+  const nameInputRef = useRef<RNTextInput>(null);
+
+  const releaseNameInputFocus = useCallback(() => {
+    nameInputRef.current?.blur();
+    Keyboard.dismiss();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
@@ -108,6 +142,7 @@ export default function ConfigureScreen() {
   const canProceed = canProceedConfigure() && draft.name.trim().length > 0;
 
   const handleNext = () => {
+    releaseNameInputFocus();
     if (isEditing && editingMedicationId) {
       router.push(`/medicine/${editingMedicationId}`);
       return;
@@ -115,11 +150,31 @@ export default function ConfigureScreen() {
     router.push('/medicine/shape');
   };
 
+  const openTypeDialog = () => {
+    releaseNameInputFocus();
+    setTypeDialog(true);
+  };
+
+  const openStrengthDialog = () => {
+    releaseNameInputFocus();
+    setStrengthDialog(true);
+  };
+
+  const openDoseUnitDialog = () => {
+    releaseNameInputFocus();
+    setDoseUnitDialog(true);
+  };
+
   return (
     <>
       <Stack.Screen options={{ title: isEditing ? 'Edit details' : 'Set information' }} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <TextInput
+        ref={nameInputRef}
         label="Medication name"
         value={draft.name}
         onChangeText={setName}
@@ -130,7 +185,7 @@ export default function ConfigureScreen() {
 
       <Button
         mode="outlined"
-        onPress={() => setTypeDialog(true)}
+        onPress={openTypeDialog}
         style={styles.field}
         accessibilityLabel="Select medication type"
       >
@@ -141,7 +196,7 @@ export default function ConfigureScreen() {
         <>
           <Button
             mode="outlined"
-            onPress={() => setDoseUnitDialog(true)}
+            onPress={openDoseUnitDialog}
             style={styles.field}
             accessibilityLabel="Set scoop size"
           >
@@ -152,7 +207,7 @@ export default function ConfigureScreen() {
           </Button>
           <Button
             mode="outlined"
-            onPress={() => setStrengthDialog(true)}
+            onPress={openStrengthDialog}
             style={styles.field}
             accessibilityLabel="Set strength"
           >
@@ -165,7 +220,7 @@ export default function ConfigureScreen() {
       ) : (
         <Button
           mode="outlined"
-          onPress={() => setStrengthDialog(true)}
+          onPress={openStrengthDialog}
           style={styles.field}
           accessibilityLabel="Set strength"
         >
@@ -226,4 +281,9 @@ const styles = StyleSheet.create({
   field: { marginTop: 8 },
   next: { marginTop: 24 },
   unitLabel: { marginTop: 16 },
+  errorText: {
+    color: healthOsTheme.colors.error,
+    marginTop: 4,
+    marginBottom: 4,
+  },
 });
