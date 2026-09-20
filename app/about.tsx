@@ -1,26 +1,26 @@
 import { ScrollView, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { router } from 'expo-router';
+import { useT } from '@/src/i18n/useT';
 
 export default function AboutScreen() {
+  const { t } = useT();
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text variant="titleLarge">Health OS</Text>
       <Text variant="bodyMedium" style={styles.disclaimer}>
-        Health OS is a personal medicine and supplement tracker. It is not medical advice,
-        diagnosis, or treatment. Always consult a qualified healthcare provider about your medications.
+        {t('about.disclaimer')}
       </Text>
-      <Text variant="titleMedium" style={styles.section}>Data sources</Text>
-      <Text variant="bodySmall">
-        India drug names: NRCeS CDCI dataset (CC BY 4.0). C-DAC / NRCeS attribution required.
-        Dataset version: bundled local copy.
+      <Text variant="titleMedium" style={styles.section}>
+        {t('about.dataSources')}
       </Text>
+      <Text variant="bodySmall">{t('about.indiaSource')}</Text>
       <Text variant="bodySmall" style={styles.section}>
-        US drug names: NLM RxTerms (keyless API). Supplements: NIH DSLD (keyless API).
-        NLM and NIH do not endorse this app.
+        {t('about.usSource')}
       </Text>
       <Button mode="outlined" onPress={() => router.push('/reliability')} style={styles.section}>
-        Troubleshoot
+        {t('about.troubleshoot')}
       </Button>
     </ScrollView>
   );

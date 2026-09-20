@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Portal, Text } from 'react-native-paper';
 import { ColorWheelPicker } from './ColorWheelPicker';
 import { normalizeHex } from '../colors/colorUtils';
+import { useT } from '@/src/i18n/useT';
 
 const SAMSUNG = {
   dialogBg: '#252525',
@@ -20,11 +21,13 @@ interface CustomColorDialogProps {
 
 export function CustomColorDialog({
   visible,
-  title = 'Custom colour',
+  title,
   value = '#FFFFFF',
   onDismiss,
   onConfirm,
 }: CustomColorDialogProps) {
+  const { t } = useT();
+  const heading = title ?? t('colour.custom');
   const [pending, setPending] = useState(normalizeHex(value));
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export function CustomColorDialog({
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
           <Text variant="titleMedium" style={styles.title}>
-            {title}
+            {heading}
           </Text>
           <ColorWheelPicker value={pending} onChange={setPending} />
           <View style={styles.footer}>
@@ -48,18 +51,18 @@ export function CustomColorDialog({
               style={styles.footerBtn}
               onPress={onDismiss}
               accessibilityRole="button"
-              accessibilityLabel="Cancel"
+              accessibilityLabel={t('common.cancel')}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
             <View style={styles.footerDivider} />
             <Pressable
               style={styles.footerBtn}
               onPress={() => onConfirm(pending)}
               accessibilityRole="button"
-              accessibilityLabel="OK"
+              accessibilityLabel={t('common.ok')}
             >
-              <Text style={styles.okText}>OK</Text>
+              <Text style={styles.okText}>{t('common.ok')}</Text>
             </Pressable>
           </View>
         </View>

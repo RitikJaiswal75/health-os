@@ -1,9 +1,10 @@
 import { healthOsTheme, tokens } from '@/src/core/theme/paperTheme';
-import { MEDICATION_TYPES, type MedicationType } from '@/src/core/types/domain';
+import { MEDICATION_TYPES, getMedicationTypeLabel, type MedicationType } from '@/src/core/types/domain';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
+import { useT } from '@/src/i18n/useT';
 
 interface MedicationTypeDialogProps {
   visible: boolean;
@@ -18,6 +19,7 @@ export function MedicationTypeDialog({
   onDismiss,
   onConfirm,
 }: MedicationTypeDialogProps) {
+  const { t } = useT();
   const { height: windowHeight } = useWindowDimensions();
   const [pending, setPending] = useState<MedicationType | undefined>(value);
 
@@ -34,10 +36,10 @@ export function MedicationTypeDialog({
       <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
         <View style={styles.header}>
           <Text variant="headlineSmall" style={styles.title}>
-            Medication type
+            {t('type.title')}
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            Choose the form that best matches your medicine.
+            {t('type.subtitle')}
           </Text>
         </View>
 
@@ -56,10 +58,10 @@ export function MedicationTypeDialog({
                   style={[styles.option, selected && styles.optionSelected]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={type.label}
+                  accessibilityLabel={getMedicationTypeLabel(type.value)}
                 >
                   <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>
-                    {type.label}
+                    {getMedicationTypeLabel(type.value)}
                   </Text>
                   {selected ? (
                     <MaterialCommunityIcons
@@ -83,7 +85,7 @@ export function MedicationTypeDialog({
             style={styles.footerButton}
             contentStyle={styles.footerButtonContent}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             mode="contained"
@@ -92,7 +94,7 @@ export function MedicationTypeDialog({
             style={styles.footerButton}
             contentStyle={styles.footerButtonContent}
           >
-            Done
+            {t('common.done')}
           </Button>
         </View>
       </Dialog>

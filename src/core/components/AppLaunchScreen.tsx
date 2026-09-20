@@ -1,9 +1,10 @@
 import { Image, StyleSheet, View } from 'react-native';
+import { t } from '@/src/i18n/translate';
 
 /** Full-bleed branded splash shown while the app initializes. */
 export function AppLaunchScreen() {
   return (
-    <View style={styles.root} accessibilityLabel="Loading Health OS">
+    <View style={styles.root} accessibilityLabel={t('launch.loading')}>
       <Image
         source={require('../../../assets/images/Splash_Screen.png')}
         style={styles.image}

@@ -4,6 +4,8 @@ import { format, isSameDay } from 'date-fns';
 import { getDateStrip, getPastDateStrip, isToday, formatDateKey } from '../../core/dates/dateUtils';
 import { DateCompletionRing } from './DateCompletionRing';
 import { healthOsTheme, tokens } from '../../core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
+import { getDateFnsLocale } from '@/src/i18n/dateLocale';
 
 export interface DateCompletion {
   taken: number;
@@ -28,6 +30,7 @@ export function DateStrip({
   mode = 'centered',
   completionByDate = {},
 }: DateStripProps) {
+  const { t } = useT();
   const dates =
     mode === 'past' ? getPastDateStrip(days, selectedDate) : getDateStrip(days, selectedDate);
 
@@ -44,7 +47,7 @@ export function DateStrip({
         return (
           <View key={date.toISOString()} style={styles.chip}>
             <Text variant="labelSmall" style={styles.weekday}>
-              {format(date, 'EEE')}
+              {format(date, 'EEE', { locale: getDateFnsLocale() })}
             </Text>
             <Pressable
               onPress={() => onSelectDate(date)}
@@ -55,8 +58,12 @@ export function DateStrip({
               accessibilityState={{ selected }}
               accessibilityLabel={
                 scheduled > 0
-                  ? `${format(date, 'EEEE, MMMM d')}, ${taken} of ${scheduled} doses taken`
-                  : format(date, 'EEEE, MMMM d')
+                  ? t('date.dosesTaken', {
+                      date: format(date, 'EEEE, MMMM d', { locale: getDateFnsLocale() }),
+                      taken,
+                      scheduled,
+                    })
+                  : format(date, 'EEEE, MMMM d', { locale: getDateFnsLocale() })
               }
             >
               <View style={styles.dayWrap} pointerEvents="none">

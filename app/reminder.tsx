@@ -19,6 +19,7 @@ import {
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
 import type { DoseEvent, Medication } from '@/src/db/schema';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 type ReminderItem = {
   medication: Medication;
@@ -36,6 +37,7 @@ export default function ReminderScreen() {
   const [snoozeDialog, setSnoozeDialog] = useState(false);
   const db = dbState.status === 'ready' ? dbState.db : null;
   const medRepo = useMemo(() => (db ? new MedicationRepository(db) : null), [db]);
+  const { t } = useT();
 
   const items = useMemo((): ReminderItem[] => {
     if (!db || !medRepo) return [];
@@ -162,9 +164,9 @@ export default function ReminderScreen() {
   if (items.length === 0) {
     if (dbState.status === 'loading') {
       return (
-        <View style={styles.container} accessibilityLabel="Loading medication reminder">
+        <View style={styles.container} accessibilityLabel={t('reminder.loadingA11y')}>
           <Text variant="headlineSmall" style={styles.heading}>
-            Loading reminder…
+            {t('reminder.loading')}
           </Text>
         </View>
       );
@@ -172,28 +174,28 @@ export default function ReminderScreen() {
 
     if (dbState.status === 'error') {
       return (
-        <View style={styles.container} accessibilityLabel="Medication reminder unavailable">
+        <View style={styles.container} accessibilityLabel={t('reminder.unavailableA11y')}>
           <Text variant="headlineSmall" style={styles.heading}>
-            Could not load reminder
+            {t('reminder.unavailable')}
           </Text>
-          <Button mode="contained" onPress={dbState.retry} accessibilityLabel="Retry loading reminder">
-            Retry
+          <Button mode="contained" onPress={dbState.retry} accessibilityLabel={t('reminder.retryA11y')}>
+            {t('common.retry')}
           </Button>
         </View>
       );
     }
 
     return (
-      <View style={styles.container} accessibilityLabel="Medication reminder">
+      <View style={styles.container} accessibilityLabel={t('reminder.screenA11y')}>
         <Text variant="headlineSmall" style={styles.heading}>
-          Reminder no longer pending
+          {t('reminder.gone')}
         </Text>
         <Button
           mode="contained"
           onPress={() => void dismiss()}
-          accessibilityLabel="Dismiss reminder"
+          accessibilityLabel={t('reminder.dismissA11y')}
         >
-          Dismiss
+          {t('common.dismiss')}
         </Button>
       </View>
     );
@@ -202,9 +204,9 @@ export default function ReminderScreen() {
   const isGrouped = items.length > 1;
 
   return (
-    <View style={styles.container} accessibilityLabel="Medication reminder">
+    <View style={styles.container} accessibilityLabel={t('reminder.screenA11y')}>
       <Text variant="headlineSmall" style={styles.heading}>
-        {isGrouped ? 'Medications due' : 'Medication due'}
+        {isGrouped ? t('reminder.dueMany') : t('reminder.dueTitle')}
       </Text>
 
       {isGrouped ? (
@@ -228,26 +230,26 @@ export default function ReminderScreen() {
 
       <View style={styles.actions}>
         {isGrouped ? (
-          <Button mode="contained" onPress={handleTakeAll} accessibilityLabel="Take all medications">
-            Take all
+          <Button mode="contained" onPress={handleTakeAll} accessibilityLabel={t('reminder.takeAll')}>
+            {t('reminder.takeAllLabel')}
           </Button>
         ) : (
           <Button
             mode="contained"
             onPress={() => requestTaken(items[0]!.medication.id, items[0])}
-            accessibilityLabel="Mark taken"
+            accessibilityLabel={t('home.markTaken')}
           >
-            Taken
+            {t('common.taken')}
           </Button>
         )}
-        <Button mode="outlined" onPress={() => setSnoozeDialog(true)} accessibilityLabel="Snooze">
-          Snooze
+        <Button mode="outlined" onPress={() => setSnoozeDialog(true)} accessibilityLabel={t('common.snooze')}>
+          {t('common.snooze')}
         </Button>
-        <Button mode="text" onPress={handleSkipAll} accessibilityLabel="Skip dose">
-          Skip
+        <Button mode="text" onPress={handleSkipAll} accessibilityLabel={t('home.skipDose')}>
+          {t('common.skip')}
         </Button>
-        <Button mode="text" onPress={() => void dismiss()} accessibilityLabel="Dismiss reminder">
-          Dismiss
+        <Button mode="text" onPress={() => void dismiss()} accessibilityLabel={t('reminder.dismissA11y')}>
+          {t('common.dismiss')}
         </Button>
       </View>
 

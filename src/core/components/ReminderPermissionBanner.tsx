@@ -7,11 +7,13 @@ import {
 } from '@/src/features/reliability/reliabilityService';
 import { useReminderPermissionBannerStore } from '@/src/features/reliability/reminderPermissionBannerStore';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export function ReminderPermissionBanner() {
   const { state } = usePermissionState();
   const dismissed = useReminderPermissionBannerStore((store) => store.dismissed);
   const dismiss = useReminderPermissionBannerStore((store) => store.dismiss);
+  const { t } = useT();
   const showBanner = shouldShowReminderPermissionBanner(state);
 
   if (!showBanner || dismissed) {
@@ -26,17 +28,17 @@ export function ReminderPermissionBanner() {
         style={styles.banner}
         actions={[
           {
-            label: 'Dismiss',
+            label: t('common.dismiss'),
             onPress: dismiss,
           },
           {
-            label: 'Enable permissions',
+            label: t('banner.enable'),
             onPress: navigateToReliabilityScreen,
           },
         ]}
         accessibilityRole="alert"
       >
-        Please provide permission to get notified on medications.
+        {t('banner.body')}
       </Banner>
     </View>
   );

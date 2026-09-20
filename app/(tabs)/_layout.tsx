@@ -3,8 +3,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { healthOsNavigationTheme } from '@/src/core/theme/navigationTheme';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export default function TabLayout() {
+  const { t } = useT();
+
   return (
     <Tabs
       screenOptions={{
@@ -25,7 +28,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Today',
+          title: t('tabs.today'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="home" size={size} color={color} />
           ),
@@ -34,7 +37,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Medications',
+          title: t('tabs.medications'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="pill" size={size} color={color} />
           ),
@@ -43,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
+          title: t('tabs.history'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="calendar" size={size} color={color} />
           ),

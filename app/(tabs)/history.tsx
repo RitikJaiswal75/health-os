@@ -9,16 +9,18 @@ import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import type { DoseEvent } from '@/src/db/schema';
-import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
+import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
 import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export default function HistoryScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [editDose, setEditDose] = useState<DoseEvent | null>(null);
   const [editStatus, setEditStatus] = useState<DoseStatus>('taken');
   const dbState = useDatabaseBootstrap();
+  const { t } = useT();
   const dateKey = formatDateKey(selectedDate);
   const earliestHistoryDate = useMemo(() => {
     if (dbState.status !== 'ready') return startOfDay(new Date());
@@ -63,7 +65,7 @@ export default function HistoryScreen() {
     <View style={styles.container}>
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="History" />
+        <Appbar.Content title={t('history.title')} />
       </Appbar.Header>
 
       <ReminderPermissionBanner />
@@ -75,7 +77,7 @@ export default function HistoryScreen() {
           minDate={earliestHistoryDate}
         />
         {doses.length === 0 ? (
-          <Text style={styles.empty}>No doses logged for this day.</Text>
+          <Text style={styles.empty}>{t('history.empty')}</Text>
         ) : (
           doses.map((dose) => {
             const med = medRepo?.getById(dose.medicationId);
@@ -92,8 +94,14 @@ export default function HistoryScreen() {
                   <Text variant="titleMedium">{med?.nickname ?? med?.name}</Text>
                   <Text variant="bodySmall">
                     {dose.status === 'snoozed'
-                      ? `${formatScheduledTime(originalScheduledAt(dose))} — ${DOSE_STATUS_LABEL.snoozed} until ${formatScheduledTime(dose.scheduledAt)}`
-                      : `${formatScheduledTime(dose.scheduledAt)} — ${DOSE_STATUS_LABEL[dose.status as DoseStatus]}`}
+                      ? t('home.snoozedUntil', {
+                          time: formatScheduledTime(originalScheduledAt(dose)),
+                          until: formatScheduledTime(dose.scheduledAt),
+                        })
+                      : t('home.statusLine', {
+                          time: formatScheduledTime(dose.scheduledAt),
+                          status: getDoseStatusLabel(dose.status as DoseStatus),
+                        })}
                   </Text>
                 </Card.Content>
               </Card>
@@ -104,7 +112,7 @@ export default function HistoryScreen() {
 
       <Portal>
         <Dialog visible={!!editDose} onDismiss={() => setEditDose(null)}>
-          <Dialog.Title>Edit dose</Dialog.Title>
+          <Dialog.Title>{t('home.editDose')}</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
               {DOSE_STATUS_OPTIONS.filter((option) => {
@@ -120,19 +128,19 @@ export default function HistoryScreen() {
               }).map((option) => (
                 <RadioButton.Item
                   key={option.value}
-                  label={option.label}
+                  label={getDoseStatusLabel(option.value)}
                   value={option.value}
                 />
               ))}
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setEditDose(null)}>Cancel</Button>
+            <Button onPress={() => setEditDose(null)}>{t('common.cancel')}</Button>
             <Button onPress={handleDelete} textColor="#CF6679">
-              Delete
+              {t('common.delete')}
             </Button>
             <Button mode="contained" onPress={handleSaveEdit}>
-              Save
+              {t('common.save')}
             </Button>
           </Dialog.Actions>
         </Dialog>

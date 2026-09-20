@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Button, Dialog, Portal, RadioButton } from 'react-native-paper';
 import type { MedicationVariant } from '@/src/db/schema';
+import { useT } from '@/src/i18n/useT';
 
 interface VariantPickerSheetProps {
   visible: boolean;
@@ -13,36 +14,41 @@ interface VariantPickerSheetProps {
 export function VariantPickerSheet({
   visible,
   variants,
-  title = 'Which strength?',
+  title,
   onSelect,
   onDismiss,
 }: VariantPickerSheetProps) {
+  const { t } = useT();
   const [selected, setSelected] = useState<string>(variants[0]?.id ?? '');
+  const heading = title ?? t('variant.title');
 
   return (
     <Portal>
       <Dialog visible={visible} onDismiss={onDismiss}>
-        <Dialog.Title>{title}</Dialog.Title>
+        <Dialog.Title>{heading}</Dialog.Title>
         <Dialog.Content>
           <RadioButton.Group onValueChange={setSelected} value={selected}>
             {variants.map((v) => (
               <RadioButton.Item
                 key={v.id}
-                label={`${v.label}${v.strengthValue ? ` — ${v.strengthValue} ${v.strengthUnit ?? ''}` : ''} (${v.currentQuantity} left)`}
+                label={t('variant.left', {
+                  label: `${v.label}${v.strengthValue ? ` — ${v.strengthValue} ${v.strengthUnit ?? ''}` : ''}`,
+                  count: v.currentQuantity,
+                })}
                 value={v.id}
               />
             ))}
           </RadioButton.Group>
         </Dialog.Content>
         <Dialog.Actions>
-          <Button onPress={onDismiss}>Cancel</Button>
+          <Button onPress={onDismiss}>{t('common.cancel')}</Button>
           <Button
             mode="contained"
             disabled={!selected}
             onPress={() => onSelect(selected)}
-            accessibilityLabel="Confirm variant"
+            accessibilityLabel={t('variant.confirm')}
           >
-            Taken
+            {t('common.taken')}
           </Button>
         </Dialog.Actions>
       </Dialog>

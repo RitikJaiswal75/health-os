@@ -14,10 +14,55 @@ import { StackHeaderWithBanner } from '@/src/core/components/StackHeaderWithBann
 import { DbBootstrapGate } from '@/src/db/DbBootstrapGate';
 import { ReminderNotificationBootstrap } from '@/src/features/reminders/ReminderNotificationBootstrap';
 import { ReminderRouterReadyGate } from '@/src/features/reminders/ReminderRouterReadyGate';
+import { I18nProvider } from '@/src/i18n/I18nProvider';
+import { useT } from '@/src/i18n/useT';
 
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
+
+function RootNavigation() {
+  const { t } = useT();
+
+  return (
+    <DbBootstrapGate>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: healthOsTheme.colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="medicine" />
+        <Stack.Screen name="reminder" options={{ presentation: 'fullScreenModal' }} />
+        <Stack.Screen
+          name="about"
+          options={{
+            presentation: 'modal',
+            headerShown: true,
+            title: t('about.title'),
+            header: (props) => <StackHeaderWithBanner {...props} />,
+          }}
+        />
+        <Stack.Screen
+          name="reliability"
+          options={{ presentation: 'modal', headerShown: true, title: t('reliability.title') }}
+        />
+        <Stack.Screen
+          name="language"
+          options={{
+            presentation: 'modal',
+            headerShown: true,
+            title: t('language.title'),
+            header: (props) => <StackHeaderWithBanner {...props} />,
+          }}
+        />
+      </Stack>
+      <ReminderRouterReadyGate />
+      <ReminderNotificationBootstrap />
+    </DbBootstrapGate>
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -35,33 +80,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider value={healthOsNavigationTheme}>
           <PaperProvider theme={healthOsTheme}>
-            <DbBootstrapGate>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: healthOsTheme.colors.background },
-                }}
-              >
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="medicine" />
-                <Stack.Screen name="reminder" options={{ presentation: 'fullScreenModal' }} />
-                <Stack.Screen
-                  name="about"
-                  options={{
-                    presentation: 'modal',
-                    headerShown: true,
-                    title: 'About',
-                    header: (props) => <StackHeaderWithBanner {...props} />,
-                  }}
-                />
-                <Stack.Screen
-                  name="reliability"
-                  options={{ presentation: 'modal', headerShown: true, title: 'Troubleshooting' }}
-                />
-              </Stack>
-              <ReminderRouterReadyGate />
-              <ReminderNotificationBootstrap />
-            </DbBootstrapGate>
+            <I18nProvider>
+              <RootNavigation />
+            </I18nProvider>
           </PaperProvider>
         </ThemeProvider>
       </SafeAreaProvider>

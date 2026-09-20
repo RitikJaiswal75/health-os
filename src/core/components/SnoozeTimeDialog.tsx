@@ -5,6 +5,7 @@ import { addMinutes } from 'date-fns';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import { formatLocalDateTime, formatScheduledTime } from '../dates/dateUtils';
 import { healthOsTheme } from '../theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 const QUICK_SNOOZE_MINUTES = [15, 30] as const;
 
@@ -25,6 +26,7 @@ function resolveCustomSnoozeUntil(pickerTime: Date): Date {
 }
 
 export function SnoozeTimeDialog({ visible, onDismiss, onConfirm }: SnoozeTimeDialogProps) {
+  const { t } = useT();
   const [pickerTime, setPickerTime] = useState(() => addMinutes(new Date(), 30));
   const [customMode, setCustomMode] = useState(false);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
@@ -68,9 +70,9 @@ export function SnoozeTimeDialog({ visible, onDismiss, onConfirm }: SnoozeTimeDi
   return (
     <Portal>
       <Dialog visible={visible} onDismiss={onDismiss}>
-        <Dialog.Title>Snooze until</Dialog.Title>
+        <Dialog.Title>{t('snooze.title')}</Dialog.Title>
         <Dialog.Content>
-          <Text style={styles.hint}>Choose when you want to be reminded again.</Text>
+          <Text style={styles.hint}>{t('snooze.hint')}</Text>
 
           <View style={styles.quickRow}>
             {QUICK_SNOOZE_MINUTES.map((minutes) => (
@@ -81,12 +83,12 @@ export function SnoozeTimeDialog({ visible, onDismiss, onConfirm }: SnoozeTimeDi
                 onPress={() => handleQuickSnooze(minutes)}
                 style={styles.quickBtn}
               >
-                {minutes} min
+                {t('common.minutesShort', { count: minutes })}
               </Button>
             ))}
             {!customMode ? (
               <Button mode="outlined" compact onPress={openCustomPicker} style={styles.quickBtn}>
-                Custom
+                {t('common.custom')}
               </Button>
             ) : null}
           </View>
@@ -122,16 +124,16 @@ export function SnoozeTimeDialog({ visible, onDismiss, onConfirm }: SnoozeTimeDi
               )}
 
               <Text style={styles.preview}>
-                Reminder at {formatScheduledTime(formatLocalDateTime(previewTime))}
+                {t('snooze.reminderAt', { time: formatScheduledTime(formatLocalDateTime(previewTime)) })}
               </Text>
             </>
           ) : null}
         </Dialog.Content>
         <Dialog.Actions>
-          <Button onPress={onDismiss}>Cancel</Button>
+          <Button onPress={onDismiss}>{t('common.cancel')}</Button>
           {customMode ? (
             <Button mode="contained" onPress={handleCustomConfirm}>
-              Snooze
+              {t('common.snooze')}
             </Button>
           ) : null}
         </Dialog.Actions>

@@ -4,6 +4,7 @@ import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillSh
 import { formatTakeDoseInstruction, supportsDualColor, type PillShape } from '@/src/core/types/domain';
 import type { Medication } from '@/src/db/schema';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 type ReminderMedicationRowProps = {
   medication: Medication;
@@ -18,6 +19,7 @@ export function ReminderMedicationRow({
   onTaken,
   showTakenButton = true,
 }: ReminderMedicationRowProps) {
+  const { t } = useT();
   const takeInstruction = formatTakeDoseInstruction(
     doseAmount,
     medication.medicationType,
@@ -32,14 +34,14 @@ export function ReminderMedicationRow({
   const displayName = medication.nickname ?? medication.name;
 
   return (
-    <View style={styles.row} accessibilityLabel={`Reminder for ${displayName}`}>
+    <View style={styles.row} accessibilityLabel={t('reminder.for', { name: displayName })}>
       <View style={styles.previewCircle}>
         {medication.photoUri ? (
           <Image
             source={{ uri: medication.photoUri }}
             style={styles.previewPhoto}
             accessibilityIgnoresInvertColors
-            accessibilityLabel={`Photo of ${displayName}`}
+            accessibilityLabel={t('reminder.photo', { name: displayName })}
           />
         ) : (
           <PillShapeIcon
@@ -64,8 +66,8 @@ export function ReminderMedicationRow({
         </Text>
       </View>
       {showTakenButton ? (
-        <Button mode="contained-tonal" onPress={onTaken} accessibilityLabel={`Mark ${displayName} taken`}>
-          Taken
+        <Button mode="contained-tonal" onPress={onTaken} accessibilityLabel={t('reminder.markNamed', { name: displayName })}>
+          {t('common.taken')}
         </Button>
       ) : null}
     </View>

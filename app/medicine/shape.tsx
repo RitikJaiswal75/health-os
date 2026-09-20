@@ -27,6 +27,7 @@ import {
 import { copyPhotoToDurableStorage } from '@/src/core/storage/durableStorage';
 import { permissionHelper } from '@/src/core/permissions/permissionHelper';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 const SAMSUNG = {
   bg: '#000000',
@@ -47,6 +48,7 @@ export default function ShapeScreen() {
   const { width } = useWindowDimensions();
   const { draft, setAppearance } = useWizardStore();
   const [previewUri, setPreviewUri] = useState(draft.photoUri);
+  const { t } = useT();
 
   const previewShape = draft.pillShape ?? 'capsule_divided';
   const previewColor = draft.pillColor ?? SHAPE_PREVIEW_COLOR;
@@ -122,17 +124,17 @@ export default function ShapeScreen() {
             style={styles.pillBtn}
             onPress={() => pickImage('gallery')}
             accessibilityRole="button"
-            accessibilityLabel="Gallery"
+            accessibilityLabel={t('shape.gallery')}
           >
-            <Text style={styles.pillBtnText}>Gallery</Text>
+            <Text style={styles.pillBtnText}>{t('shape.gallery')}</Text>
           </Pressable>
           <Pressable
             style={styles.pillBtn}
             onPress={() => pickImage('camera')}
             accessibilityRole="button"
-            accessibilityLabel="Camera"
+            accessibilityLabel={t('shape.camera')}
           >
-            <Text style={styles.pillBtnText}>Camera</Text>
+            <Text style={styles.pillBtnText}>{t('shape.camera')}</Text>
           </Pressable>
         </View>
       </View>
@@ -146,7 +148,7 @@ export default function ShapeScreen() {
           {PILL_SHAPE_CATEGORIES.map((category) => (
             <View key={category.title} style={styles.categorySection}>
               <Text variant="titleMedium" style={styles.categoryTitle}>
-                {category.title}
+                {category.title === 'Pill shapes' ? t('shape.category.pills') : t('shape.category.other')}
               </Text>
               <View style={styles.grid}>
                 {category.shapes.map((shape) => {
@@ -182,17 +184,17 @@ export default function ShapeScreen() {
             style={styles.footerBtn}
             onPress={() => router.push('/medicine/colour')}
             accessibilityRole="button"
-            accessibilityLabel="Skip"
+            accessibilityLabel={t('common.skip')}
           >
-            <Text style={styles.footerBtnText}>Skip</Text>
+            <Text style={styles.footerBtnText}>{t('common.skip')}</Text>
           </Pressable>
           <Pressable
             style={[styles.footerBtn, styles.footerBtnPrimary]}
             onPress={() => router.push('/medicine/colour')}
             accessibilityRole="button"
-            accessibilityLabel="Next"
+            accessibilityLabel={t('common.next')}
           >
-            <Text style={[styles.footerBtnText, styles.footerBtnTextPrimary]}>Next</Text>
+            <Text style={[styles.footerBtnText, styles.footerBtnTextPrimary]}>{t('common.next')}</Text>
           </Pressable>
         </View>
       </View>

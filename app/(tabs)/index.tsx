@@ -17,12 +17,13 @@ import {
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
 import type { DoseEvent } from '@/src/db/schema';
-import { DOSE_STATUS_LABEL, DOSE_STATUS_OPTIONS, type DoseStatus } from '@/src/core/types/domain';
+import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
 import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export default function HomeScreen() {
   const dbState = useDatabaseBootstrap();
@@ -32,6 +33,7 @@ export default function HomeScreen() {
   const [snoozeDose, setSnoozeDose] = useState<DoseEvent | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [menuVisible, setMenuVisible] = useState(false);
+  const { t } = useT();
 
   const dateKey = formatDateKey(selectedDate);
 
@@ -163,8 +165,13 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Appbar.Header>
-        <Appbar.Content title="Health OS" />
-        <Appbar.Action icon="calendar" onPress={() => router.push('/history')} accessibilityLabel="Open history" />
+        <Appbar.Content title={t('home.title')} />
+        <Appbar.Action
+          icon="translate"
+          onPress={() => router.push('/language')}
+          accessibilityLabel={t('menu.language')}
+        />
+        <Appbar.Action icon="calendar" onPress={() => router.push('/history')} accessibilityLabel={t('menu.openHistory')} />
         <Menu
           visible={menuVisible}
           onDismiss={() => setMenuVisible(false)}
@@ -172,23 +179,30 @@ export default function HomeScreen() {
             <Appbar.Action
               icon="dots-vertical"
               onPress={() => setMenuVisible(true)}
-              accessibilityLabel="Open menu"
+              accessibilityLabel={t('menu.open')}
             />
           }
         >
           <Menu.Item
             onPress={() => {
               setMenuVisible(false);
+              router.push('/language');
+            }}
+            title={t('menu.language')}
+          />
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(false);
               router.push('/about');
             }}
-            title="About"
+            title={t('menu.about')}
           />
           <Menu.Item
             onPress={() => {
               setMenuVisible(false);
               router.push('/reliability');
             }}
-            title="Troubleshooting"
+            title={t('menu.troubleshooting')}
           />
         </Menu>
       </Appbar.Header>
@@ -205,7 +219,7 @@ export default function HomeScreen() {
         <Card style={styles.panel}>
           <Card.Content>
             {doses.length === 0 ? (
-              <Text style={styles.panelEmpty}>No scheduled medications for this day.</Text>
+              <Text style={styles.panelEmpty}>{t('home.emptyDay')}</Text>
             ) : (
               doses.map((dose) => {
                 const med = meds.find((m) => m.id === dose.medicationId);
@@ -227,25 +241,31 @@ export default function HomeScreen() {
                     }
                   >
                     <Card.Content>
-                      <Text variant="titleMedium">{med?.nickname ?? med?.name ?? 'Medication'}</Text>
+                      <Text variant="titleMedium">{med?.nickname ?? med?.name ?? t('home.medicationFallback')}</Text>
                       <Text variant="bodySmall">
                         {dose.status === 'snoozed'
-                          ? `${formatScheduledTime(originalScheduledAt(dose))} — ${DOSE_STATUS_LABEL.snoozed} until ${formatScheduledTime(dose.scheduledAt)}`
-                          : `${formatScheduledTime(dose.scheduledAt)} — ${DOSE_STATUS_LABEL[dose.status as DoseStatus]}`}
+                          ? t('home.snoozedUntil', {
+                              time: formatScheduledTime(originalScheduledAt(dose)),
+                              until: formatScheduledTime(dose.scheduledAt),
+                            })
+                          : t('home.statusLine', {
+                              time: formatScheduledTime(dose.scheduledAt),
+                              status: getDoseStatusLabel(dose.status as DoseStatus),
+                            })}
                         {med && med.currentQuantity > 0
-                          ? ` · ${med.currentQuantity} remaining`
+                          ? ` · ${t('home.remaining', { count: med.currentQuantity })}`
                           : ''}
                       </Text>
                       {!isActionable ? null : (
                         <View style={styles.actions}>
-                          <Button mode="contained" onPress={() => handleTaken(dose)} accessibilityLabel="Mark taken">
-                            Taken
+                          <Button mode="contained" onPress={() => handleTaken(dose)} accessibilityLabel={t('home.markTaken')}>
+                            {t('common.taken')}
                           </Button>
-                          <Button mode="outlined" onPress={() => handleSkip(dose)} accessibilityLabel="Skip dose">
-                            Skip
+                          <Button mode="outlined" onPress={() => handleSkip(dose)} accessibilityLabel={t('home.skipDose')}>
+                            {t('common.skip')}
                           </Button>
-                          <Button mode="text" onPress={() => setSnoozeDose(dose)} accessibilityLabel="Snooze">
-                            Snooze
+                          <Button mode="text" onPress={() => setSnoozeDose(dose)} accessibilityLabel={t('common.snooze')}>
+                            {t('common.snooze')}
                           </Button>
                         </View>
                       )}
@@ -261,11 +281,11 @@ export default function HomeScreen() {
           style={styles.panel}
           onPress={() => router.push('/(tabs)/library')}
           accessibilityRole="button"
-          accessibilityLabel="Open your medications"
+          accessibilityLabel={t('home.openLibrary')}
         >
           <Card.Content>
             <View style={styles.panelHeader}>
-              <Text variant="titleMedium">Your medications</Text>
+              <Text variant="titleMedium">{t('home.yourMedications')}</Text>
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={24}
@@ -274,19 +294,20 @@ export default function HomeScreen() {
             </View>
             {meds.length === 0 ? (
               <Text variant="bodyMedium" style={styles.panelHint}>
-                Add medications to get reminders when it&apos;s time to take them and learn about possible
-                interactions between your medications.
+                {t('home.addHint')}
               </Text>
             ) : (
               <Text variant="bodyMedium" style={styles.panelHint}>
-                {meds.length} medication{meds.length === 1 ? '' : 's'} in your library. Tap to view and manage.
+                {meds.length === 1
+                  ? t('home.libraryCountOne')
+                  : t('home.libraryCount', { count: meds.length })}
               </Text>
             )}
           </Card.Content>
         </Card>
       </ScrollView>
 
-      <FAB icon="plus" style={styles.fab} onPress={navigateToAddMedication} accessibilityLabel="Add medication" />
+      <FAB icon="plus" style={styles.fab} onPress={navigateToAddMedication} accessibilityLabel={t('home.addMedication')} />
 
       {variantSheet}
 
@@ -298,7 +319,7 @@ export default function HomeScreen() {
 
       <Portal>
         <Dialog visible={!!editDose} onDismiss={() => setEditDose(null)}>
-          <Dialog.Title>Edit dose</Dialog.Title>
+          <Dialog.Title>{t('home.editDose')}</Dialog.Title>
           <Dialog.Content>
             <RadioButton.Group onValueChange={(v) => setEditStatus(v as DoseStatus)} value={editStatus}>
               {DOSE_STATUS_OPTIONS.filter((option) => {
@@ -314,19 +335,19 @@ export default function HomeScreen() {
               }).map((option) => (
                 <RadioButton.Item
                   key={option.value}
-                  label={option.label}
+                  label={getDoseStatusLabel(option.value)}
                   value={option.value}
                 />
               ))}
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setEditDose(null)}>Cancel</Button>
+            <Button onPress={() => setEditDose(null)}>{t('common.cancel')}</Button>
             <Button onPress={handleDeleteDose} textColor="#CF6679">
-              Delete
+              {t('common.delete')}
             </Button>
             <Button mode="contained" onPress={handleSaveEdit}>
-              Save
+              {t('common.save')}
             </Button>
           </Dialog.Actions>
         </Dialog>

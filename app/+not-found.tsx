@@ -3,18 +3,21 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { healthOsTheme, tokens } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export default function NotFoundScreen() {
+  const { t } = useT();
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Stack.Screen options={{ title: t('notFound.title') }} />
       <View style={styles.container}>
         <Text variant="titleMedium" style={styles.title}>
-          This screen does not exist.
+          {t('notFound.body')}
         </Text>
         <Link href="/" style={styles.link}>
           <Text variant="bodyMedium" style={styles.linkText}>
-            Go to home screen
+            {t('notFound.home')}
           </Text>
         </Link>
       </View>
