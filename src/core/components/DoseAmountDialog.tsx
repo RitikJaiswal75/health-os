@@ -7,6 +7,8 @@ import {
   type MedicationType,
 } from '@/src/core/types/domain';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
+import { t } from '@/src/i18n/translate';
 
 const theme = healthOsTheme.colors;
 
@@ -32,10 +34,13 @@ function parseDoseInput(input: string): number {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
-function doseInputLabel(medicationType?: MedicationType | string): string {
-  if (medicationType === 'powder') return 'Amount (g)';
-  if (medicationType === 'liquid') return 'Amount (ml)';
-  return 'How many?';
+function doseInputLabel(
+  medicationType: MedicationType | string | undefined,
+  translate: typeof t,
+): string {
+  if (medicationType === 'powder') return translate('doseAmount.grams');
+  if (medicationType === 'liquid') return translate('doseAmount.ml');
+  return translate('doseAmount.howMany');
 }
 
 export function DoseAmountDialog({
@@ -50,6 +55,7 @@ export function DoseAmountDialog({
   onDismiss,
   onConfirm,
 }: DoseAmountDialogProps) {
+  const { t } = useT();
   const directMeasured = usesDirectMeasuredDose(medicationType);
   const [input, setInput] = useState(String(amount));
 
@@ -73,26 +79,26 @@ export function DoseAmountDialog({
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
           <Text variant="titleMedium" style={styles.title}>
-            Dose {doseIndex + 1} amount
+            {t('doseAmount.title', { n: doseIndex + 1 })}
           </Text>
           {directMeasured ? (
             <Text style={styles.hint}>
-              Enter whole {medicationType === 'powder' ? 'grams' : 'millilitres'} to take (no decimals).
+              {medicationType === 'powder' ? t('doseAmount.hintPowder') : t('doseAmount.hintLiquid')}
             </Text>
           ) : null}
           <TextInput
-            label={doseInputLabel(medicationType)}
+            label={doseInputLabel(medicationType, t)}
             value={input}
             onChangeText={(value) => setInput(sanitizeWholeNumberInput(value))}
             keyboardType="number-pad"
             mode="outlined"
             style={styles.input}
-            accessibilityLabel={`Dose ${doseIndex + 1} ${doseInputLabel(medicationType)}`}
+            accessibilityLabel={t('schedule.doseAmount', { n: doseIndex + 1 })}
           />
           {preview && <Text style={styles.preview}>{preview}</Text>}
           <View style={styles.footer}>
-            <Pressable style={styles.footerBtn} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Cancel">
-              <Text style={styles.cancelText}>Cancel</Text>
+            <Pressable style={styles.footerBtn} onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t('common.cancel')}>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
             <View style={styles.footerDivider} />
             <Pressable
@@ -103,10 +109,10 @@ export function DoseAmountDialog({
               }}
               disabled={!(Number.isFinite(parsed) && parsed > 0)}
               accessibilityRole="button"
-              accessibilityLabel="OK"
+              accessibilityLabel={t('common.ok')}
             >
               <Text style={[styles.okText, !(Number.isFinite(parsed) && parsed > 0) && styles.okTextDisabled]}>
-                OK
+                {t('common.ok')}
               </Text>
             </Pressable>
           </View>

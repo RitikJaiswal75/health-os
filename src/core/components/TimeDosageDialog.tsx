@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Portal, RadioButton, Text, TextInput } from 'react-native-paper';
 import { TIMES_PER_DAY_OPTIONS } from '@/src/core/types/domain';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 const theme = healthOsTheme.colors;
 
@@ -14,6 +15,7 @@ interface TimeDosageDialogProps {
 }
 
 export function TimeDosageDialog({ visible, timesPerDay, onDismiss, onConfirm }: TimeDosageDialogProps) {
+  const { t } = useT();
   const [pendingCount, setPendingCount] = useState(timesPerDay);
   const [customCount, setCustomCount] = useState(String(timesPerDay || ''));
   const [showCustom, setShowCustom] = useState(false);
@@ -40,7 +42,7 @@ export function TimeDosageDialog({ visible, timesPerDay, onDismiss, onConfirm }:
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
           <Text variant="titleMedium" style={styles.title}>
-            How many times a day?
+            {t('times.title')}
           </Text>
           <ScrollView style={styles.list} bounces={false}>
             <RadioButton.Group
@@ -60,7 +62,17 @@ export function TimeDosageDialog({ visible, timesPerDay, onDismiss, onConfirm }:
               {TIMES_PER_DAY_OPTIONS.filter((o) => o.count > 0).map((o) => (
                 <RadioButton.Item
                   key={o.count}
-                  label={o.label}
+                  label={
+                    o.count === 1
+                      ? t('times.once')
+                      : o.count === 2
+                        ? t('times.twice')
+                        : o.count === 3
+                          ? t('times.three')
+                          : o.count === 4
+                            ? t('times.four')
+                            : t('times.five')
+                  }
                   value={String(o.count)}
                   labelStyle={styles.optionLabel}
                   color={theme.primary}
@@ -70,7 +82,7 @@ export function TimeDosageDialog({ visible, timesPerDay, onDismiss, onConfirm }:
                 />
               ))}
               <RadioButton.Item
-                label="Custom"
+                label={t('common.custom')}
                 value="custom"
                 labelStyle={styles.optionLabel}
                 color={theme.primary}
@@ -82,20 +94,20 @@ export function TimeDosageDialog({ visible, timesPerDay, onDismiss, onConfirm }:
             {showCustom && (
               <View style={styles.customRow}>
                 <TextInput
-                  label="Custom count"
+                  label={t('times.customCount')}
                   value={customCount}
                   onChangeText={setCustomCount}
                   keyboardType="numeric"
                   mode="outlined"
                   style={styles.customInput}
-                  accessibilityLabel="Custom times per day"
+                  accessibilityLabel={t('times.customA11y')}
                 />
               </View>
             )}
           </ScrollView>
           <View style={styles.footer}>
-            <Pressable style={styles.footerBtn} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Cancel">
-              <Text style={styles.cancelText}>Cancel</Text>
+            <Pressable style={styles.footerBtn} onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t('common.cancel')}>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
             {showCustom && (
               <>
@@ -104,9 +116,9 @@ export function TimeDosageDialog({ visible, timesPerDay, onDismiss, onConfirm }:
                   style={styles.footerBtn}
                   onPress={() => confirmCount(parseInt(customCount, 10))}
                   accessibilityRole="button"
-                  accessibilityLabel="OK"
+                  accessibilityLabel={t('common.ok')}
                 >
-                  <Text style={styles.okText}>OK</Text>
+                  <Text style={styles.okText}>{t('common.ok')}</Text>
                 </Pressable>
               </>
             )}

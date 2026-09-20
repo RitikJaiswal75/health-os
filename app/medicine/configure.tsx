@@ -12,6 +12,7 @@ import {
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { validateStrengthFields } from '@/src/features/medications/strengthFieldValidation';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 function StrengthDialog({
   visible,
@@ -34,6 +35,7 @@ function StrengthDialog({
   const [unit, setUnit] = useState<StrengthUnit>(initialUnit);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [unitError, setUnitError] = useState<string | null>(null);
+  const { t } = useT();
 
   useEffect(() => {
     if (visible) {
@@ -77,7 +79,7 @@ function StrengthDialog({
             </Text>
           ) : null}
           <Text variant="labelLarge" style={styles.unitLabel}>
-            Unit
+            {t('common.unit')}
           </Text>
           <RadioButton.Group
             onValueChange={(value) => {
@@ -97,8 +99,8 @@ function StrengthDialog({
           ) : null}
         </Dialog.Content>
         <Dialog.Actions>
-          <Button onPress={onDismiss}>Cancel</Button>
-          <Button onPress={handleSave}>Save</Button>
+          <Button onPress={onDismiss}>{t('common.cancel')}</Button>
+          <Button onPress={handleSave}>{t('common.save')}</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>
@@ -121,6 +123,7 @@ export default function ConfigureScreen() {
   const [strengthDialog, setStrengthDialog] = useState(false);
   const [doseUnitDialog, setDoseUnitDialog] = useState(false);
   const nameInputRef = useRef<RNTextInput>(null);
+  const { t } = useT();
 
   const releaseNameInputFocus = useCallback(() => {
     nameInputRef.current?.blur();
@@ -167,7 +170,7 @@ export default function ConfigureScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isEditing ? 'Edit details' : 'Set information' }} />
+      <Stack.Screen options={{ title: isEditing ? t('configure.editTitle') : t('configure.title') }} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -175,21 +178,21 @@ export default function ConfigureScreen() {
       >
       <TextInput
         ref={nameInputRef}
-        label="Medication name"
+        label={t('configure.name')}
         value={draft.name}
         onChangeText={setName}
         mode="outlined"
         style={styles.nameInput}
-        accessibilityLabel="Medication name"
+        accessibilityLabel={t('configure.name')}
       />
 
       <Button
         mode="outlined"
         onPress={openTypeDialog}
         style={styles.field}
-        accessibilityLabel="Select medication type"
+        accessibilityLabel={t('configure.selectType')}
       >
-        Type: {typeLabel || 'Select type'}
+        {typeLabel ? t('configure.typeValue', { type: typeLabel }) : t('configure.selectTypeValue')}
       </Button>
 
       {isPowder ? (
@@ -198,23 +201,21 @@ export default function ConfigureScreen() {
             mode="outlined"
             onPress={openDoseUnitDialog}
             style={styles.field}
-            accessibilityLabel="Set scoop size"
+            accessibilityLabel={t('configure.setScoop')}
           >
-            Scoop size:{' '}
             {draft.doseUnitValue
-              ? `${draft.doseUnitValue} ${draft.doseUnitUnit ?? 'g'}`
-              : 'Set scoop / serving size (optional)'}
+              ? t('configure.scoopSize', { value: `${draft.doseUnitValue} ${draft.doseUnitUnit ?? 'g'}` })
+              : t('configure.scoopOptional')}
           </Button>
           <Button
             mode="outlined"
             onPress={openStrengthDialog}
             style={styles.field}
-            accessibilityLabel="Set strength"
+            accessibilityLabel={t('configure.setStrength')}
           >
-            Strength:{' '}
             {draft.strengthValue
-              ? `${draft.strengthValue} ${draft.strengthUnit ?? 'g'}`
-              : 'Set active ingredient per scoop (optional)'}
+              ? t('configure.strengthValue', { value: `${draft.strengthValue} ${draft.strengthUnit ?? 'g'}` })
+              : t('configure.strengthPerScoopOptional')}
           </Button>
         </>
       ) : (
@@ -222,10 +223,11 @@ export default function ConfigureScreen() {
           mode="outlined"
           onPress={openStrengthDialog}
           style={styles.field}
-          accessibilityLabel="Set strength"
+          accessibilityLabel={t('configure.setStrength')}
         >
-          Strength:{' '}
-          {draft.strengthValue ? `${draft.strengthValue} ${draft.strengthUnit}` : 'Set strength (optional)'}
+          {draft.strengthValue
+            ? t('configure.strengthValue', { value: `${draft.strengthValue} ${draft.strengthUnit}` })
+            : t('configure.strengthOptional')}
         </Button>
       )}
 
@@ -234,9 +236,9 @@ export default function ConfigureScreen() {
         disabled={!canProceed}
         onPress={handleNext}
         style={styles.next}
-        accessibilityLabel={isEditing ? 'Done editing details' : 'Next'}
+        accessibilityLabel={isEditing ? t('configure.doneA11y') : t('configure.next')}
       >
-        {isEditing ? 'Done' : 'Next'}
+        {isEditing ? t('configure.done') : t('configure.next')}
       </Button>
 
       <MedicationTypeDialog
@@ -251,8 +253,8 @@ export default function ConfigureScreen() {
 
       <StrengthDialog
         visible={strengthDialog}
-        title={isPowder ? 'Strength per scoop' : 'Set strength'}
-        label={isPowder ? 'Active ingredient amount' : 'Amount'}
+        title={isPowder ? t('configure.strengthPerScoop') : t('configure.setStrength')}
+        label={isPowder ? t('configure.activeIngredient') : t('configure.amount')}
         initialValue={draft.strengthValue}
         initialUnit={draft.strengthUnit ?? (isPowder ? 'g' : 'mg')}
         onDismiss={() => setStrengthDialog(false)}
@@ -261,8 +263,8 @@ export default function ConfigureScreen() {
 
       <StrengthDialog
         visible={doseUnitDialog}
-        title="Scoop / serving size"
-        label="Powder amount per scoop"
+        title={t('configure.scoopServing')}
+        label={t('configure.powderPerScoop')}
         initialValue={draft.doseUnitValue}
         initialUnit={draft.doseUnitUnit ?? 'g'}
         onDismiss={() => setDoseUnitDialog(false)}

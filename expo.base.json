@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "1.6.1",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.health.os",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
@@ -85,7 +85,8 @@
       "./plugins/withReleaseApkOptimization.js",
       "expo-sqlite",
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
@@ -94,7 +95,8 @@
       "router": {},
       "eas": {
         "projectId": "7c5d818a-aa53-4103-877e-fd3e546f9c95"
-      }
+      },
+      "i18nBaseUrl": "https://healthos.ritik.cc/i18n"
     }
   }
 }

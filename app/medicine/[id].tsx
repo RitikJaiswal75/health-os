@@ -8,11 +8,13 @@ import { medicationToDraft } from '@/src/features/medications/medicationDraftMap
 import { MedicationReviewView } from '@/src/features/medications/MedicationReviewView';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export default function MedicineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const dbState = useDatabaseBootstrap();
   const { loadDraftForEdit, editingMedicationId } = useWizardStore();
+  const { t } = useT();
 
   useFocusEffect(
     useCallback(() => {
@@ -53,7 +55,7 @@ export default function MedicineDetailScreen() {
   const schedules = medRepo.getActiveSchedules(id);
 
   if (!med || schedules.length === 0) {
-    return <Text style={styles.empty}>Medication not found.</Text>;
+    return <Text style={styles.empty}>{t('review.notFound')}</Text>;
   }
 
   if (editingMedicationId !== id) {

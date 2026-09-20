@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { permissionHelper, type PermissionState } from '../../core/permissions/permissionHelper';
 import { useWizardStore } from '../medications/wizardStore';
+import { t } from '@/src/i18n/translate';
 
 export const ADD_MEDICATION_PATH = '/medicine/search';
 
@@ -58,10 +59,10 @@ export function getNextPermissionAction(
 export function getBlockedRemindersMessage(state: PermissionState | null): string | null {
   if (Platform.OS !== 'android' || !state) return null;
   if (!state.notifications) {
-    return 'Allow notifications so Health OS can alert you when a dose is due.';
+    return t('reliability.blockedNotifications');
   }
   if (!state.exactAlarm) {
-    return 'Enable exact alarms so reminders fire on time.';
+    return t('reliability.blockedExact');
   }
   return null;
 }
@@ -69,10 +70,10 @@ export function getBlockedRemindersMessage(state: PermissionState | null): strin
 export function getRecommendedRemindersMessage(state: PermissionState | null): string | null {
   if (Platform.OS !== 'android' || !state) return null;
   if (!state.fullScreenIntent) {
-    return 'Allow full-screen intents for Health OS in Settings (same type of permission Clock and Calendar use for lock-screen alarms).';
+    return t('reliability.recommendedFullScreen');
   }
   if (!state.overlay) {
-    return 'Allow Health OS to display over other apps for the best reminder experience.';
+    return t('reliability.recommendedOverlay');
   }
   return null;
 }

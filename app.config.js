@@ -31,6 +31,7 @@ module.exports = () => {
         ...expo.extra,
         indiaCatalogUrl:
           process.env.EXPO_PUBLIC_INDIA_CATALOG_URL ?? 'https://drugs.healthos.ritik.cc',
+        i18nBaseUrl: process.env.EXPO_PUBLIC_I18N_BASE_URL ?? 'https://healthos.ritik.cc/i18n',
       },
     },
   };

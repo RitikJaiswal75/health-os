@@ -1,4 +1,5 @@
 import { format, parseISO, startOfDay, addDays, isSameDay } from 'date-fns';
+import { getDateFnsLocale } from '@/src/i18n/dateLocale';
 
 export function formatDateKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
@@ -42,7 +43,7 @@ export function scheduledAtToDateKey(iso: string): string {
 }
 
 export function formatDisplayDate(dateKey: string): string {
-  return format(parseDateKey(dateKey), 'd MMMM');
+  return format(parseDateKey(dateKey), 'd MMMM', { locale: getDateFnsLocale() });
 }
 
 export function hasScheduleEndDate(endDate?: string | null): boolean {

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import type { Medication } from '@/src/db/schema';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from '@/src/features/reminders/notificationSetup';
+import { t } from '@/src/i18n/translate';
 
 export async function notifyRefillIfNeeded(
   med: Medication,
@@ -18,8 +19,8 @@ export async function notifyRefillIfNeeded(
   const label = med.nickname ?? med.name;
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Refill reminder',
-      body: `${label} has ${newQty} left. Consider refilling soon.`,
+      title: t('refill.notifyTitle'),
+      body: t('refill.notifyBody', { name: label, count: newQty }),
       ...(Platform.OS === 'android' ? { channelId: MEDICATION_REMINDER_CHANNEL } : {}),
     },
     trigger: null,

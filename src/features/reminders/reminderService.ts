@@ -6,6 +6,7 @@ import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from './notifica
 import { dedupeAlarms, groupToSlotAlarms, type AlarmScheduleInput } from './alarmGrouping';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { DoseEventRepository, MedicationRepository } from '../medications/medicationRepository';
+import { t } from '@/src/i18n/translate';
 
 export type { AlarmScheduleInput } from './alarmGrouping';
 
@@ -61,8 +62,8 @@ async function scheduleExpoNotifications(occurrences: AlarmScheduleInput[]): Pro
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Medication due',
-        body: `Time to take ${occ.medicationName}`,
+        title: t('reminder.dueTitle'),
+        body: t('reminder.dueBody', { name: occ.medicationName }),
         ...(Platform.OS === 'ios' ? { sound: true } : {}),
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: {

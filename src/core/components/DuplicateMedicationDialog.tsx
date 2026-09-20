@@ -3,6 +3,7 @@ import {
   type DuplicateMedicationConflict,
   formatDuplicateMedicationMessage,
 } from '@/src/features/medications/duplicateMedicationService';
+import { useT } from '@/src/i18n/useT';
 
 interface DuplicateMedicationDialogProps {
   visible: boolean;
@@ -17,18 +18,19 @@ export function DuplicateMedicationDialog({
   onDismiss,
   onEditExisting,
 }: DuplicateMedicationDialogProps) {
+  const { t } = useT();
   if (!conflict) return null;
 
   return (
     <Portal>
       <Dialog visible={visible} onDismiss={onDismiss}>
-        <Dialog.Title>Medication already active</Dialog.Title>
+        <Dialog.Title>{t('duplicate.title')}</Dialog.Title>
         <Dialog.Content>
           <Text>{formatDuplicateMedicationMessage(conflict)}</Text>
         </Dialog.Content>
         <Dialog.Actions>
-          <Button onPress={onDismiss}>Cancel</Button>
-          <Button onPress={onEditExisting}>Edit existing</Button>
+          <Button onPress={onDismiss}>{t('common.cancel')}</Button>
+          <Button onPress={onEditExisting}>{t('duplicate.editExisting')}</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>

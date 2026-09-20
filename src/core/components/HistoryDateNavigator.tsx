@@ -6,6 +6,8 @@ import { Button, IconButton } from 'react-native-paper';
 import { clampCalendarDate } from '../dates/dateUtils';
 import { DateStrip } from './DateStrip';
 import { healthOsTheme, tokens } from '../theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
+import { getDateFnsLocale } from '@/src/i18n/dateLocale';
 
 interface HistoryDateNavigatorProps {
   selectedDate: Date;
@@ -20,6 +22,7 @@ export function HistoryDateNavigator({
   minDate,
   maxDate = new Date(),
 }: HistoryDateNavigatorProps) {
+  const { t } = useT();
   const [pickerOpen, setPickerOpen] = useState(false);
   const today = startOfDay(maxDate);
   const earliest = startOfDay(minDate);
@@ -56,22 +59,24 @@ export function HistoryDateNavigator({
           icon="chevron-left"
           disabled={!canGoBack}
           onPress={() => shiftWeek(-1)}
-          accessibilityLabel="Previous week"
+          accessibilityLabel={t('history.previousWeek')}
         />
         <Button
           mode="text"
           onPress={() => setPickerOpen(true)}
           style={styles.dateButton}
           labelStyle={styles.dateLabel}
-          accessibilityLabel={`Selected date ${format(selectedDate, 'EEEE, MMMM d, yyyy')}`}
+          accessibilityLabel={t('history.selectedDate', {
+            date: format(selectedDate, 'EEEE, MMMM d, yyyy', { locale: getDateFnsLocale() }),
+          })}
         >
-          {format(selectedDate, 'EEE, d MMM yyyy')}
+          {format(selectedDate, 'EEE, d MMM yyyy', { locale: getDateFnsLocale() })}
         </Button>
         <IconButton
           icon="chevron-right"
           disabled={!canGoForward}
           onPress={() => shiftWeek(1)}
-          accessibilityLabel="Next week"
+          accessibilityLabel={t('history.nextWeek')}
         />
       </View>
 

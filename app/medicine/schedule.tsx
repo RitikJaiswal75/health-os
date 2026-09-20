@@ -9,6 +9,7 @@ import { DoseAmountDialog } from '@/src/core/components/DoseAmountDialog';
 import { formatDateKey, formatDisplayDate, formatTime24, hasScheduleEndDate, parseDateKey } from '@/src/core/dates/dateUtils';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { formatDoseLabel, FREQUENCY_OPTIONS, getDefaultDoseAmount, type ScheduleType } from '@/src/core/types/domain';
+import { useT } from '@/src/i18n/useT';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository } from '@/src/features/medications/medicationRepository';
@@ -19,14 +20,24 @@ import {
 } from '@/src/features/medications/duplicateMedicationService';
 import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 
+const WEEKDAY_KEYS = [
+  'weekday.sun',
+  'weekday.mon',
+  'weekday.tue',
+  'weekday.wed',
+  'weekday.thu',
+  'weekday.fri',
+  'weekday.sat',
+] as const;
+
 const WEEKDAYS = [
-  { label: 'S', bit: 1 << 0 },
-  { label: 'M', bit: 1 << 1 },
-  { label: 'T', bit: 1 << 2 },
-  { label: 'W', bit: 1 << 3 },
-  { label: 'T', bit: 1 << 4 },
-  { label: 'F', bit: 1 << 5 },
-  { label: 'S', bit: 1 << 6 },
+  { labelKey: WEEKDAY_KEYS[0], bit: 1 << 0 },
+  { labelKey: WEEKDAY_KEYS[1], bit: 1 << 1 },
+  { labelKey: WEEKDAY_KEYS[2], bit: 1 << 2 },
+  { labelKey: WEEKDAY_KEYS[3], bit: 1 << 3 },
+  { labelKey: WEEKDAY_KEYS[4], bit: 1 << 4 },
+  { labelKey: WEEKDAY_KEYS[5], bit: 1 << 5 },
+  { labelKey: WEEKDAY_KEYS[6], bit: 1 << 6 },
 ];
 
 type DatePickerTarget = 'start' | 'end' | null;
@@ -53,6 +64,7 @@ export default function ScheduleScreen() {
     null,
   );
   const dbState = useDatabaseBootstrap();
+  const { t } = useT();
 
   const doseLabelOptions = {
     strengthValue: draft.strengthValue,
@@ -127,7 +139,7 @@ export default function ScheduleScreen() {
       <View style={styles.section}>
         <View style={styles.card}>
           <Text style={styles.question}>
-            How often do you take {draft.name || 'this medication'}?
+            {t('schedule.howOften', { name: draft.name || t('schedule.thisMedication') })}
           </Text>
           <RadioButton.Group
             onValueChange={(v) => applyFrequency(v as ScheduleType)}
@@ -137,7 +149,17 @@ export default function ScheduleScreen() {
               <View key={option.type}>
                 {index > 0 && <View style={styles.rowDivider} />}
                 <RadioButton.Item
-                  label={option.label}
+                  label={t(
+                    option.type === 'fixed_daily'
+                      ? 'schedule.everyDay'
+                      : option.type === 'interval_days'
+                        ? 'schedule.everyXDays'
+                        : option.type === 'weekdays'
+                          ? 'schedule.everyWeek'
+                          : option.type === 'monthly'
+                            ? 'schedule.everyMonth'
+                            : 'schedule.asNeeded',
+                  )}
                   value={option.type}
                   labelStyle={styles.radioLabel}
                   color={healthOsTheme.colors.primary}
@@ -153,7 +175,7 @@ export default function ScheduleScreen() {
 
       {draft.frequency === 'interval_days' && (
         <TextInput
-          label="Every how many days?"
+          label={t('schedule.intervalLabel')}
           value={intervalInput}
           onChangeText={setIntervalInput}
           keyboardType="numeric"
@@ -161,7 +183,7 @@ export default function ScheduleScreen() {
           onBlur={() =>
             setFrequency('interval_days', { intervalDays: parseInt(intervalInput, 10) || 2 })
           }
-          accessibilityLabel="Interval days"
+          accessibilityLabel={t('schedule.intervalA11y')}
         />
       )}
 
@@ -169,9 +191,10 @@ export default function ScheduleScreen() {
         <View style={styles.weekdayRow}>
           {WEEKDAYS.map((d, i) => {
             const selected = (weekdayMask & d.bit) !== 0;
+            const label = t(d.labelKey);
             return (
               <Pressable
-                key={`${d.label}-${i}`}
+                key={`${d.labelKey}-${i}`}
                 style={[styles.weekdayChip, selected && styles.weekdayChipSelected]}
                 onPress={() => {
                   const next = weekdayMask & d.bit ? weekdayMask & ~d.bit : weekdayMask | d.bit;
@@ -179,10 +202,10 @@ export default function ScheduleScreen() {
                   setFrequency('weekdays', { weekdayMask: next || d.bit });
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Weekday ${d.label}`}
+                accessibilityLabel={t('schedule.weekday', { label })}
                 accessibilityState={{ selected }}
               >
-                <Text style={[styles.weekdayText, selected && styles.weekdayTextSelected]}>{d.label}</Text>
+                <Text style={[styles.weekdayText, selected && styles.weekdayTextSelected]}>{label}</Text>
               </Pressable>
             );
           })}
@@ -191,7 +214,7 @@ export default function ScheduleScreen() {
 
       {draft.frequency === 'monthly' && (
         <TextInput
-          label="Day of month (1–31)"
+          label={t('schedule.dayOfMonth')}
           value={dayOfMonthInput}
           onChangeText={setDayOfMonthInput}
           keyboardType="numeric"
@@ -203,34 +226,36 @@ export default function ScheduleScreen() {
 
       {showTimeSection && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Time and dosage</Text>
+          <Text style={styles.sectionTitle}>{t('schedule.timeDosage')}</Text>
           {!draft.timesCountSet ? (
             <View style={styles.card}>
               <Text style={styles.cardBody}>
-                Set this medication&apos;s dosage and get reminders to take it at specific times.
+                {t('schedule.timeDosageHint')}
               </Text>
               <Button
                 mode="contained"
                 onPress={() => setTimesDialog(true)}
                 style={styles.actionBtn}
-                accessibilityLabel="Set time and dosage"
+                accessibilityLabel={t('schedule.setTimeDosage')}
               >
-                Set time and dosage
+                {t('schedule.setTimeDosage')}
               </Button>
             </View>
           ) : (
             <View style={styles.card}>
               <View style={styles.timesHeader}>
                 <Text style={styles.timesHeaderLabel}>
-                  {draft.timesPerDay} {draft.timesPerDay === 1 ? 'time' : 'times'} a day
+                  {draft.timesPerDay === 1
+                    ? t('schedule.timeADay')
+                    : t('schedule.timesADay', { count: draft.timesPerDay })}
                 </Text>
                 <Pressable
                   style={styles.editBtn}
                   onPress={() => setTimesDialog(true)}
                   accessibilityRole="button"
-                  accessibilityLabel="Edit times per day"
+                  accessibilityLabel={t('schedule.editTimes')}
                 >
-                  <Text style={styles.editBtnText}>Edit</Text>
+                  <Text style={styles.editBtnText}>{t('common.edit')}</Text>
                 </Pressable>
               </View>
               {draft.timesOfDay.map((time, index) => (
@@ -241,7 +266,7 @@ export default function ScheduleScreen() {
                       style={styles.doseTimeSide}
                       onPress={() => setTimePickerIndex(index)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Dose ${index + 1} time`}
+                      accessibilityLabel={t('schedule.doseTime', { n: index + 1 })}
                     >
                       <MaterialCommunityIcons
                         name="clock-outline"
@@ -256,7 +281,7 @@ export default function ScheduleScreen() {
                       style={styles.doseAmountSide}
                       onPress={() => setDoseEditIndex(index)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Dose ${index + 1} amount`}
+                      accessibilityLabel={t('schedule.doseAmount', { n: index + 1 })}
                     >
                       <Text style={styles.doseAmount}>
                         {formatDoseLabel(time.doseAmount ?? defaultDoseAmount, draft.medicationType, doseLabelOptions)}
@@ -266,7 +291,7 @@ export default function ScheduleScreen() {
                 </View>
               ))}
               <Text style={styles.timesHint}>
-                Check the preset time above and adjust if necessary.
+                {t('schedule.presetHint')}
               </Text>
             </View>
           )}
@@ -274,15 +299,15 @@ export default function ScheduleScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Duration</Text>
+        <Text style={styles.sectionTitle}>{t('schedule.duration')}</Text>
         <View style={styles.card}>
           <Pressable
             style={styles.dateRow}
             onPress={() => setDatePicker('start')}
             accessibilityRole="button"
-            accessibilityLabel="Start date"
+            accessibilityLabel={t('schedule.startDate')}
           >
-            <Text style={styles.dateLabel}>Start date</Text>
+            <Text style={styles.dateLabel}>{t('schedule.startDate')}</Text>
             <Text style={styles.dateValueAccent}>{formatDisplayDate(draft.startDate)}</Text>
           </Pressable>
           <View style={styles.rowDivider} />
@@ -290,11 +315,11 @@ export default function ScheduleScreen() {
             style={styles.dateRow}
             onPress={() => setDatePicker('end')}
             accessibilityRole="button"
-            accessibilityLabel="End date"
+            accessibilityLabel={t('schedule.endDate')}
           >
-            <Text style={styles.dateLabel}>End date</Text>
+            <Text style={styles.dateLabel}>{t('schedule.endDate')}</Text>
             <Text style={hasScheduleEndDate(draft.endDate) ? styles.dateValueAccent : styles.dateValueMuted}>
-              {hasScheduleEndDate(draft.endDate) ? formatDisplayDate(draft.endDate!.trim()) : 'None'}
+              {hasScheduleEndDate(draft.endDate) ? formatDisplayDate(draft.endDate!.trim()) : t('common.none')}
             </Text>
           </Pressable>
           {hasScheduleEndDate(draft.endDate) ? (
@@ -304,7 +329,7 @@ export default function ScheduleScreen() {
                 style={styles.clearEndDateRow}
                 onPress={clearEndDate}
                 accessibilityRole="button"
-                accessibilityLabel="Remove end date"
+                accessibilityLabel={t('schedule.removeEndDate')}
               >
                 <MaterialCommunityIcons
                   name="close-circle-outline"
@@ -312,7 +337,7 @@ export default function ScheduleScreen() {
                   color={healthOsTheme.colors.error}
                   style={styles.clearEndDateIcon}
                 />
-                <Text style={styles.clearEndDateText}>Remove end date</Text>
+                <Text style={styles.clearEndDateText}>{t('schedule.removeEndDate')}</Text>
               </Pressable>
             </>
           ) : null}
@@ -320,10 +345,10 @@ export default function ScheduleScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Reminder settings</Text>
+        <Text style={styles.sectionTitle}>{t('schedule.reminders')}</Text>
         <View style={styles.card}>
           <Text style={styles.cardBody}>
-            You&apos;ll get a notification when it&apos;s time to take your medication.
+            {t('schedule.reminderHint')}
           </Text>
         </View>
       </View>
@@ -353,9 +378,9 @@ export default function ScheduleScreen() {
           }
         }}
         style={styles.next}
-        accessibilityLabel="Next"
+        accessibilityLabel={t('common.next')}
       >
-        Next
+        {t('common.next')}
       </Button>
 
       <TimeDosageDialog
@@ -470,16 +495,19 @@ const styles = StyleSheet.create({
   },
   radioItem: {
     justifyContent: 'flex-start',
+    alignItems: 'center',
     gap: 12,
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     marginVertical: 0,
+    minHeight: 52,
   },
   radioLabel: {
     color: healthOsTheme.colors.onSurface,
     fontSize: 16,
+    lineHeight: 22,
     textAlign: 'left',
-    flexGrow: 0,
+    flexGrow: 1,
     flexShrink: 1,
   },
   weekdayRow: {

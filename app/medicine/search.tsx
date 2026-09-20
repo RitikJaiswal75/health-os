@@ -28,6 +28,7 @@ import {
   type DuplicateMedicationConflict,
 } from '@/src/features/medications/duplicateMedicationService';
 import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
+import { useT } from '@/src/i18n/useT';
 
 const KEYBOARD_FOOTER_GAP = 16;
 const SEARCH_DEBOUNCE_MS = 400;
@@ -48,6 +49,7 @@ export default function SearchScreen() {
     null,
   );
   const customNameInputRef = useRef<RNTextInput>(null);
+  const { t } = useT();
 
   const openCustomDialog = () => {
     Keyboard.dismiss();
@@ -109,9 +111,7 @@ export default function SearchScreen() {
 
         setResults(merged);
         if (merged.length === 0) {
-          setErrorMessage(
-            'No matches found. Try another spelling, check your connection for online catalogs, or add a custom medication.',
-          );
+          setErrorMessage(t('search.noMatches'));
         }
       } catch (error) {
         if (signal.aborted || isAbortError(error)) return;
@@ -119,7 +119,7 @@ export default function SearchScreen() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : 'Search failed. Please try again or add a custom medication.',
+            : t('search.failed'),
         );
       } finally {
         if (!signal.aborted) {
@@ -181,10 +181,10 @@ export default function SearchScreen() {
   return (
     <View style={[styles.container, keyboardInset > 0 && { paddingBottom: keyboardInset }]}>
       <Searchbar
-        placeholder="Search medicines or supplements"
+        placeholder={t('search.placeholder')}
         value={query}
         onChangeText={setQuery}
-        accessibilityLabel="Search medicines"
+        accessibilityLabel={t('search.accessibility')}
         autoFocus
         style={styles.searchbar}
         inputStyle={styles.searchInput}
@@ -215,7 +215,7 @@ export default function SearchScreen() {
       />
       <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
         <Button mode="outlined" onPress={openCustomDialog}>
-          Add custom medication
+          {t('search.addCustom')}
         </Button>
       </View>
       <DuplicateMedicationDialog
@@ -234,22 +234,22 @@ export default function SearchScreen() {
 
       <Portal>
         <Dialog visible={customDialog} onDismiss={() => setCustomDialog(false)}>
-          <Dialog.Title>Custom medication</Dialog.Title>
+          <Dialog.Title>{t('search.customTitle')}</Dialog.Title>
           <Dialog.Content>
             <TextInput
               ref={customNameInputRef}
-              label="Medication name"
-              placeholder="Enter name"
+              label={t('search.customName')}
+              placeholder={t('search.enterName')}
               value={customName}
               onChangeText={setCustomName}
               mode="outlined"
               style={styles.customNameInput}
-              accessibilityLabel="Custom medication name"
+              accessibilityLabel={t('search.customName')}
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setCustomDialog(false)}>Cancel</Button>
-            <Button onPress={addCustom}>Continue</Button>
+            <Button onPress={() => setCustomDialog(false)}>{t('common.cancel')}</Button>
+            <Button onPress={addCustom}>{t('common.continue')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

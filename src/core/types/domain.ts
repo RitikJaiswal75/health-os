@@ -1,3 +1,6 @@
+import { t, tCount, type MessageKey } from '@/src/i18n/translate';
+import { en } from '@/src/i18n/en';
+
 export type ScheduleType =
   | 'fixed_daily'
   | 'interval_days'
@@ -26,7 +29,9 @@ export type MedicationType = (typeof MEDICATION_TYPES)[number]['value'];
 
 export function getMedicationTypeLabel(type?: MedicationType | string): string {
   if (!type) return '';
-  return MEDICATION_TYPES.find((t) => t.value === type)?.label ?? type;
+  const key = `type.${type}` as MessageKey;
+  if (key in en) return t(key);
+  return MEDICATION_TYPES.find((item) => item.value === type)?.label ?? type;
 }
 
 export type DoseStatus = 'pending' | 'taken' | 'skipped' | 'missed' | 'snoozed';
@@ -43,6 +48,10 @@ export const DOSE_STATUS_LABEL: Record<DoseStatus, string> = {
 export const DOSE_STATUS_OPTIONS = (
   Object.entries(DOSE_STATUS_LABEL) as [DoseStatus, string][]
 ).map(([value, label]) => ({ value, label }));
+
+export function getDoseStatusLabel(status: DoseStatus): string {
+  return t(`status.${status}`);
+}
 
 export type InventoryTransactionType =
   | 'initial'
@@ -229,7 +238,7 @@ export const PILL_COLORS = [
 export const FREQUENCY_OPTIONS = [
   { label: 'Every day', type: 'fixed_daily' as ScheduleType },
   { label: 'Every X days', type: 'interval_days' as ScheduleType },
-  { label: 'Every week', type: 'weekdays' as ScheduleType },
+  { label: 'Specific days of the week', type: 'weekdays' as ScheduleType },
   { label: 'Every month', type: 'monthly' as ScheduleType },
   { label: 'As needed', type: 'as_needed' as ScheduleType },
 ];
@@ -278,24 +287,24 @@ export function inventoryDeductAmount(
 export function getInventoryQuantityPrompt(medicationType?: MedicationType | string): string {
   switch (medicationType) {
     case 'powder':
-      return 'Number of remaining scoops';
+      return t('inventory.scoops');
     case 'liquid':
-      return 'Number of remaining doses';
+      return t('inventory.doses');
     case 'inhaler':
-      return 'Number of remaining uses';
+      return t('inventory.uses');
     case 'drops':
-      return 'Number of remaining doses';
+      return t('inventory.doses');
     case 'injectable':
-      return 'Number of remaining injections';
+      return t('inventory.injections');
     case 'gummy':
-      return 'Number of remaining gummies';
+      return t('inventory.gummies');
     case 'tablet':
-      return 'Number of remaining tablets';
+      return t('inventory.tablets');
     case 'capsule':
     case 'softgel_capsule':
-      return 'Number of remaining capsules';
+      return t('inventory.capsules');
     default:
-      return 'Number of remaining doses';
+      return t('inventory.doses');
   }
 }
 
@@ -324,19 +333,19 @@ export function formatStrengthSubtitle(
   if (typeLabel) parts.push(typeLabel);
 
   if (medicationType === 'powder' && doseUnitValue != null && doseUnitUnit) {
-    parts.push(`${doseUnitValue} ${doseUnitUnit} per scoop`);
+    parts.push(t('review.perScoop', { value: `${doseUnitValue} ${doseUnitUnit}` }));
   }
 
   if (strengthValue != null && strengthUnit) {
     const strengthPart =
       medicationType === 'powder'
-        ? `${strengthValue} ${strengthUnit} strength`
+        ? t('review.strengthSuffix', { value: `${strengthValue} ${strengthUnit}` })
         : `${strengthValue} ${strengthUnit}`;
     parts.push(strengthPart);
   }
 
   if (parts.length > 0) return parts.join(', ');
-  return 'Set medication info';
+  return t('review.infoFallback');
 }
 
 export function formatDoseLabel(
@@ -351,29 +360,29 @@ export function formatDoseLabel(
 
   switch (medicationType) {
     case 'tablet':
-      return `${count} ${count === 1 ? 'tablet' : 'tablets'}`;
+      return tCount('dose.tablet.one', 'dose.tablet.other', count);
     case 'capsule':
     case 'softgel_capsule':
-      return `${count} ${count === 1 ? 'capsule' : 'capsules'}`;
+      return tCount('dose.capsule.one', 'dose.capsule.other', count);
     case 'gummy':
-      return `${count} ${count === 1 ? 'gummy' : 'gummies'}`;
+      return tCount('dose.gummy.one', 'dose.gummy.other', count);
     case 'inhaler':
-      return `${count} ${count === 1 ? 'pump' : 'pumps'}`;
+      return tCount('dose.pump.one', 'dose.pump.other', count);
     case 'powder': {
       const unit = doseUnitUnit ?? strengthUnit ?? 'g';
-      return `${formatDoseQuantity(count)} ${unit}`;
+      return t('dose.measured', { count: formatDoseQuantity(count), unit });
     }
     case 'liquid': {
       const unit = strengthUnit ?? 'ml';
-      return `${formatDoseQuantity(count)} ${unit}`;
+      return t('dose.measured', { count: formatDoseQuantity(count), unit });
     }
     case 'injectable':
-      return `${count} ${count === 1 ? 'injection' : 'injections'}`;
+      return tCount('dose.injection.one', 'dose.injection.other', count);
     case 'drops':
       if (strengthValue != null && strengthUnit) {
         return formatMeasuredDose(count, strengthValue, strengthUnit, 'ml', 'drop');
       }
-      return `${count} ${count === 1 ? 'drop' : 'drops'}`;
+      return tCount('dose.drop.one', 'dose.drop.other', count);
     case 'topical':
     case 'cream':
     case 'gel':
@@ -381,11 +390,11 @@ export function formatDoseLabel(
       if (strengthValue != null && strengthUnit && strengthUnit !== '%') {
         return formatMeasuredDose(count, strengthValue, strengthUnit, strengthUnit, 'application');
       }
-      return `${count} ${count === 1 ? 'application' : 'applications'}`;
+      return tCount('dose.application.one', 'dose.application.other', count);
     case 'device':
-      return `${count} ${count === 1 ? 'use' : 'uses'}`;
+      return tCount('dose.use.one', 'dose.use.other', count);
     default:
-      return `${count} ${count === 1 ? 'dose' : 'doses'}`;
+      return tCount('dose.dose.one', 'dose.dose.other', count);
   }
 }
 
@@ -398,12 +407,14 @@ export function formatTakeDoseInstruction(
   doseUnitValue?: number,
   doseUnitUnit?: StrengthUnit | string,
 ): string {
-  return `Take ${formatDoseLabel(doseAmount, medicationType, {
-    strengthValue,
-    strengthUnit,
-    doseUnitValue,
-    doseUnitUnit,
-  })}`;
+  return t('dose.take', {
+    label: formatDoseLabel(doseAmount, medicationType, {
+      strengthValue,
+      strengthUnit,
+      doseUnitValue,
+      doseUnitUnit,
+    }),
+  });
 }
 
 function formatMeasuredDose(
@@ -420,7 +431,7 @@ function formatMeasuredDose(
   }
 
   const unit = count === 1 ? countFallback : `${countFallback}s`;
-  return `${count} ${unit}`;
+  return t('dose.measured', { count, unit });
 }
 
 function formatDoseQuantity(value: number): string {

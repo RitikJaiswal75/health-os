@@ -1,4 +1,6 @@
 import { G, Path } from 'react-native-svg';
+import { t, type MessageKey } from '@/src/i18n/translate';
+import { en } from '@/src/i18n/en';
 import type { PillShape } from '../types/domain';
 import {
   BlisterPack,
@@ -71,6 +73,8 @@ const SHAPE_LABELS: Record<string, string> = {
 };
 
 export function formatShapeLabel(shape: string): string {
+  const key = `shapeLabel.${shape}` as MessageKey;
+  if (key in en) return t(key);
   if (SHAPE_LABELS[shape]) return SHAPE_LABELS[shape];
   return shape.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

@@ -14,6 +14,7 @@ import {
 import { permissionHelper, type PermissionKind } from '@/src/core/permissions/permissionHelper';
 import { ensureNotificationSetup } from '@/src/features/reminders/notificationSetup';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
+import { useT } from '@/src/i18n/useT';
 
 const MIN_CHECK_AGAIN_FEEDBACK_MS = 700;
 
@@ -68,6 +69,7 @@ export default function ReliabilityScreen() {
   const nextAction = getNextPermissionAction(state);
   const isPreAddFlow = returnTo === ADD_MEDICATION_PATH;
   const nativeLinked = permissionHelper.isNativeAlarmModuleLinked();
+  const { t } = useT();
 
   const runPermissionAction = useCallback(
     async (action: () => Promise<unknown>) => {
@@ -114,27 +116,26 @@ export default function ReliabilityScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text variant="titleMedium" style={styles.title}>
-        {blocked ? 'Enable reminders' : 'Reminders ready'}
+        {blocked ? t('reliability.enable') : t('reliability.ready')}
       </Text>
 
       {!nativeLinked && (
         <Text style={styles.warning} accessibilityRole="alert">
-          Alarm module is not loaded. Rebuild the app with `npm run android` after these changes,
-          then return here.
+          {t('reliability.moduleMissing')}
         </Text>
       )}
 
       {blocked ? (
         <Text style={styles.body} accessibilityRole="alert">
           {isPreAddFlow
-            ? 'Health OS needs notifications and exact alarms before you add a medication, so it can remind you on time.'
+            ? t('reliability.preAddBlocked')
             : blocked}
         </Text>
       ) : (
         <Text style={styles.body}>
           {isPreAddFlow
-            ? 'Reminder permissions look good. You can add your medication now.'
-            : 'Reminder permissions look good.'}
+            ? t('reliability.preAddReady')
+            : t('reliability.readyBody')}
         </Text>
       )}
 
@@ -146,10 +147,10 @@ export default function ReliabilityScreen() {
 
       {state && (
         <View style={styles.checklist}>
-          <PermissionRow label="Notifications" granted={state.notifications} />
-          <PermissionRow label="Exact alarms" granted={state.exactAlarm} />
-          <PermissionRow label="Full-screen alarms" granted={state.fullScreenIntent} />
-          <PermissionRow label="Display over other apps" granted={state.overlay} />
+          <PermissionRow label={t('reliability.notifications')} granted={state.notifications} />
+          <PermissionRow label={t('reliability.exactAlarms')} granted={state.exactAlarm} />
+          <PermissionRow label={t('reliability.fullScreen')} granted={state.fullScreenIntent} />
+          <PermissionRow label={t('reliability.overlay')} granted={state.overlay} />
         </View>
       )}
 
@@ -160,9 +161,9 @@ export default function ReliabilityScreen() {
               action="notifications"
               nextAction={nextAction}
               onPress={() => runPermissionAction(() => ensureNotificationSetup())}
-              accessibilityLabel="Enable notifications"
+              accessibilityLabel={t('reliability.enableNotifications')}
             >
-              Enable notifications
+              {t('reliability.enableNotifications')}
             </ReliabilityButton>
           )}
           {!state?.exactAlarm && (
@@ -170,9 +171,9 @@ export default function ReliabilityScreen() {
               action="exact_alarm"
               nextAction={nextAction}
               onPress={() => openNativeSetting('exact_alarm')}
-              accessibilityLabel="Enable exact alarms"
+              accessibilityLabel={t('reliability.enableExact')}
             >
-              Enable exact alarms
+              {t('reliability.enableExact')}
             </ReliabilityButton>
           )}
           {!state?.fullScreenIntent && (
@@ -180,9 +181,9 @@ export default function ReliabilityScreen() {
               action="full_screen_intent"
               nextAction={nextAction}
               onPress={() => openNativeSetting('full_screen_intent')}
-              accessibilityLabel="Enable full screen intent"
+              accessibilityLabel={t('reliability.enableFullScreen')}
             >
-              Enable full-screen alarms
+              {t('reliability.enableFullScreen')}
             </ReliabilityButton>
           )}
           {!state?.overlay && (
@@ -190,9 +191,9 @@ export default function ReliabilityScreen() {
               action="overlay"
               nextAction={nextAction}
               onPress={() => openNativeSetting('overlay')}
-              accessibilityLabel="Open overlay settings"
+              accessibilityLabel={t('reliability.openOverlay')}
             >
-              Display over other apps
+              {t('reliability.overlay')}
             </ReliabilityButton>
           )}
           <ReliabilityButton
@@ -201,9 +202,9 @@ export default function ReliabilityScreen() {
             onPress={() => void handleCheckAgain()}
             loading={checkingAgain}
             disabled={checkingAgain}
-            accessibilityLabel="Check permissions again"
+            accessibilityLabel={t('reliability.checkAgain')}
           >
-            Check again
+            {t('reliability.checkAgain')}
           </ReliabilityButton>
         </>
       )}
@@ -214,9 +215,9 @@ export default function ReliabilityScreen() {
           nextAction={nextAction}
           onPress={handleBack}
           style={styles.continueBtn}
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('reliability.goBack')}
         >
-          Back
+          {t('common.back')}
         </ReliabilityButton>
       ) : (
         <ReliabilityButton
@@ -224,9 +225,9 @@ export default function ReliabilityScreen() {
           nextAction={nextAction}
           onPress={handleContinue}
           style={styles.continueBtn}
-          accessibilityLabel={isPreAddFlow ? 'Continue to add medication' : 'Continue to home'}
+          accessibilityLabel={isPreAddFlow ? t('reliability.continueAdd') : t('reliability.continueHome')}
         >
-          {isPreAddFlow ? 'Add medication' : 'Go to home'}
+          {isPreAddFlow ? t('reliability.addMedication') : t('reliability.goHome')}
         </ReliabilityButton>
       )}
 

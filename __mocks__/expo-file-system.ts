@@ -3,3 +3,5 @@ export const cacheDirectory = 'file:///mock/cache/';
 export const getInfoAsync = jest.fn(async () => ({ exists: false }));
 export const makeDirectoryAsync = jest.fn(async () => undefined);
 export const copyAsync = jest.fn(async () => undefined);
+export const writeAsStringAsync = jest.fn(async () => undefined);
+export const readAsStringAsync = jest.fn(async () => '');

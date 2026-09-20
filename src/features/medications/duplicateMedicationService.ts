@@ -2,6 +2,7 @@ import { isBefore, startOfDay } from 'date-fns';
 import type { Medication, Schedule } from '../../db/schema';
 import { formatDateKey, formatDisplayDate, hasScheduleEndDate, parseDateKey } from '../../core/dates/dateUtils';
 import type { MedicationRepository } from './medicationRepository';
+import { t } from '@/src/i18n/translate';
 
 export interface ProposedSchedulePeriod {
   startDate: string;
@@ -55,15 +56,15 @@ export function formatActiveSchedulePeriod(
 ): string {
   const start = formatDisplayDate(schedule.startDate);
   if (hasScheduleEndDate(schedule.endDate)) {
-    return `${start} to ${formatDisplayDate(schedule.endDate!)}`;
+    return t('duplicate.periodRange', { start, end: formatDisplayDate(schedule.endDate!) });
   }
-  return `${start} with no end date`;
+  return t('duplicate.noEnd', { start });
 }
 
 export function formatDuplicateMedicationMessage(conflict: DuplicateMedicationConflict): string {
   const label = conflict.medication.nickname ?? conflict.medication.name;
   const period = formatActiveSchedulePeriod(conflict.schedule);
-  return `${label} is already scheduled (${period}). Edit the existing medication to change dose or timing.`;
+  return t('duplicate.body', { name: label, period });
 }
 
 export function proposedSchedulePeriod(

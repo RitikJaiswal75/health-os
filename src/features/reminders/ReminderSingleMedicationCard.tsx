@@ -4,6 +4,7 @@ import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillSh
 import { formatTakeDoseInstruction, supportsDualColor, type PillShape } from '@/src/core/types/domain';
 import type { Medication } from '@/src/db/schema';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 type ReminderSingleMedicationCardProps = {
   medication: Medication;
@@ -14,6 +15,7 @@ export function ReminderSingleMedicationCard({
   medication,
   doseAmount,
 }: ReminderSingleMedicationCardProps) {
+  const { t } = useT();
   const takeInstruction = formatTakeDoseInstruction(
     doseAmount,
     medication.medicationType,
@@ -28,14 +30,14 @@ export function ReminderSingleMedicationCard({
   const displayName = medication.nickname ?? medication.name;
 
   return (
-    <View style={styles.card} accessibilityLabel={`Reminder for ${displayName}`}>
+    <View style={styles.card} accessibilityLabel={t('reminder.for', { name: displayName })}>
       <View style={styles.previewCircle}>
         {medication.photoUri ? (
           <Image
             source={{ uri: medication.photoUri }}
             style={styles.previewPhoto}
             accessibilityIgnoresInvertColors
-            accessibilityLabel={`Photo of ${displayName}`}
+            accessibilityLabel={t('reminder.photo', { name: displayName })}
           />
         ) : (
           <PillShapeIcon

@@ -12,6 +12,8 @@ import { RefillQuantityDialog } from '@/src/core/components/RefillQuantityDialog
 import { formatStrengthSubtitle, getMedicationTypeLabel } from '@/src/core/types/domain';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
+import { t } from '@/src/i18n/translate';
 
 function formatStrengthLine(med: Medication): string {
   const subtitle = formatStrengthSubtitle(
@@ -21,7 +23,7 @@ function formatStrengthLine(med: Medication): string {
     med.doseUnitValue ?? undefined,
     med.doseUnitUnit ?? undefined,
   );
-  if (subtitle !== 'Set medication info') {
+  if (subtitle !== t('review.infoFallback')) {
     return subtitle;
   }
   return getMedicationTypeLabel(med.medicationType);
@@ -35,6 +37,7 @@ export default function LibraryScreen() {
   const dbState = useDatabaseBootstrap();
   const [refreshKey, setRefreshKey] = useState(0);
   const [refillMed, setRefillMed] = useState<Medication | null>(null);
+  const { t } = useT();
 
   useFocusEffect(
     useCallback(() => {
@@ -61,14 +64,14 @@ export default function LibraryScreen() {
   return (
     <View style={styles.container}>
       <Appbar.Header>
-        <Appbar.Content title="Your medications" />
+        <Appbar.Content title={t('home.yourMedications')} />
       </Appbar.Header>
 
       <ReminderPermissionBanner />
 
       <ScrollView contentContainerStyle={styles.content}>
         {meds.length === 0 ? (
-          <Text style={styles.empty}>No medications in your library.</Text>
+          <Text style={styles.empty}>{t('library.empty')}</Text>
         ) : (
           meds.map((med) => (
             <Card key={med.id} style={styles.card}>
@@ -77,7 +80,7 @@ export default function LibraryScreen() {
                   style={styles.rowMain}
                   onPress={() => router.push(`/medicine/${med.id}`)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${med.nickname ?? med.name}`}
+                  accessibilityLabel={t('library.openMedication', { name: med.nickname ?? med.name })}
                 >
                   <View style={styles.glyphWrap}>
                     <PillShapeIcon
@@ -92,7 +95,10 @@ export default function LibraryScreen() {
                       {med.nickname ?? med.name}
                     </Text>
                     <Text variant="bodySmall" style={styles.meta}>
-                      {formatStrengthLine(med)} · {med.currentQuantity} remaining
+                      {t('library.remainingLine', {
+                        details: formatStrengthLine(med),
+                        count: med.currentQuantity,
+                      })}
                     </Text>
                   </View>
                 </Pressable>
@@ -101,9 +107,9 @@ export default function LibraryScreen() {
                   compact
                   onPress={() => setRefillMed(med)}
                   style={styles.refillBtn}
-                  accessibilityLabel={`Refill ${med.nickname ?? med.name}`}
+                  accessibilityLabel={t('library.refillMedication', { name: med.nickname ?? med.name })}
                 >
-                  Refill
+                  {t('common.refill')}
                 </Button>
               </Card.Content>
             </Card>
@@ -115,12 +121,12 @@ export default function LibraryScreen() {
         icon="plus"
         style={styles.fab}
         onPress={navigateToAddMedication}
-        accessibilityLabel="Add medication"
+        accessibilityLabel={t('home.addMedication')}
       />
 
       <RefillQuantityDialog
         visible={refillMed != null}
-        medicationName={refillMed?.nickname ?? refillMed?.name ?? 'medication'}
+        medicationName={refillMed?.nickname ?? refillMed?.name ?? t('refill.medicationFallback')}
         onDismiss={() => setRefillMed(null)}
         onConfirm={confirmRefill}
       />

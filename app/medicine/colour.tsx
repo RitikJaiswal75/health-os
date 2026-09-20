@@ -9,6 +9,7 @@ import { isPresetPillColor } from '@/src/core/colors/colorUtils';
 import { PILL_COLORS, supportsDualColor } from '@/src/core/types/domain';
 import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { useT } from '@/src/i18n/useT';
 
 export default function ColourScreen() {
   const { draft, setAppearance } = useWizardStore();
@@ -16,6 +17,7 @@ export default function ColourScreen() {
   const previewColor = draft.pillColor ?? SHAPE_PREVIEW_COLOR;
   const showDualTone = dualColor && draft.pillColor2 != null;
   const [customDialog, setCustomDialog] = useState<{ slot: 1 | 2 } | null>(null);
+  const { t } = useT();
 
   const selectColor = (color: string, slot: 1 | 2) => {
     if (slot === 1) {
@@ -48,7 +50,7 @@ export default function ColourScreen() {
             isSelected(color, slot) && styles.swatchSelected,
           ]}
           accessibilityRole="button"
-          accessibilityLabel={`Colour ${slot} ${color}`}
+          accessibilityLabel={t('colour.swatch', { slot, color })}
           accessibilityState={{ selected: isSelected(color, slot) }}
         />
       ))}
@@ -56,7 +58,7 @@ export default function ColourScreen() {
         onPress={() => setCustomDialog({ slot })}
         style={[styles.swatch, styles.customSwatch, isCustomSelected(slot) && styles.swatchSelected]}
         accessibilityRole="button"
-        accessibilityLabel={`Custom colour ${slot}`}
+        accessibilityLabel={t('colour.customSwatch', { slot })}
         accessibilityState={{ selected: isCustomSelected(slot) }}
       >
         <View style={styles.customSwatchInner}>
@@ -78,7 +80,7 @@ export default function ColourScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text variant="titleMedium">Choose a colour</Text>
+      <Text variant="titleMedium">{t('colour.choose')}</Text>
       <View style={styles.preview}>
         {draft.pillShape && (
           <PillShapeIcon
@@ -91,26 +93,26 @@ export default function ColourScreen() {
       </View>
 
       <Text variant="labelLarge" style={styles.sectionLabel}>
-        {dualColor ? 'Colour 1' : 'Colour'}
+        {dualColor ? t('colour.one') : t('colour.single')}
       </Text>
       {renderSwatches(1)}
 
       {dualColor && (
         <>
           <Text variant="labelLarge" style={styles.sectionLabel}>
-            Colour 2
+            {t('colour.two')}
           </Text>
           {renderSwatches(2)}
         </>
       )}
 
       <Button mode="contained" onPress={() => router.push('/medicine/schedule')}>
-        Next
+        {t('common.next')}
       </Button>
 
       <CustomColorDialog
         visible={customDialog != null}
-        title={customDialog?.slot === 2 ? 'Custom colour 2' : 'Custom colour'}
+        title={customDialog?.slot === 2 ? t('colour.custom2') : t('colour.custom')}
         value={
           customDialog?.slot === 2
             ? draft.pillColor2 ?? draft.pillColor ?? SHAPE_PREVIEW_COLOR

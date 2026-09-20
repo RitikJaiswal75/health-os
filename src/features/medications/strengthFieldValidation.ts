@@ -1,4 +1,5 @@
 import type { StrengthUnit } from '@/src/core/types/domain';
+import { t } from '@/src/i18n/translate';
 
 export function validateStrengthFields(
   amountInput: string,
@@ -10,16 +11,16 @@ export function validateStrengthFields(
   let unitError: string | null = null;
 
   if (!trimmed) {
-    amountError = `Enter ${label.toLowerCase()}.`;
+    amountError = t('strength.enterField', { field: label.toLowerCase() });
   } else {
     const value = parseFloat(trimmed);
     if (!Number.isFinite(value) || value <= 0) {
-      amountError = 'Enter a valid amount greater than zero.';
+      amountError = t('strength.invalidAmount');
     }
   }
 
   if (!unit) {
-    unitError = 'Select a unit before saving.';
+    unitError = t('strength.selectUnit');
   }
 
   if (amountError || unitError) {

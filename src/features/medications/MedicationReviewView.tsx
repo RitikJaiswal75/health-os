@@ -36,11 +36,17 @@ import {
   type DuplicateMedicationConflict,
 } from '@/src/features/medications/duplicateMedicationService';
 import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
+import { t, tCount } from '@/src/i18n/translate';
+import { useT } from '@/src/i18n/useT';
 
 function getFrequencyLabel(type?: ScheduleType, intervalDays?: number): string {
   if (type === 'interval_days' && intervalDays) {
-    return `Every ${intervalDays} days`;
+    return tCount('schedule.everyNDaysOne', 'schedule.everyNDays', intervalDays);
   }
+  if (type === 'fixed_daily') return t('schedule.everyDay');
+  if (type === 'weekdays') return t('schedule.everyWeek');
+  if (type === 'monthly') return t('schedule.everyMonth');
+  if (type === 'as_needed') return t('schedule.asNeeded');
   return FREQUENCY_OPTIONS.find((f) => f.type === type)?.label ?? '';
 }
 
@@ -84,6 +90,7 @@ function buildSaveInput(
 }
 
 export function MedicationReviewView() {
+  const { t } = useT();
   const { draft, setInventory, setNicknameNotes, reset, editingMedicationId, editSessionKey } =
     useWizardStore();
   const dbState = useDatabaseBootstrap();
@@ -201,7 +208,7 @@ export function MedicationReviewView() {
       if (isEditing && editingMedicationId) {
         const saved = medRepo.update(editingMedicationId, input);
         if (!saved) {
-          setSaveError('Medication could not be saved. It may have been removed.');
+          setSaveError(t('review.saveMissing'));
           return;
         }
         const schedules = medRepo.getActiveSchedules(editingMedicationId);
@@ -224,7 +231,7 @@ export function MedicationReviewView() {
       reset();
       router.replace('/');
     } catch {
-      setSaveError('Something went wrong while saving. Please try again.');
+      setSaveError(t('review.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -262,9 +269,9 @@ export function MedicationReviewView() {
           style={styles.previewDetailsEditBtn}
           onPress={() => router.push('/medicine/configure')}
           accessibilityRole="button"
-          accessibilityLabel="Edit name and strength"
+          accessibilityLabel={t('review.editName')}
         >
-          <Text style={styles.editBtnText}>Edit</Text>
+          <Text style={styles.editBtnText}>{t('common.edit')}</Text>
         </Pressable>
         <View style={styles.previewCircleWrap}>
           <View style={styles.previewCircle}>
@@ -287,7 +294,7 @@ export function MedicationReviewView() {
             style={styles.previewEditBtn}
             onPress={() => router.push('/medicine/shape')}
             accessibilityRole="button"
-            accessibilityLabel="Edit shape and colour"
+            accessibilityLabel={t('review.editShape')}
           >
             <MaterialCommunityIcons name="pencil" size={16} color={healthOsTheme.colors.onSurface} />
           </Pressable>
@@ -298,14 +305,14 @@ export function MedicationReviewView() {
 
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Schedule</Text>
+          <Text style={styles.cardTitle}>{t('review.schedule')}</Text>
           <Pressable
             style={styles.editBtn}
             onPress={() => router.push('/medicine/schedule')}
             accessibilityRole="button"
-            accessibilityLabel="Edit schedule"
+            accessibilityLabel={t('review.editSchedule')}
           >
-            <Text style={styles.editBtnText}>Edit</Text>
+            <Text style={styles.editBtnText}>{t('common.edit')}</Text>
           </Pressable>
         </View>
 
@@ -348,7 +355,7 @@ export function MedicationReviewView() {
             color={healthOsTheme.colors.onSurfaceVariant}
             style={styles.rowIcon}
           />
-          <Text style={styles.scheduleText}>Starting {formatDisplayDate(draft.startDate)}</Text>
+          <Text style={styles.scheduleText}>{t('review.starting', { date: formatDisplayDate(draft.startDate) })}</Text>
         </View>
         {endDate ? (
           <View style={styles.scheduleRow}>
@@ -358,7 +365,7 @@ export function MedicationReviewView() {
               color={healthOsTheme.colors.onSurfaceVariant}
               style={styles.rowIcon}
             />
-            <Text style={styles.scheduleText}>Ending {formatDisplayDate(endDate)}</Text>
+            <Text style={styles.scheduleText}>{t('review.ending', { date: formatDisplayDate(endDate) })}</Text>
           </View>
         ) : null}
       </View>
@@ -367,7 +374,7 @@ export function MedicationReviewView() {
         style={styles.card}
         onLayout={(event) => registerFieldOffset('quantity', event.nativeEvent.layout.y)}
       >
-        <Text style={styles.cardTitle}>Quantity</Text>
+        <Text style={styles.cardTitle}>{t('review.quantity')}</Text>
         <TextInput
           placeholder={quantityPrompt}
           value={quantity}
@@ -381,7 +388,7 @@ export function MedicationReviewView() {
           accessibilityLabel={quantityPrompt}
         />
         <View style={styles.refillRow}>
-          <Text style={styles.refillLabel}>Refill reminder</Text>
+          <Text style={styles.refillLabel}>{t('review.refillReminder')}</Text>
           <Switch
             value={refillOn}
             onValueChange={(v) => {
@@ -390,17 +397,17 @@ export function MedicationReviewView() {
               else setRefillThreshold('');
             }}
             color={healthOsTheme.colors.primary}
-            accessibilityLabel="Refill reminder"
+            accessibilityLabel={t('review.refillReminder')}
           />
         </View>
         {refillOn && refillThreshold ? (
           <Text style={styles.refillHint}>
-            Remind when remaining quantity falls below {refillThreshold}
+            {t('review.belowHint', { count: refillThreshold })}
           </Text>
         ) : null}
         {refillOn ? (
           <Button mode="text" onPress={() => setRefillDialog(true)} style={styles.refillEditBtn}>
-            {refillThreshold ? 'Change threshold' : 'Set threshold'}
+            {refillThreshold ? t('review.changeThreshold') : t('review.setThreshold')}
           </Button>
         ) : null}
       </View>
@@ -410,23 +417,23 @@ export function MedicationReviewView() {
         onLayout={(event) => registerFieldOffset('nickname', event.nativeEvent.layout.y)}
       >
         <TextInput
-          placeholder="Medication nickname"
+          placeholder={t('review.nickname')}
           value={nickname}
           onChangeText={setNickname}
           onFocus={() => scrollFieldIntoView('nickname')}
           mode="outlined"
           left={<TextInput.Icon icon="pill" />}
           style={styles.fieldInput}
-          accessibilityLabel="Medication nickname"
+          accessibilityLabel={t('review.nickname')}
         />
         <Text style={styles.nicknameHint}>
-          If you set a nickname, the nickname will be used throughout the Medication tracker.
+          {t('review.nicknameHint')}
         </Text>
       </View>
 
       <View onLayout={(event) => registerFieldOffset('notes', event.nativeEvent.layout.y)}>
         <TextInput
-          placeholder="Notes"
+          placeholder={t('review.notes')}
           value={notes}
           onChangeText={setNotes}
           onFocus={() => scrollFieldIntoView('notes')}
@@ -434,7 +441,7 @@ export function MedicationReviewView() {
           multiline
           left={<TextInput.Icon icon="note-text-outline" />}
           style={[styles.fieldInput, styles.notesInput]}
-          accessibilityLabel="Notes"
+          accessibilityLabel={t('review.notes')}
         />
       </View>
 
@@ -444,9 +451,9 @@ export function MedicationReviewView() {
         loading={saving}
         onPress={() => void handleSave()}
         style={styles.saveBtn}
-        accessibilityLabel={isEditing ? 'Save changes' : 'Save medication'}
+        accessibilityLabel={isEditing ? t('review.saveChanges') : t('review.saveMedication')}
       >
-        Save
+        {t('common.save')}
       </Button>
 
       {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
@@ -457,29 +464,29 @@ export function MedicationReviewView() {
           textColor={healthOsTheme.colors.error}
           onPress={() => setDeleteDialog(true)}
           style={styles.deleteBtn}
-          accessibilityLabel="Delete medication"
+          accessibilityLabel={t('review.deleteMedication')}
         >
-          Delete medication
+          {t('review.deleteMedication')}
         </Button>
       )}
 
       <Portal>
         <Dialog visible={refillDialog} onDismiss={() => setRefillDialog(false)}>
-          <Dialog.Title>Refill reminder threshold</Dialog.Title>
+          <Dialog.Title>{t('review.thresholdTitle')}</Dialog.Title>
           <Dialog.Content>
             <Text style={styles.refillDialogBody}>
-              Remind you when the remaining quantity drops below this number.
+              {t('review.thresholdBody')}
             </Text>
             <TextInput
-              label="Remind when below"
+              label={t('review.remindWhenBelow')}
               value={refillThreshold}
               onChangeText={setRefillThreshold}
               keyboardType="numeric"
-              accessibilityLabel="Refill reminder threshold"
+              accessibilityLabel={t('review.thresholdTitle')}
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setRefillDialog(false)}>Done</Button>
+            <Button onPress={() => setRefillDialog(false)}>{t('common.done')}</Button>
           </Dialog.Actions>
         </Dialog>
 
@@ -497,16 +504,15 @@ export function MedicationReviewView() {
         />
 
         <Dialog visible={deleteDialog} onDismiss={() => !deleting && setDeleteDialog(false)}>
-          <Dialog.Title>Delete medication?</Dialog.Title>
+          <Dialog.Title>{t('review.deleteTitle')}</Dialog.Title>
           <Dialog.Content>
             <Text>
-              {draft.nickname ?? draft.name} will be removed along with its schedule, doses, and
-              reminders. This cannot be undone.
+              {t('review.deleteBody', { name: draft.nickname ?? draft.name })}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setDeleteDialog(false)} disabled={deleting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               textColor={healthOsTheme.colors.error}
@@ -514,7 +520,7 @@ export function MedicationReviewView() {
               loading={deleting}
               disabled={deleting}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </Dialog.Actions>
         </Dialog>
