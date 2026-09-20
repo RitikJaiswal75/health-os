@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { I18nManager } from 'react-native';
+import { I18nManager, InteractionManager } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { AppLocale, LocalePreference } from './locales';
 import { isAppLocale, resolveAppLocale } from './locales';
@@ -12,6 +12,7 @@ type LocaleState = {
   preference: LocalePreference;
   locale: AppLocale;
   hydrated: boolean;
+  switching: boolean;
   catalogRevision: number;
   setPreference: (preference: LocalePreference) => Promise<void>;
   hydrate: () => Promise<void>;
@@ -80,12 +81,36 @@ function syncLocale(preference: LocalePreference): AppLocale {
   return locale;
 }
 
+/** Let React commit the new locale and paint before hiding the switch overlay. */
+async function waitForLocaleUi(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+export function beginLanguageSwitch(): void {
+  useLocaleStore.setState({ switching: true });
+}
+
+export function endLanguageSwitch(): void {
+  useLocaleStore.setState({ switching: false });
+}
+
+export { waitForLocaleUi };
+
 export const useLocaleStore = create<LocaleState>((set, get) => ({
   preference: 'system',
   locale: 'en',
   hydrated: false,
+  switching: false,
   catalogRevision: 0,
   setPreference: async (preference) => {
+    if (preference === get().preference) return;
+    if (!get().switching) {
+      set({ switching: true });
+    }
     const locale = resolvePreference(preference);
     await ensureCatalog(locale);
     syncLocale(preference);
@@ -95,6 +120,7 @@ export const useLocaleStore = create<LocaleState>((set, get) => ({
       catalogRevision: state.catalogRevision + 1,
     }));
     await persistPreference(preference);
+    await waitForLocaleUi();
     void refreshCatalog(locale).then((updated) => {
       if (updated) {
         set((state) => ({ catalogRevision: state.catalogRevision + 1 }));

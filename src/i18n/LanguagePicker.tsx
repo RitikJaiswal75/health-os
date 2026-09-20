@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { RadioButton, Text } from 'react-native-paper';
 import { APP_LOCALES, type LocalePreference } from './locales';
-import { useLocaleStore } from './localeStore';
+import { beginLanguageSwitch, endLanguageSwitch, useLocaleStore, waitForLocaleUi } from './localeStore';
 import { useT } from './useT';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 
@@ -16,7 +16,17 @@ export function LanguagePicker({ showHeading = true, onSelected }: LanguagePicke
   const setPreference = useLocaleStore((state) => state.setPreference);
 
   const applyLanguage = (value: LocalePreference) => {
-    void setPreference(value).then(() => onSelected?.());
+    if (value === preference) return;
+    beginLanguageSwitch();
+    void (async () => {
+      try {
+        await setPreference(value);
+        await waitForLocaleUi();
+        onSelected?.();
+      } finally {
+        endLanguageSwitch();
+      }
+    })();
   };
 
   return (
