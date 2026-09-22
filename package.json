@@ -1,7 +1,7 @@
 {
   "name": "health-os",
   "main": "expo-router/entry",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "scripts": {
     "start": "expo start --dev-client",
     "start:go": "expo start",
@@ -30,6 +30,9 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@react-native-firebase/app": "26.4.0",
+    "@react-native-firebase/crashlytics": "26.4.0",
+    "@sentry/react-native": "8.27.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.44.5",
     "expo": "~57.0.22",
@@ -39,6 +42,7 @@
     "expo-font": "~57.0.4",
     "expo-image-picker": "~57.0.17",
     "expo-linking": "~57.0.10",
+    "expo-localization": "~57.0.1",
     "expo-notifications": "~57.0.18",
     "expo-router": "~57.0.21",
     "expo-splash-screen": "~57.0.9",
@@ -46,7 +50,6 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-web-browser": "~57.0.3",
-    "expo-localization": "~57.0.1",
     "medication-alarm": "file:./modules/medication-alarm",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -97,13 +100,18 @@
       "src/features/**/*.{ts,tsx}",
       "src/core/**/*.{ts,tsx}",
       "src/db/**/*.{ts,tsx}",
-      "!**/*.d.ts"
+      "!**/*.d.ts",
+      "!src/core/observability/ErrorBoundary.tsx",
+      "!src/core/observability/ObservabilityBootstrap.tsx"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^react-native$": "<rootDir>/__mocks__/react-native.ts",
       "^expo-sqlite$": "<rootDir>/__mocks__/expo-sqlite.ts",
       "^expo-file-system/legacy$": "<rootDir>/__mocks__/expo-file-system.ts",
+      "^@sentry/react-native$": "<rootDir>/__mocks__/sentry-react-native.ts",
+      "^@react-native-firebase/app$": "<rootDir>/__mocks__/react-native-firebase-app.ts",
+      "^@react-native-firebase/crashlytics$": "<rootDir>/__mocks__/react-native-firebase-crashlytics.ts",
       "^@/src/db/client$": "<rootDir>/src/db/client.native.ts",
       "^@/src/features/catalog/indiaCatalog$": "<rootDir>/src/features/catalog/indiaCatalog.native.ts"
     },

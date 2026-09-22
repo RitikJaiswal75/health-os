@@ -76,6 +76,7 @@ Daily, every N days, specific weekdays, monthly, or as-needed — with multiple 
 - Database and pill photos live in durable **`Documents/HealthOS/`** storage
 - Data survives Android **Clear cache**; removed only on **Clear data** / uninstall
 - Catalog API queries (RxTerms, DSLD) are cached locally for 24 hours
+- Crash reports (if enabled) send only an anonymous install ID, app/OS version, device model, route name, and stack — never medication names, notes, or photos
 
 ---
 
@@ -107,6 +108,8 @@ cp .env.example .env   # optional — defaults to https://drugs.healthos.ritik.c
 ```
 
 India medicine search hits **`https://drugs.healthos.ritik.cc`** (Cloudflare Worker + D1, per-query). Worker setup: [`workers/india-catalog/README.md`](workers/india-catalog/README.md).
+
+Crash-reporting config is served from **`https://config.healthos.ritik.cc`**. Setup: [`workers/app-config/README.md`](workers/app-config/README.md) and [`docs/OBSERVABILITY-SETUP.md`](docs/OBSERVABILITY-SETUP.md).
 
 ### Run in development
 
@@ -187,6 +190,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 | State | Zustand (wizard draft) |
 | Alarms | Custom `medication-alarm` native module (Android) |
 | Catalog | Cloudflare Worker (India, per-query) + RxTerms + NIH DSLD |
+| Crash reporting | Sentry (primary) + Firebase Crashlytics (fallback), switched via Cloudflare Worker |
 
 ---
 
@@ -200,6 +204,7 @@ src/db/               Drizzle schema, migrations, repositories
 modules/medication-alarm/   Android alarm native module
 data/                 Local-only catalog source for worker seeding (gitignored)
 workers/india-catalog/  Cloudflare Worker for per-query India medicine search
+workers/app-config/     Cloudflare Worker for crash-reporting provider config
 dist/                 Local APK output from android:apk (gitignored)
 scripts/              Catalog ingest, RN compat patches, manifest checks
 ```

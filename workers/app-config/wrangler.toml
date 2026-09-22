@@ -1,0 +1,11 @@
+name = "health-os-app-config"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+[[routes]]
+pattern = "config.healthos.ritik.cc"
+custom_domain = true
+
+[[kv_namespaces]]
+binding = "APP_CONFIG"
+id = "89897542252d4a2db853b846445f9377"

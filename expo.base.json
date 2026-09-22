@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.health.os",
-      "versionCode": 4,
+      "versionCode": 5,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
@@ -83,6 +83,24 @@
       "./modules/medication-alarm/app.plugin.js",
       "./plugins/withDevClientMainApplication.js",
       "./plugins/withReleaseApkOptimization.js",
+      "./plugins/withObservabilityGradle.js",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://de.sentry.io/",
+          "organization": "healthos",
+          "project": "health-os",
+          "experimental_android": {
+            "enableAndroidGradlePlugin": true,
+            "includeProguardMapping": true,
+            "autoUploadProguardMapping": true,
+            "uploadNativeSymbols": false,
+            "includeNativeSources": false
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
       "expo-sqlite",
       "expo-web-browser",
       "expo-font",

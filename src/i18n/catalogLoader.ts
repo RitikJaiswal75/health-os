@@ -3,6 +3,7 @@ import type { AppLocale } from './locales';
 import type { MessageCatalog } from './en';
 import { getI18nBaseUrl } from './catalogConfig';
 import { hasCatalog, registerCatalog } from './translate';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const pending = new Map<AppLocale, Promise<boolean>>();
@@ -68,7 +69,9 @@ async function fetchRemoteCatalog(locale: AppLocale): Promise<MessageCatalog | n
     });
     if (!response.ok) return null;
     return asMessageCatalog(await response.json());
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') return null;
+    reportError('I18N_CATALOG_FAILED', error);
     return null;
   } finally {
     clearTimeout(timer);

@@ -4,6 +4,7 @@ import { canLogDoseForTodayOrPast } from '../medications/doseSlotUtils';
 import type { DoseStatus } from '../../core/types/domain';
 import { InventoryService } from './inventoryService';
 import { notifyRefillIfNeeded } from './refillReminderService';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 /** Mark a dose taken, adjust inventory, and fire refill notification if needed. */
 export function markDoseAsTaken(
@@ -43,7 +44,7 @@ export function markDoseAsTaken(
 
     return true;
   } catch (error) {
-    console.error('[markDoseAsTaken] failed', error);
+    reportError('DOSE_MARK_FAILED', error);
     return false;
   }
 }

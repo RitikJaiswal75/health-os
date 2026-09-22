@@ -11,13 +11,19 @@ import 'react-native-reanimated';
 import { healthOsNavigationTheme } from '@/src/core/theme/navigationTheme';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { StackHeaderWithBanner } from '@/src/core/components/StackHeaderWithBanner';
+import { ErrorBoundary } from '@/src/core/observability/ErrorBoundary';
+import { ObservabilityBootstrap } from '@/src/core/observability/ObservabilityBootstrap';
+import { initCrashReporting } from '@/src/core/observability/crashReporter';
+import { readCachedObservabilityConfig } from '@/src/core/observability/configStore';
 import { DbBootstrapGate } from '@/src/db/DbBootstrapGate';
 import { ReminderNotificationBootstrap } from '@/src/features/reminders/ReminderNotificationBootstrap';
 import { ReminderRouterReadyGate } from '@/src/features/reminders/ReminderRouterReadyGate';
 import { I18nProvider } from '@/src/i18n/I18nProvider';
 import { useT } from '@/src/i18n/useT';
 
-export { ErrorBoundary } from 'expo-router';
+export { ErrorBoundary };
+
+initCrashReporting(readCachedObservabilityConfig() ?? undefined);
 
 SplashScreen.preventAutoHideAsync();
 
@@ -81,6 +87,7 @@ export default function RootLayout() {
         <ThemeProvider value={healthOsNavigationTheme}>
           <PaperProvider theme={healthOsTheme}>
             <I18nProvider>
+              <ObservabilityBootstrap />
               <RootNavigation />
             </I18nProvider>
           </PaperProvider>
