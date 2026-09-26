@@ -112,7 +112,7 @@ describe('crashReporter', () => {
     const sent = (sentry.capture as jest.Mock).mock.calls[0][0] as CrashEvent;
     expect(sent.message).toBeNull();
     expect(sent.errorCode).toBe('DOSE_MARK_FAILED');
-    expect(crash.capture).not.toHaveBeenCalled();
+    expect(crash.capture).toHaveBeenCalledTimes(1);
   });
 
   it('switches non-fatal routing when remote config changes', async () => {

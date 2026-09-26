@@ -33,31 +33,52 @@ function adapter(id: 'sentry' | 'crashlytics', capture: jest.Mock): CrashReporte
 }
 
 describe('routeCrashEvent', () => {
-  it('sends to the primary provider when it succeeds', async () => {
+  it('sends the same event to every configured provider', async () => {
     const sentry = adapter('sentry', jest.fn(async () => true));
     const crash = adapter('crashlytics', jest.fn(async () => true));
     const outbox = { enqueue: jest.fn() };
 
     await expect(
       routeCrashEvent(event, baseConfig, { sentry, crashlytics: crash }, outbox),
-    ).resolves.toBe('primary');
+    ).resolves.toBe('both');
 
     expect(sentry.capture).toHaveBeenCalledTimes(1);
-    expect(crash.capture).not.toHaveBeenCalled();
+    expect(crash.capture).toHaveBeenCalledTimes(1);
+    expect(sentry.capture).toHaveBeenCalledWith(event);
+    expect(crash.capture).toHaveBeenCalledWith(event);
     expect(outbox.enqueue).not.toHaveBeenCalled();
   });
 
-  it('fails over to Crashlytics when Sentry is unreachable', async () => {
+  it('still delivers to Crashlytics when Sentry is unreachable', async () => {
     const sentry = adapter('sentry', jest.fn(async () => false));
     const crash = adapter('crashlytics', jest.fn(async () => true));
     const outbox = { enqueue: jest.fn() };
 
     await expect(
       routeCrashEvent(event, baseConfig, { sentry, crashlytics: crash }, outbox),
-    ).resolves.toBe('fallback');
+    ).resolves.toBe('both');
 
+    expect(sentry.capture).toHaveBeenCalledTimes(1);
     expect(crash.capture).toHaveBeenCalledTimes(1);
     expect(outbox.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('sends only to the primary when fallback is none', async () => {
+    const sentry = adapter('sentry', jest.fn(async () => true));
+    const crash = adapter('crashlytics', jest.fn(async () => true));
+    const outbox = { enqueue: jest.fn() };
+
+    await expect(
+      routeCrashEvent(
+        event,
+        { ...baseConfig, fallback: 'none' },
+        { sentry, crashlytics: crash },
+        outbox,
+      ),
+    ).resolves.toBe('primary');
+
+    expect(sentry.capture).toHaveBeenCalledTimes(1);
+    expect(crash.capture).not.toHaveBeenCalled();
   });
 
   it('enqueues to the outbox when both providers fail', async () => {

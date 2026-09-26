@@ -123,7 +123,7 @@ export async function flushCrashOutbox(): Promise<void> {
     const result = await routeCrashEvent(row.event, currentConfig, adapters, {
       enqueue: () => undefined,
     });
-    if (result === 'primary' || result === 'fallback') {
+    if (result === 'primary' || result === 'both') {
       outbox.remove(row.id);
     } else {
       outbox.incrementAttempts(row.id);

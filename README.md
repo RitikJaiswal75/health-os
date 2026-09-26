@@ -190,7 +190,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 | State | Zustand (wizard draft) |
 | Alarms | Custom `medication-alarm` native module (Android) |
 | Catalog | Cloudflare Worker (India, per-query) + RxTerms + NIH DSLD |
-| Crash reporting | Sentry (primary) + Firebase Crashlytics (fallback), switched via Cloudflare Worker |
+| Crash reporting | Sentry and Crashlytics both receive every report; the provider list is switched via Cloudflare Worker |
 
 ---
 

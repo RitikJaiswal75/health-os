@@ -1,6 +1,6 @@
 # Observability setup (Sentry, Crashlytics, config worker)
 
-Health OS reports crashes to a **config-selected primary provider** with automatic failover. Native crash handlers are installed at process start, so a remote provider switch takes effect on the **next app launch**. Non-fatal errors switch as soon as the app refreshes config (within 15 minutes).
+Health OS reports each crash to **every provider listed** in the remote config (`primary` and `fallback` are both delivery targets, not an either-or). Set `fallback` to `"none"` to use a single provider. Native crash handlers are installed at process start, so a remote provider change takes effect on the **next app launch**. Non-fatal routing updates as soon as the app refreshes config (within 15 minutes).
 
 Accounts are free. No credit card is required for any of these steps.
 
@@ -92,7 +92,7 @@ Timing:
 - **Crashlytics** uploads on the *next* launch after a crash. Crash, reopen, wait up to 5 minutes. Dashboard: **DevOps & Engagement → Crashlytics**. For debug/dev-client testing, set `crashlytics_debug_enabled: true` in [`firebase.json`](../firebase.json) locally and rebuild.
 - **Sentry** non-fatals arrive in seconds. Native fatals wait for the next launch.
 
-**Why Sentry shows errors but Crashlytics may not:** With `"primary":"sentry"`, non-fatals go to Sentry first. Crashlytics receives them when Sentry fails (network/offline) or on **native crash**. Change routing via Worker config — no app release needed.
+**Both dashboards:** With `"primary":"sentry"` and `"fallback":"crashlytics"`, every non-fatal is sent to **both**. A report is queued on device only when every configured provider fails. Native crashes still belong to Crashlytics (Sentry NDK is off). Change the provider list via Worker config — no app release needed.
 
 PII check: open one real event in Sentry → JSON tab. It must not contain a medication name, note, photo URI, or file path under `Documents/HealthOS`.
 

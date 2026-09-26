@@ -24,6 +24,16 @@ async function tryCapture(
   }
 }
 
+function deliveryTargets(config: ObservabilityConfig, adapters: AdapterMap): ProviderId[] {
+  const ids: ProviderId[] = [];
+  for (const id of [config.primary, config.fallback]) {
+    if (id === 'none' || ids.includes(id)) continue;
+    if (!adapters[id]) continue;
+    ids.push(id);
+  }
+  return ids;
+}
+
 export async function routeCrashEvent(
   event: CrashEvent,
   config: ObservabilityConfig,
@@ -35,11 +45,15 @@ export async function routeCrashEvent(
   if (event.level === 'error' && !config.captureNonFatal) return 'dropped';
   if (config.sampleRate < 1 && rng() >= config.sampleRate) return 'dropped';
 
-  if (await tryCapture(config.primary, adapters, event)) return 'primary';
-  if (config.fallback !== config.primary && (await tryCapture(config.fallback, adapters, event))) {
-    return 'fallback';
+  const targets = deliveryTargets(config, adapters);
+  if (targets.length === 0) return 'dropped';
+
+  const results = await Promise.all(targets.map((id) => tryCapture(id, adapters, event)));
+  const delivered = results.some(Boolean);
+  if (!delivered) {
+    outbox.enqueue(event);
+    return 'outbox';
   }
 
-  outbox.enqueue(event);
-  return 'outbox';
+  return targets.length > 1 ? 'both' : 'primary';
 }

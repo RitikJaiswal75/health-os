@@ -35,4 +35,4 @@ export interface CrashOutboxSink {
   enqueue(event: CrashEvent): void;
 }
 
-export type RouteResult = 'primary' | 'fallback' | 'outbox' | 'dropped';
+export type RouteResult = 'primary' | 'both' | 'outbox' | 'dropped';

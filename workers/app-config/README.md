@@ -4,7 +4,7 @@ Cloudflare Worker + KV that serves **crash-reporting provider config** so Health
 
 **Production URL:** `https://config.healthos.ritik.cc`
 
-The app reads `GET /v1/observability` at launch (cached 15 minutes). A provider switch is a KV write, not a store update. Native crash handlers still flip on the **next app launch**.
+The app reads `GET /v1/observability` at launch (cached 15 minutes). Every named provider in `primary` and `fallback` receives each report. Set `fallback` to `"none"` for a single provider. A provider-list change is a KV write, not a store update. Native crash handlers still flip on the **next app launch**.
 
 ## One-time setup
 
@@ -65,7 +65,7 @@ Read back what is live:
 npm run config:get
 ```
 
-Example: Sentry primary, Crashlytics fallback (default when DSN is set):
+Example: Sentry and Crashlytics both receive every report:
 
 ```json
 {
@@ -93,7 +93,7 @@ Example: Crashlytics only (no Sentry):
 }
 ```
 
-Example: Crashlytics primary, Sentry fallback:
+Example: Crashlytics and Sentry both receive every report:
 
 ```json
 {
