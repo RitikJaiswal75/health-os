@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "enabled": true,
+  "primary": "sentry",
+  "fallback": "crashlytics",
+  "captureNonFatal": true,
+  "sampleRate": 1.0,
+  "sentryDsn": ""
+}

@@ -3,6 +3,7 @@ import type { DoseEvent } from '../../db/schema';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
 import type { DoseStatus } from '../../core/types/domain';
 import { inventoryDeductAmount } from '../../core/types/domain';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 export interface InventoryChangeResult {
   previousQty: number;
@@ -68,7 +69,7 @@ export class InventoryService {
         doseEventId: input.doseEventId,
       });
     } catch (error) {
-      console.warn('[InventoryService] ledger insert failed', error);
+      reportError('INVENTORY_LEDGER_FAILED', error);
     }
   }
 

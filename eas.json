@@ -25,6 +25,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "SHAREABLE_APK": "1",
         "NODE_ENV": "production",
