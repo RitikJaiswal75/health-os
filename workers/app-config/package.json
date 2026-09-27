@@ -1,0 +1,15 @@
+{
+  "name": "health-os-app-config-worker",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "kv:create": "wrangler kv namespace create APP_CONFIG",
+    "config:get": "wrangler kv key get --binding=APP_CONFIG observability --text --remote",
+    "config:set": "npx tsx scripts/config-set.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5",
+    "wrangler": "^4.0.0"
+  }
+}

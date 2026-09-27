@@ -7,6 +7,7 @@ import { dedupeAlarms, groupToSlotAlarms, type AlarmScheduleInput } from './alar
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { DoseEventRepository, MedicationRepository } from '../medications/medicationRepository';
 import { t } from '@/src/i18n/translate';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 export type { AlarmScheduleInput } from './alarmGrouping';
 
@@ -96,6 +97,7 @@ async function scheduleNativeAlarms(occurrences: AlarmScheduleInput[]): Promise<
       await MedicationAlarm.scheduleAlarms(slotAlarms);
     }
   } catch (error) {
+    reportError('ALARM_SCHEDULE_FAILED', error);
     if (__DEV__) {
       console.warn('[scheduleNativeAlarms]', error);
     }

@@ -1,5 +1,6 @@
 import { addHours, isAfter, parseISO } from 'date-fns';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 export const CACHE_TTL_HOURS = 24;
 
@@ -105,6 +106,7 @@ export async function searchRxTerms(query: string, signal?: AbortSignal): Promis
     }));
   } catch (error) {
     if (isAbortError(error)) throw error;
+    reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
 }
@@ -125,6 +127,7 @@ export async function searchDsld(query: string, signal?: AbortSignal): Promise<C
     }));
   } catch (error) {
     if (isAbortError(error)) throw error;
+    reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
 }

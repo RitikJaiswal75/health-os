@@ -63,7 +63,14 @@ docs/PLAN.md
 releases/
 *.apk
 *.aab
+coverage/
 workers/india-catalog/seed/
 workers/india-catalog/seed.sql
 workers/india-catalog/node_modules/
 workers/india-catalog/.wrangler/
+workers/app-config/node_modules/
+workers/app-config/.wrangler/
+
+# Firebase / Sentry local secrets (never commit)
+google-services.json
+GoogleService-Info.plist

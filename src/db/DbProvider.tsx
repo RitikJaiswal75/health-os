@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SQLiteDatabase } from './clientTypes';
 import { bootstrapDatabase, retryBootstrap } from './client';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 export type DbContextValue =
   | { status: 'loading' }
@@ -16,6 +17,7 @@ export function useDatabaseBootstrap(): DbContextValue {
     if (result.status === 'ready') {
       setState({ status: 'ready', db: result.db });
     } else {
+      reportError('DB_BOOTSTRAP_FAILED', new Error(result.message), { safeMessage: true });
       setState({
         status: 'error',
         message: result.message,
@@ -24,6 +26,7 @@ export function useDatabaseBootstrap(): DbContextValue {
             if (r.status === 'ready') {
               setState({ status: 'ready', db: r.db });
             } else {
+              reportError('DB_BOOTSTRAP_FAILED', new Error(r.message), { safeMessage: true });
               setState({
                 status: 'error',
                 message: r.message,
