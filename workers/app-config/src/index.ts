@@ -1,20 +1,7 @@
-import { BUNDLED_DEFAULT_CONFIG, parseObservabilityConfig } from '../../../src/core/observability/configSchema';
+import { CACHE_CONTROL, CONFIG_ROUTES, CORS_HEADERS } from './constants';
+import type { ConfigRoute, Env } from './types';
 
-export interface Env {
-  APP_CONFIG: {
-    get(key: string): Promise<string | null>;
-  };
-}
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
-  'Access-Control-Expose-Headers': 'ETag',
-};
-
-const CACHE_CONTROL = 'public, max-age=900';
-const CONFIG_KEY = 'observability';
+export type { Env } from './types';
 
 function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
@@ -36,6 +23,16 @@ async function etagFor(body: string): Promise<string> {
   return `"${hex}"`;
 }
 
+async function readConfig(route: ConfigRoute, env: Env): Promise<unknown> {
+  const stored = await env.APP_CONFIG.get(route.kvKey);
+  if (!stored) return route.fallback;
+  try {
+    return route.parse(JSON.parse(stored) as unknown) ?? route.fallback;
+  } catch {
+    return route.fallback;
+  }
+}
+
 export async function handleRequest(request: Request, env: Env): Promise<Response> {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -47,7 +44,8 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     return json({ ok: true });
   }
 
-  if (url.pathname !== '/v1/observability') {
+  const route = CONFIG_ROUTES[url.pathname];
+  if (!route) {
     return json({ error: 'Not found' }, 404);
   }
 
@@ -55,16 +53,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  const stored = await env.APP_CONFIG.get(CONFIG_KEY);
-  let parsed = null;
-  if (stored) {
-    try {
-      parsed = parseObservabilityConfig(JSON.parse(stored) as unknown);
-    } catch {
-      parsed = null;
-    }
-  }
-  const config = parsed ?? BUNDLED_DEFAULT_CONFIG;
+  const config = await readConfig(route, env);
   const body = JSON.stringify(config);
   const etag = await etagFor(body);
 

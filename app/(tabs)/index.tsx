@@ -21,6 +21,7 @@ import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/
 import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
+import { AppUpdateBanner } from '@/src/core/components/AppUpdateBanner';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
@@ -207,6 +208,7 @@ export default function HomeScreen() {
         </Menu>
       </Appbar.Header>
 
+      <AppUpdateBanner />
       <ReminderPermissionBanner />
 
       <ScrollView contentContainerStyle={styles.content}>
