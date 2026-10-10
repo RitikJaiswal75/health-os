@@ -64,4 +64,17 @@ describe('appUpdateLoader', () => {
     await expect(refreshAppUpdateConfig()).resolves.toBeNull();
     expect(appUpdateCache.writeCachedAppUpdateConfig).not.toHaveBeenCalled();
   });
+
+  it('shares one request between overlapping refreshes', async () => {
+    const fetchMock = respond(200, REMOTE, '"etag-1"');
+    global.fetch = fetchMock;
+
+    const [first, second] = await Promise.all([refreshAppUpdateConfig(), refreshAppUpdateConfig()]);
+    expect(first).toEqual(REMOTE);
+    expect(second).toEqual(REMOTE);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await refreshAppUpdateConfig();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

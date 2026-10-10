@@ -9,8 +9,11 @@ import {
 import { parseAppUpdateConfig } from './appUpdateSchema';
 import type { AppUpdateConfig } from './types';
 
+let inFlight: Promise<AppUpdateConfig | null> | null = null;
+
+/** Overlapping callers share one request, so an older response can never overwrite a newer one. */
 export function refreshAppUpdateConfig(): Promise<AppUpdateConfig | null> {
-  return fetchRemoteConfig({
+  inFlight ??= fetchRemoteConfig({
     path: REMOTE_CONFIG_PATHS.appUpdate,
     parse: parseAppUpdateConfig,
     cache: {
@@ -19,5 +22,8 @@ export function refreshAppUpdateConfig(): Promise<AppUpdateConfig | null> {
       readEtag: readAppUpdateEtag,
       writeEtag: writeAppUpdateEtag,
     },
+  }).finally(() => {
+    inFlight = null;
   });
+  return inFlight;
 }
