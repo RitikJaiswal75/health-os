@@ -21,6 +21,7 @@ import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/
 import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
+import { AppUpdateBanner } from '@/src/core/components/AppUpdateBanner';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
@@ -209,105 +210,109 @@ export default function HomeScreen() {
 
       <ReminderPermissionBanner />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <DateStrip
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          completionByDate={completionByDate}
-        />
+      <View style={styles.body}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <DateStrip
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            completionByDate={completionByDate}
+          />
+  
+          <Card style={styles.panel}>
+            <Card.Content>
+              {doses.length === 0 ? (
+                <Text style={styles.panelEmpty}>{t('home.emptyDay')}</Text>
+              ) : (
+                doses.map((dose) => {
+                  const med = meds.find((m) => m.id === dose.medicationId);
+                  const isLogged = ['taken', 'skipped', 'missed'].includes(dose.status);
+                  const isActionable =
+                    (dose.status === 'pending' || dose.status === 'snoozed') &&
+                    canLogDoseForTodayOrPast(dose);
+                  return (
+                    <Card
+                      key={dose.id}
+                      style={styles.doseCard}
+                      onPress={
+                        isLogged
+                          ? () => {
+                              setEditDose(dose);
+                              setEditStatus(dose.status as DoseStatus);
+                            }
+                          : undefined
+                      }
+                    >
+                      <Card.Content>
+                        <Text variant="titleMedium">{med?.nickname ?? med?.name ?? t('home.medicationFallback')}</Text>
+                        <Text variant="bodySmall">
+                          {dose.status === 'snoozed'
+                            ? t('home.snoozedUntil', {
+                                time: formatScheduledTime(originalScheduledAt(dose)),
+                                until: formatScheduledTime(dose.scheduledAt),
+                              })
+                            : t('home.statusLine', {
+                                time: formatScheduledTime(dose.scheduledAt),
+                                status: getDoseStatusLabel(dose.status as DoseStatus),
+                              })}
+                          {med && med.currentQuantity > 0
+                            ? ` · ${t('home.remaining', { count: med.currentQuantity })}`
+                            : ''}
+                        </Text>
+                        {!isActionable ? null : (
+                          <View style={styles.actions}>
+                            <Button mode="contained" onPress={() => handleTaken(dose)} accessibilityLabel={t('home.markTaken')}>
+                              {t('common.taken')}
+                            </Button>
+                            <Button mode="outlined" onPress={() => handleSkip(dose)} accessibilityLabel={t('home.skipDose')}>
+                              {t('common.skip')}
+                            </Button>
+                            <Button mode="text" onPress={() => setSnoozeDose(dose)} accessibilityLabel={t('common.snooze')}>
+                              {t('common.snooze')}
+                            </Button>
+                          </View>
+                        )}
+                      </Card.Content>
+                    </Card>
+                  );
+                })
+              )}
+            </Card.Content>
+          </Card>
+  
+          <Card
+            style={styles.panel}
+            onPress={() => router.push('/(tabs)/library')}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.openLibrary')}
+          >
+            <Card.Content>
+              <View style={styles.panelHeader}>
+                <Text variant="titleMedium">{t('home.yourMedications')}</Text>
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={24}
+                  color={healthOsTheme.colors.onSurfaceVariant}
+                />
+              </View>
+              {meds.length === 0 ? (
+                <Text variant="bodyMedium" style={styles.panelHint}>
+                  {t('home.addHint')}
+                </Text>
+              ) : (
+                <Text variant="bodyMedium" style={styles.panelHint}>
+                  {meds.length === 1
+                    ? t('home.libraryCountOne')
+                    : t('home.libraryCount', { count: meds.length })}
+                </Text>
+              )}
+            </Card.Content>
+          </Card>
+        </ScrollView>
 
-        <Card style={styles.panel}>
-          <Card.Content>
-            {doses.length === 0 ? (
-              <Text style={styles.panelEmpty}>{t('home.emptyDay')}</Text>
-            ) : (
-              doses.map((dose) => {
-                const med = meds.find((m) => m.id === dose.medicationId);
-                const isLogged = ['taken', 'skipped', 'missed'].includes(dose.status);
-                const isActionable =
-                  (dose.status === 'pending' || dose.status === 'snoozed') &&
-                  canLogDoseForTodayOrPast(dose);
-                return (
-                  <Card
-                    key={dose.id}
-                    style={styles.doseCard}
-                    onPress={
-                      isLogged
-                        ? () => {
-                            setEditDose(dose);
-                            setEditStatus(dose.status as DoseStatus);
-                          }
-                        : undefined
-                    }
-                  >
-                    <Card.Content>
-                      <Text variant="titleMedium">{med?.nickname ?? med?.name ?? t('home.medicationFallback')}</Text>
-                      <Text variant="bodySmall">
-                        {dose.status === 'snoozed'
-                          ? t('home.snoozedUntil', {
-                              time: formatScheduledTime(originalScheduledAt(dose)),
-                              until: formatScheduledTime(dose.scheduledAt),
-                            })
-                          : t('home.statusLine', {
-                              time: formatScheduledTime(dose.scheduledAt),
-                              status: getDoseStatusLabel(dose.status as DoseStatus),
-                            })}
-                        {med && med.currentQuantity > 0
-                          ? ` · ${t('home.remaining', { count: med.currentQuantity })}`
-                          : ''}
-                      </Text>
-                      {!isActionable ? null : (
-                        <View style={styles.actions}>
-                          <Button mode="contained" onPress={() => handleTaken(dose)} accessibilityLabel={t('home.markTaken')}>
-                            {t('common.taken')}
-                          </Button>
-                          <Button mode="outlined" onPress={() => handleSkip(dose)} accessibilityLabel={t('home.skipDose')}>
-                            {t('common.skip')}
-                          </Button>
-                          <Button mode="text" onPress={() => setSnoozeDose(dose)} accessibilityLabel={t('common.snooze')}>
-                            {t('common.snooze')}
-                          </Button>
-                        </View>
-                      )}
-                    </Card.Content>
-                  </Card>
-                );
-              })
-            )}
-          </Card.Content>
-        </Card>
+        <FAB icon="plus" style={styles.fab} onPress={navigateToAddMedication} accessibilityLabel={t('home.addMedication')} />
+      </View>
 
-        <Card
-          style={styles.panel}
-          onPress={() => router.push('/(tabs)/library')}
-          accessibilityRole="button"
-          accessibilityLabel={t('home.openLibrary')}
-        >
-          <Card.Content>
-            <View style={styles.panelHeader}>
-              <Text variant="titleMedium">{t('home.yourMedications')}</Text>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={24}
-                color={healthOsTheme.colors.onSurfaceVariant}
-              />
-            </View>
-            {meds.length === 0 ? (
-              <Text variant="bodyMedium" style={styles.panelHint}>
-                {t('home.addHint')}
-              </Text>
-            ) : (
-              <Text variant="bodyMedium" style={styles.panelHint}>
-                {meds.length === 1
-                  ? t('home.libraryCountOne')
-                  : t('home.libraryCount', { count: meds.length })}
-              </Text>
-            )}
-          </Card.Content>
-        </Card>
-      </ScrollView>
-
-      <FAB icon="plus" style={styles.fab} onPress={navigateToAddMedication} accessibilityLabel={t('home.addMedication')} />
+      <AppUpdateBanner />
 
       {variantSheet}
 
@@ -358,6 +363,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: healthOsTheme.colors.background },
+  body: { flex: 1 },
   content: { paddingBottom: 96, gap: 12 },
   panel: {
     marginHorizontal: 16,

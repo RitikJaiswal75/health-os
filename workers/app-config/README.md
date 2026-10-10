@@ -107,10 +107,70 @@ Example: Crashlytics and Sentry both receive every report:
 }
 ```
 
+## App update prompts
+
+`GET /v1/app-update` tells installs when to show the optional update banner or the blocking force-update screen. The source of truth is [`config/app-update.json`](config/app-update.json). Merging a change to it on `main` deploys it automatically (see [Deploy on merge](#deploy-on-merge)).
+
+```json
+{
+  "version": 1,
+  "android": {
+    "latestVersion": "2.1.0",
+    "minSupportedVersion": "2.0.2",
+    "storeUrl": "https://play.google.com/store/apps/details?id=com.health.os"
+  }
+}
+```
+
+- Installs below `latestVersion` see a banner on the Today tab (Later / Skip this version / Update).
+- Installs below `minSupportedVersion` see a full-screen overlay with only an Update button. It never covers the medication reminder screen. Leave the field out to force nobody.
+- `minSupportedVersion` must be at or below `latestVersion`. `config:set` rejects anything else, including unknown fields (usually a typo or the wrong `--kind`).
+- The app ignores unknown fields, so old installs keep working when new optional fields are added. Never change `version: 1` in a way that would break that.
+
+### Release steps
+
+1. App PR: bump `version` and `android.versionCode` in `expo.base.json`, and `version` in `package.json`. The PR check fails without this.
+2. Build the `.aab` and upload it to Play.
+3. **Wait until the release is live at 100% in production.** Raising `latestVersion` earlier sends users to a store page with no update for them.
+4. Config PR: raise `latestVersion` (and optionally `minSupportedVersion`) in `config/app-update.json`. The PR check validates it and rejects a version newer than the app on that branch.
+5. Before raising `minSupportedVersion`, check that the new build didn't raise `minSdk`. Users on older Android can't install it and would be locked out.
+
+Emergency kill switch, when waiting for a merge is too slow:
+
+```bash
+cd workers/app-config
+npm run config:set -- config/app-update.json --kind app-update --remote
+npm run config:get:app-update
+```
+
+Then open a PR with the same change so the committed file matches what is live.
+
+Validate without writing:
+
+```bash
+npm run config:set -- config/app-update.json --kind app-update --validate-only
+```
+
+## Deploy on merge
+
+[`.github/workflows/deploy-app-config.yml`](../../.github/workflows/deploy-app-config.yml) runs on pushes to `main`:
+
+- Worker code or a shared schema changed: `wrangler deploy`.
+- `config/app-update.json` changed: `config:set --kind app-update --remote`.
+- Then it polls `/v1/app-update` until the served config matches the committed file (the worker returns its default on a bad KV value, so a plain 200 isn't proof).
+
+One-time setup: in the GitHub repo settings, add these Actions secrets:
+
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Workers Scripts: Edit** and **Workers KV Storage: Edit** on this account.
+- `CLOUDFLARE_ACCOUNT_ID`: from `npx wrangler whoami`.
+
+The observability config is still written by hand with `config:set` (default `--kind observability`).
+
 ## API
 
 ```
 GET /v1/observability?platform=android&appVersion=2.0.1
+GET /v1/app-update?platform=android&appVersion=2.0.1
 GET /health
 ```
 

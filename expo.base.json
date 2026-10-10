@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
@@ -18,16 +18,14 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.health.os",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "fetch"
-        ],
+        "UIBackgroundModes": ["fetch"],
         "NSCameraUsageDescription": "Health OS uses the camera to photograph your pill for easy identification.",
         "NSPhotoLibraryUsageDescription": "Health OS uses your photo library to pick a pill image."
       }
     },
     "android": {
       "package": "com.health.os",
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",

@@ -336,6 +336,14 @@ export const en = {
   'banner.body': 'Please provide permission to get notified on medications.',
   'banner.enable': 'Enable permissions',
 
+  'update.optional.body': 'Health OS {{version}} is available with fixes and improvements.',
+  'update.later': 'Later',
+  'update.skip': 'Skip this version',
+  'update.now': 'Update',
+  'update.force.title': 'Update required',
+  'update.force.body':
+    'This version of Health OS is no longer supported. Update from the Play Store to keep using the app. Your data stays on this device.',
+
   'weekday.sun': 'S',
   'weekday.mon': 'M',
   'weekday.tue': 'T',
