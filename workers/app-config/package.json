@@ -6,6 +6,7 @@
     "dev": "wrangler dev",
     "kv:create": "wrangler kv namespace create APP_CONFIG",
     "config:get": "wrangler kv key get --binding=APP_CONFIG observability --text --remote",
+    "config:get:app-update": "wrangler kv key get --binding=APP_CONFIG app-update --text --remote",
     "config:set": "npx tsx scripts/config-set.ts"
   },
   "devDependencies": {

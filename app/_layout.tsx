@@ -10,12 +10,14 @@ import 'react-native-reanimated';
 
 import { healthOsNavigationTheme } from '@/src/core/theme/navigationTheme';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
+import { ForceUpdateOverlay } from '@/src/core/components/ForceUpdateOverlay';
 import { StackHeaderWithBanner } from '@/src/core/components/StackHeaderWithBanner';
 import { ErrorBoundary } from '@/src/core/observability/ErrorBoundary';
 import { ObservabilityBootstrap } from '@/src/core/observability/ObservabilityBootstrap';
 import { initCrashReporting } from '@/src/core/observability/crashReporter';
 import { readCachedObservabilityConfig } from '@/src/core/observability/configStore';
 import { DbBootstrapGate } from '@/src/db/DbBootstrapGate';
+import { AppUpdateBootstrap } from '@/src/features/appUpdate/AppUpdateBootstrap';
 import { ReminderNotificationBootstrap } from '@/src/features/reminders/ReminderNotificationBootstrap';
 import { ReminderRouterReadyGate } from '@/src/features/reminders/ReminderRouterReadyGate';
 import { I18nProvider } from '@/src/i18n/I18nProvider';
@@ -64,6 +66,7 @@ function RootNavigation() {
           }}
         />
       </Stack>
+      <ForceUpdateOverlay />
       <ReminderRouterReadyGate />
       <ReminderNotificationBootstrap />
     </DbBootstrapGate>
@@ -88,6 +91,7 @@ export default function RootLayout() {
           <PaperProvider theme={healthOsTheme}>
             <I18nProvider>
               <ObservabilityBootstrap />
+              <AppUpdateBootstrap />
               <RootNavigation />
             </I18nProvider>
           </PaperProvider>

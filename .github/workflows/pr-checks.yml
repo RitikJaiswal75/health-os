@@ -1,0 +1,60 @@
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            app:
+              - 'app/**'
+              - 'src/**'
+              - 'modules/**'
+              - 'plugins/**'
+              - 'assets/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'expo.base.json'
+              - 'app.config.js'
+            updateConfig:
+              - 'workers/app-config/config/app-update.json'
+              - 'src/features/appUpdate/**'
+
+      - name: Check version bump
+        if: steps.changes.outputs.app == 'true'
+        run: npx --yes tsx@4 scripts/check-version-bump.ts --base "${{ github.base_ref }}"
+
+      - name: Validate app-update config
+        if: steps.changes.outputs.updateConfig == 'true'
+        working-directory: workers/app-config
+        run: npx --yes tsx@4 scripts/config-set.ts config/app-update.json --kind app-update --validate-only
+
+      - name: Check advertised version exists
+        if: steps.changes.outputs.updateConfig == 'true'
+        run: npx --yes tsx@4 scripts/check-version-bump.ts --app-update-config workers/app-config/config/app-update.json
