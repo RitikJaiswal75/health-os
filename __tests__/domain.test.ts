@@ -180,6 +180,7 @@ describe('catalogPrefill', () => {
   it('infers injectable type from injection form labels', () => {
     expect(inferMedicationTypeFromCatalog('injection', 'Insulin Glargine Injection')).toBe('injectable');
     expect(inferMedicationTypeFromCatalog('vial', 'B12 Ampoule')).toBe('injectable');
+    expect(inferMedicationTypeFromCatalog('nasal spray', 'Nasivion Nasal Spray')).toBe('spray');
   });
 
   it('parses strength from Indian catalog composition strings', () => {
@@ -836,7 +837,7 @@ describe('wizardStore', () => {
 });
 
 describe('formatDoseLabel', () => {
-  const { formatDoseLabel, formatTakeDoseInstruction, getInventoryQuantityPrompt } = require('../src/core/types/domain');
+  const { formatDoseLabel, formatTakeDoseInstruction, getInventoryQuantityPrompt, defaultShapeForMedicationType } = require('../src/core/types/domain');
 
   it('labels solid oral forms by count', () => {
     expect(formatDoseLabel(1, 'tablet')).toBe('1 tablet');
@@ -857,6 +858,14 @@ describe('formatDoseLabel', () => {
   it('labels inhaler doses as pumps', () => {
     expect(formatDoseLabel(1, 'inhaler')).toBe('1 pump');
     expect(formatDoseLabel(2, 'inhaler')).toBe('2 pumps');
+  });
+
+  it('labels spray doses as sprays', () => {
+    expect(formatDoseLabel(1, 'spray')).toBe('1 spray');
+    expect(formatDoseLabel(2, 'spray')).toBe('2 sprays');
+    expect(formatTakeDoseInstruction(2, 'spray')).toBe('Take 2 sprays');
+    expect(getInventoryQuantityPrompt('spray')).toBe('Number of remaining sprays');
+    expect(defaultShapeForMedicationType('spray')).toBe('spray');
   });
 
   it('labels injectable doses as injections', () => {

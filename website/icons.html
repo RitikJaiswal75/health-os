@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Health OS icons</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      .page { min-height: 100vh; padding: 0 16px 48px; background: #fafafa; color: #1a1a1a; }
+      .page.dark { background: #121212; color: #eee; }
+      .toolbar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 0; background: inherit; border-bottom: 1px solid #8884; }
+      .toolbar h1 { margin: 0; font-size: 18px; }
+      .toolbar input[type='search'] { padding: 6px 10px; border-radius: 8px; border: 1px solid #8886; background: transparent; color: inherit; }
+      .group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+      .group > span { opacity: 0.7; margin-right: 2px; }
+      .swatch { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #8888; cursor: pointer; padding: 0; }
+      .swatch.active { outline: 2px solid #2196f3; outline-offset: 2px; }
+      .chip { padding: 3px 9px; border-radius: 12px; border: 1px solid #8886; background: transparent; color: inherit; cursor: pointer; }
+      .chip.active { background: #2196f3; border-color: #2196f3; color: #fff; }
+      h2 { font-size: 15px; margin: 28px 0 12px; }
+      h2 small { font-weight: 400; opacity: 0.6; margin-left: 6px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+      .tile { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 8px; border-radius: 12px; background: #fff; border: 1px solid #8882; }
+      .dark .tile { background: #1e1e1e; }
+      .tile figcaption { font-size: 12px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+      .tile code { font-size: 10px; opacity: 0.55; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/icons/main.tsx"></script>
+  </body>
+</html>
