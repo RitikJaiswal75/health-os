@@ -61,6 +61,10 @@ jobs:
         run: echo "version=$(node -p "require('./expo.base.json').expo.version")" >> "$GITHUB_OUTPUT"
 
       - name: Build shareable arm64 APK
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # Without a token, skip source map upload instead of failing the build.
+          SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
         run: npm run android:apk
 
       - name: Publish GitHub Release
