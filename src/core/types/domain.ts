@@ -18,11 +18,11 @@ export const MEDICATION_TYPES = [
   { value: 'cream', label: 'Cream' },
   { value: 'device', label: 'Device' },
   { value: 'drops', label: 'Drops' },
-  { value: 'foam', label: 'Foam' },
   { value: 'gel', label: 'Gel' },
   { value: 'gummy', label: 'Gummy' },
   { value: 'powder', label: 'Powder' },
   { value: 'inhaler', label: 'Inhaler' },
+  { value: 'spray', label: 'Spray' },
 ] as const;
 
 export type MedicationType = (typeof MEDICATION_TYPES)[number]['value'];
@@ -85,19 +85,13 @@ export const PILL_SHAPE_CATEGORIES = [
     title: 'Pill shapes',
     shapes: [
       'capsule_divided',
-      'capsule',
       'oval_capsule',
-      'bullet_capsule',
       'oblong_tablet',
-      'herbal_capsule',
       'round',
       'round_scored',
-      'round_scored_diagonal',
       'flat_oval',
       'wide_oval',
-      'rounded_square',
       'rounded_rectangle',
-      'segmented_bar',
     ],
   },
   {
@@ -110,6 +104,7 @@ export const PILL_SHAPE_CATEGORIES = [
       'dropper',
       'injection',
       'pump',
+      'spray',
       'water_soluble_tablet',
       'pill_in_glass',
       'patch',
@@ -135,47 +130,22 @@ export const FORM_SHAPES = [
   'patch',
   'iu',
   'inhaler',
-] as const;
-
-/** Legacy shapes kept for rendering stored medications, not shown in the picker. */
-export const LEGACY_PILL_SHAPES = [
-  'capsule_open',
-  'capsule_split_powder',
-  'capsule_halves',
-  'trapezoid',
-  'blister_pack',
-  'blister_strip',
-  'blister_pack_capsule',
-  'blister_strip_capsule',
-  'peanut',
-  'triangle',
-  'diamond',
-  'pentagon_up',
-  'pentagon_down',
-  'hexagon',
-  'heptagon',
-  'octagon',
-  'semicircle',
-  'apple',
-  'clover',
-  'heart',
-  'bowtie',
+  'spray',
 ] as const;
 
 export const PILL_SHAPES = [
   ...SELECTABLE_PILL_SHAPES,
   ...FORM_SHAPES,
-  ...LEGACY_PILL_SHAPES,
 ] as const;
 
 type SelectablePillShape = (typeof PILL_SHAPE_CATEGORIES)[number]['shapes'][number];
 
-export type PillShape = SelectablePillShape | FormShape | (typeof LEGACY_PILL_SHAPES)[number];
+export type PillShape = SelectablePillShape | FormShape;
 
 export type FormShape = (typeof FORM_SHAPES)[number];
 
 /** Only the divided capsule supports two-tone colouring. */
-export const DUAL_COLOR_SHAPES = ['capsule_divided', 'capsule'] as const;
+export const DUAL_COLOR_SHAPES = ['capsule_divided'] as const;
 
 export function supportsDualColor(shape?: PillShape | string): boolean {
   if (!shape) return false;
@@ -189,6 +159,8 @@ export function defaultShapeForMedicationType(type?: MedicationType | string): P
       return 'powder';
     case 'inhaler':
       return 'pump';
+    case 'spray':
+      return 'spray';
     case 'injectable':
       return 'injection';
     case 'drops':
@@ -197,7 +169,6 @@ export function defaultShapeForMedicationType(type?: MedicationType | string): P
     case 'cream':
     case 'topical':
     case 'gel':
-    case 'foam':
       return 'ointment';
     case 'device':
       return 'pump';
@@ -292,6 +263,8 @@ export function getInventoryQuantityPrompt(medicationType?: MedicationType | str
       return t('inventory.doses');
     case 'inhaler':
       return t('inventory.uses');
+    case 'spray':
+      return t('inventory.sprays');
     case 'drops':
       return t('inventory.doses');
     case 'injectable':
@@ -368,6 +341,8 @@ export function formatDoseLabel(
       return tCount('dose.gummy.one', 'dose.gummy.other', count);
     case 'inhaler':
       return tCount('dose.pump.one', 'dose.pump.other', count);
+    case 'spray':
+      return tCount('dose.spray.one', 'dose.spray.other', count);
     case 'powder': {
       const unit = doseUnitUnit ?? strengthUnit ?? 'g';
       return t('dose.measured', { count: formatDoseQuantity(count), unit });
@@ -386,7 +361,6 @@ export function formatDoseLabel(
     case 'topical':
     case 'cream':
     case 'gel':
-    case 'foam':
       if (strengthValue != null && strengthUnit && strengthUnit !== '%') {
         return formatMeasuredDose(count, strengthValue, strengthUnit, strengthUnit, 'application');
       }

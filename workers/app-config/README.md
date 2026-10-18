@@ -115,8 +115,8 @@ Example: Crashlytics and Sentry both receive every report:
 {
   "version": 1,
   "android": {
-    "latestVersion": "2.1.0",
-    "minSupportedVersion": "2.0.2",
+    "latestVersion": "2.0.4",
+    "minSupportedVersion": "2.0.3",
     "storeUrl": "https://play.google.com/store/apps/details?id=com.health.os"
   }
 }

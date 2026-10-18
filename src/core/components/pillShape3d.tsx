@@ -244,46 +244,6 @@ export function Shape3DCapsule({
   );
 }
 
-export function Shape3DPeanut({ fill }: { fill: string }) {
-  const c = shapeColors(fill);
-  return (
-    <G>
-      <Gradients id="peanut" fill={fill} />
-      <GroundShadow cx={24} cy={35} rx={14} />
-      <Circle cx={17} cy={24} r={9} fill={`url(#peanut-body)`} stroke={c.stroke} strokeWidth={c.sw} />
-      <Circle cx={31} cy={24} r={9} fill={`url(#peanut-body)`} stroke={c.stroke} strokeWidth={c.sw} />
-      <GlossDot cx={14} cy={20} rx={3.5} ry={2.2} />
-      <GlossDot cx={28} cy={20} rx={3.5} ry={2.2} />
-    </G>
-  );
-}
-
-export function Shape3DSegmentedBar({ fill }: { fill: string }) {
-  const c = shapeColors(fill);
-  const segments = [8, 18, 28, 38];
-  const widths = [8, 8, 8, 4];
-  return (
-    <G>
-      <GroundShadow cx={24} cy={35} rx={14} />
-      {segments.map((x, i) => (
-        <G key={x}>
-          <Rect
-            x={x}
-            y={16}
-            width={widths[i]}
-            height={16}
-            rx={2}
-            fill={i % 2 === 0 ? c.fill : c.shadow}
-            stroke={c.stroke}
-            strokeWidth={c.sw}
-          />
-          <Rect x={x + 1} y={17} width={widths[i] - 2} height={5} rx={1} fill={c.glossSoft} />
-        </G>
-      ))}
-    </G>
-  );
-}
-
 export function FormPowder({ fill }: { fill: string }) {
   const c = shapeColors(fill);
   const grain = adjustBrightness(c.stroke, 0.88);
@@ -364,208 +324,196 @@ export function FormPowder({ fill }: { fill: string }) {
   );
 }
 
-function SteamPlume({
-  d,
-  fill,
-  opacity,
-}: {
-  d: string;
-  fill: string;
-  opacity: number;
-}) {
-  return <Path d={d} fill={fill} opacity={opacity} />;
-}
+/** Three rising S-shaped wisps: left, centre (tallest), right. */
+const VAPOUR_WISPS = [
+  'M13 36 C11 29 13 24 16 19 C19 14 20 12 19 9 C23 14 22.5 19 19.5 23 C16.5 27 14 31 13 36 Z',
+  'M22 44 C17 35 18.5 27 22.5 20 C26 14 26.5 8.5 24 3 C31 9 31.5 15.5 27.5 22.5 C24 29 22.5 36 22 44 Z',
+  'M27.5 40 C26.5 33 28 28.5 31 24.5 C33.2 21.3 34 17 32 12 C37 17 37.2 23 34.2 28 C31.5 32.3 29 35.5 27.5 40 Z',
+];
 
-function SteamStreak({
-  cx,
-  cy,
-  rx,
-  ry,
-  opacity,
-  fill,
-}: {
-  cx: number;
-  cy: number;
-  rx: number;
-  ry: number;
-  opacity: number;
-  fill: string;
-}) {
-  return <Ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={fill} opacity={opacity} />;
-}
-
-export function FormVapour({ fill: _fill }: { fill: string }) {
-  const steamBase = '#C8D8E4';
-  const steamSoft = '#E4EEF4';
-  const steamMid = '#F2F7FA';
-  const steamBright = '#FFFFFF';
-  const wisps = [
-    { cx: 15, cy: 36, rx: 2.2, ry: 3.8, o: 0.2 },
-    { cx: 14, cy: 30, rx: 3.4, ry: 6.2, o: 0.32 },
-    { cx: 15.5, cy: 23, rx: 4.2, ry: 7.4, o: 0.42 },
-    { cx: 14, cy: 16, rx: 3.6, ry: 6.5, o: 0.36 },
-    { cx: 15, cy: 10, rx: 2.4, ry: 4.2, o: 0.26 },
-    { cx: 14.5, cy: 5, rx: 1.6, ry: 2.8, o: 0.18 },
-    { cx: 24, cy: 36, rx: 2.8, ry: 4.2, o: 0.24 },
-    { cx: 24, cy: 29, rx: 5.2, ry: 8.5, o: 0.48 },
-    { cx: 24, cy: 21, rx: 6, ry: 9.2, o: 0.58 },
-    { cx: 24, cy: 13, rx: 5, ry: 7.8, o: 0.5 },
-    { cx: 24, cy: 7, rx: 3.2, ry: 5, o: 0.34 },
-    { cx: 24, cy: 2.5, rx: 2, ry: 3.2, o: 0.22 },
-    { cx: 33, cy: 36, rx: 2.2, ry: 3.8, o: 0.2 },
-    { cx: 34, cy: 30, rx: 3.4, ry: 6.2, o: 0.32 },
-    { cx: 32.5, cy: 23, rx: 4.2, ry: 7.4, o: 0.42 },
-    { cx: 34, cy: 16, rx: 3.6, ry: 6.5, o: 0.36 },
-    { cx: 33, cy: 10, rx: 2.4, ry: 4.2, o: 0.26 },
-    { cx: 33.5, cy: 5, rx: 1.6, ry: 2.8, o: 0.18 },
-  ] as const;
-
+export function FormVapour({ fill }: { fill: string }) {
+  const c = shapeColors(fill);
   return (
     <G>
-      <Path
-        d="M8 39.5 C14 38 18 38.5 24 38.2 C30 37.9 34 38.2 40 39.5"
-        fill="none"
-        stroke={steamBase}
-        strokeWidth={1.2}
-        strokeLinecap="round"
-        opacity={0.45}
-      />
-      <SteamPlume
-        d="M13 38 C10 32 16 26 13 18 C11 11 15 5 13 1 C15 5 17 11 16 18 C18 26 14 32 17 38 Z"
-        fill={steamSoft}
-        opacity={0.28}
-      />
-      <SteamPlume
-        d="M24 38 C20 30 26 22 23 14 C21 7 25 2 24 0 C23 2 27 7 25 14 C28 22 22 30 25 38 Z"
-        fill={steamMid}
-        opacity={0.34}
-      />
-      <SteamPlume
-        d="M35 38 C38 32 32 26 35 18 C37 11 33 5 35 1 C33 5 31 11 32 18 C30 26 36 32 33 38 Z"
-        fill={steamSoft}
-        opacity={0.28}
-      />
-      {wisps.map(({ cx, cy, rx, ry, o }) => (
-        <SteamStreak key={`${cx}-${cy}`} cx={cx} cy={cy} rx={rx} ry={ry} opacity={o} fill={steamMid} />
+      <Defs>
+        <LinearGradient id="vapour-wisp" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={c.shadow} />
+          <Stop offset="50%" stopColor={c.fill} />
+          <Stop offset="100%" stopColor={c.highlight} />
+        </LinearGradient>
+      </Defs>
+      {VAPOUR_WISPS.map((d) => (
+        <Path key={d} d={d} fill="url(#vapour-wisp)" stroke={c.stroke} strokeWidth={c.sw} strokeLinejoin="round" />
       ))}
-      <Path
-        d="M15 38 C13 31 17 24 15 17 C13 10 16 4 14 1"
-        fill="none"
-        stroke={steamBright}
-        strokeWidth={1.4}
-        strokeLinecap="round"
-        opacity={0.7}
-      />
-      <Path
-        d="M24 38 C22 30 26 22 24 14 C22 7 25 2 24 0"
-        fill="none"
-        stroke={steamBright}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        opacity={0.82}
-      />
-      <Path
-        d="M33 38 C35 31 31 24 33 17 C35 10 32 4 34 1"
-        fill="none"
-        stroke={steamBright}
-        strokeWidth={1.4}
-        strokeLinecap="round"
-        opacity={0.7}
-      />
-      <Path
-        d="M18 31 C20 28 22 26 24 25 C26 26 28 28 30 31"
-        fill="none"
-        stroke={steamSoft}
-        strokeWidth={2.8}
-        strokeLinecap="round"
-        opacity={0.22}
-      />
-      <Path
-        d="M17 21 C19 17 22 15 24 14 C26 15 29 17 31 21"
-        fill="none"
-        stroke={steamSoft}
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        opacity={0.18}
-      />
     </G>
   );
 }
 
 export function FormOintment({ fill }: { fill: string }) {
   const c = shapeColors(fill);
+  const crimp = adjustBrightness(fill, 0.68);
+  const badge = adjustBrightness(fill, 1.22);
   return (
-    <G rotation="-12" origin="24, 24">
+    <G>
       <Defs>
-        <LinearGradient id="oint-body" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0%" stopColor={c.highlight} />
-          <Stop offset="100%" stopColor={c.shadow} />
+        <LinearGradient id="oint-body" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={c.shadow} />
+          <Stop offset="45%" stopColor={c.fill} />
+          <Stop offset="100%" stopColor={c.highlight} />
         </LinearGradient>
       </Defs>
-      <GroundShadow cx={26} cy={36} rx={12} />
-      <Rect x={10} y={18} width={26} height={14} rx={4} fill="url(#oint-body)" stroke={c.stroke} strokeWidth={c.sw} />
-      <Path d="M36 20 L42 24 L36 28 Z" fill={c.shadow} stroke={c.stroke} strokeWidth={0.6} />
-      <Rect x={12} y={20} width={18} height={4} rx={2} fill={c.glossSoft} />
-      <Rect x={14} y={26} width={10} height={2} rx={1} fill={c.deep} opacity={0.35} />
+      <GroundShadow cx={27} cy={41} rx={13} ry={2.4} />
+      {/* Drawn upright, then tilted so the crimp sits top-right and the nozzle bottom-left. */}
+      <G rotation={45} origin="24, 21">
+        <Rect x={21.6} y={29} width={4.8} height={5.2} rx={0.8} fill={crimp} stroke={c.stroke} strokeWidth={c.sw} />
+        <Line x1={21.8} y1={30.8} x2={26.2} y2={30.8} stroke={c.stroke} strokeWidth={0.5} />
+        <Line x1={21.8} y1={32.4} x2={26.2} y2={32.4} stroke={c.stroke} strokeWidth={0.5} />
+        <Path
+          d="M16.2 5 L31.8 5 L29.6 26 C29.4 28 27.8 29.6 25.8 29.6 L22.2 29.6 C20.2 29.6 18.6 28 18.4 26 Z"
+          fill="url(#oint-body)"
+          stroke={c.stroke}
+          strokeWidth={c.sw}
+        />
+        <Path d="M18.4 7 L20.2 7 L21.4 25 L20.2 25 Z" fill={c.glossSoft} />
+        <Rect x={15} y={2} width={18} height={4.4} rx={1} fill={crimp} stroke={c.stroke} strokeWidth={c.sw} />
+        {[18.5, 22, 25.5, 29].map((x) => (
+          <Line key={x} x1={x} y1={2.8} x2={x} y2={5.6} stroke={c.stroke} strokeWidth={0.5} opacity={0.7} />
+        ))}
+        <Circle cx={24.6} cy={15.5} r={4.8} fill={badge} stroke={c.stroke} strokeWidth={c.sw} />
+        <Path
+          d="M23.4 12.3 L25.8 12.3 L25.8 14.3 L27.8 14.3 L27.8 16.7 L25.8 16.7 L25.8 18.7 L23.4 18.7 L23.4 16.7 L21.4 16.7 L21.4 14.3 L23.4 14.3 Z"
+          fill="#FFFFFF"
+          stroke={c.stroke}
+          strokeWidth={0.6}
+          rotation={-45}
+          origin="24.6, 15.5"
+        />
+      </G>
+      <Path
+        d="M14.8 30.4 C11.5 33 7.6 35.6 8.6 38.8 C9.6 41.8 14.4 40.4 17.6 41.6 C19.6 42.3 21.6 42.6 23.6 42"
+        fill="none"
+        stroke={c.stroke}
+        strokeWidth={3.6}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M14.8 30.4 C11.5 33 7.6 35.6 8.6 38.8 C9.6 41.8 14.4 40.4 17.6 41.6 C19.6 42.3 21.6 42.6 23.6 42"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+      />
     </G>
   );
 }
 
 export function FormDropper({ fill }: { fill: string }) {
   const c = shapeColors(fill);
-  const bulb = adjustBrightness(fill, 1.08);
-  const glass = 'rgba(255,255,255,0.28)';
+  const bulb = adjustBrightness(fill, 0.9);
+  const collar = adjustBrightness(fill, 0.62);
+  const glass = 'rgba(255,255,255,0.35)';
   return (
     <G>
       <Defs>
+        <LinearGradient id="dropper-bulb" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={adjustBrightness(bulb, 0.8)} />
+          <Stop offset="50%" stopColor={bulb} />
+          <Stop offset="100%" stopColor={adjustBrightness(bulb, 1.18)} />
+        </LinearGradient>
         <LinearGradient id="dropper-tube" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={c.shadow} stopOpacity={0.45} />
+          <Stop offset="50%" stopColor={glass} />
+          <Stop offset="100%" stopColor={c.highlight} stopOpacity={0.6} />
+        </LinearGradient>
+        <LinearGradient id="dropper-liquid" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0%" stopColor={c.shadow} />
-          <Stop offset="45%" stopColor={glass} />
+          <Stop offset="60%" stopColor={c.fill} />
           <Stop offset="100%" stopColor={c.highlight} />
         </LinearGradient>
-        <LinearGradient id="dropper-bulb" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor={adjustBrightness(bulb, 1.12)} />
-          <Stop offset="60%" stopColor={bulb} />
-          <Stop offset="100%" stopColor={c.shadow} />
-        </LinearGradient>
       </Defs>
-      <GroundShadow cx={24} cy={40} rx={4} />
-      <Rect x={22.2} y={12} width={3.6} height={27} rx={1.2} fill="url(#dropper-tube)" stroke={c.stroke} strokeWidth={0.65} />
-      <Rect x={23} y={14} width={1} height={22} fill={c.glossSoft} opacity={0.7} />
+      <GroundShadow cx={35.4} cy={44} rx={3.2} ry={1.1} />
+      {/* Drawn upright, then tilted so the bulb sits top-left and the tip bottom-right. */}
+      <G rotation={-45} origin="22, 20">
+        <Path
+          d="M19.8 17 L24.2 17 L24.2 33 L22.7 39 L21.3 39 L19.8 33 Z"
+          fill="url(#dropper-tube)"
+          stroke={c.stroke}
+          strokeWidth={c.sw}
+        />
+        <Path d="M20.7 25 L23.3 25 L23.3 33 L22.4 37.6 L21.6 37.6 L20.7 33 Z" fill="url(#dropper-liquid)" />
+        <Rect x={20.6} y={18} width={0.9} height={14} rx={0.45} fill="#FFFFFF" opacity={0.7} />
+        <Rect x={18.5} y={13.5} width={7} height={4} rx={1} fill={collar} stroke={c.stroke} strokeWidth={0.65} />
+        <Rect x={15} y={10.5} width={14} height={3.5} rx={1.6} fill={collar} stroke={c.stroke} strokeWidth={c.sw} />
+        <Path
+          d="M16.8 11 L16.8 3 C16.8 -1 19 -3.5 22 -3.5 C25 -3.5 27.2 -1 27.2 3 L27.2 11 Z"
+          fill="url(#dropper-bulb)"
+          stroke={c.stroke}
+          strokeWidth={c.sw}
+        />
+        <Rect x={18.6} y={-0.5} width={1.6} height={9.5} rx={0.8} fill={c.gloss} opacity={0.55} />
+      </G>
       <Path
-        d="M24 2.5 C30 2.5 33.5 5.5 33.5 8.5 C33.5 10.5 31.5 11.2 29.5 11.2 L18.5 11.2 C16.5 11.2 14.5 10.5 14.5 8.5 C14.5 5.5 18 2.5 24 2.5 Z"
-        fill="url(#dropper-bulb)"
+        d="M35.4 35.4 C36.2 37.1 37.7 38.4 37.7 40 C37.7 41.3 36.7 42.3 35.4 42.3 C34.1 42.3 33.1 41.3 33.1 40 C33.1 38.4 34.6 37.1 35.4 35.4 Z"
+        fill="url(#dropper-liquid)"
         stroke={c.stroke}
-        strokeWidth={c.sw}
+        strokeWidth={0.65}
       />
-      <Path
-        d="M20 4.5 C22 3.5 26 3.5 28 4.5 C27 5.5 25 6 24 6 C23 6 21 5.5 20 4.5 Z"
-        fill={c.gloss}
-        opacity={0.55}
-      />
-      <Rect x={20} y={10.8} width={8} height={1.8} rx={0.9} fill={c.stroke} opacity={0.75} />
-      <Path d="M23.4 38.5 L24 40.5 L24.6 38.5 Z" fill={c.fill} opacity={0.85} />
-      <Circle cx={24} cy={39.2} r={1.1} fill={c.fill} opacity={0.55} />
+      <Ellipse cx={34.6} cy={39.6} rx={0.6} ry={1} fill="#FFFFFF" opacity={0.6} />
     </G>
   );
 }
 
 export function FormInjection({ fill }: { fill: string }) {
   const c = shapeColors(fill);
-  const barrel = 'rgba(255,255,255,0.18)';
+  const plunger = adjustBrightness(fill, 0.7);
+  const hub = adjustBrightness(fill, 1.12);
+  const metal = '#B8C2C8';
   return (
     <G>
-      <GroundShadow cx={24} cy={39} rx={8} />
-      <Line x1={24} y1={6} x2={24} y2={10} stroke={adjustBrightness(c.stroke, 0.75)} strokeWidth={1.2} />
-      <Path d="M23 6 L24 4 L25 6 Z" fill={adjustBrightness(c.stroke, 0.75)} />
-      <Rect x={19} y={10} width={10} height={20} rx={2} fill={barrel} stroke={c.stroke} strokeWidth={c.sw} />
-      <Rect x={20} y={16} width={8} height={10} rx={1} fill={c.fill} opacity={0.9} />
-      <Rect x={20} y={16} width={8} height={3} rx={1} fill={c.highlight} opacity={0.35} />
-      <Rect x={19.5} y={14} width={9} height={3} rx={1.2} fill={c.shadow} stroke={c.stroke} strokeWidth={0.5} />
-      <Rect x={21} y={30} width={6} height={5} rx={1} fill={c.shadow} stroke={c.stroke} strokeWidth={c.sw} />
-      <Rect x={15} y={33} width={18} height={3} rx={1} fill={c.stroke} />
-      <Rect x={22} y={35} width={4} height={5} rx={1} fill={adjustBrightness(c.stroke, 0.85)} />
-      <Rect x={20.5} y={11} width={2} height={18} fill={c.glossSoft} opacity={0.55} />
+      <Defs>
+        <LinearGradient id="syringe-barrel" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={c.shadow} stopOpacity={0.35} />
+          <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={0.55} />
+          <Stop offset="100%" stopColor={c.highlight} stopOpacity={0.5} />
+        </LinearGradient>
+        <LinearGradient id="syringe-liquid" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={c.shadow} />
+          <Stop offset="55%" stopColor={c.fill} />
+          <Stop offset="100%" stopColor={c.highlight} />
+        </LinearGradient>
+      </Defs>
+      <GroundShadow cx={20} cy={42} rx={13} ry={2.4} />
+      {/* Drawn upright, then tilted so the plunger sits bottom-left and the needle top-right. */}
+      <G rotation={45} origin="24, 24">
+        <Rect x={23.45} y={0.5} width={1.1} height={10} rx={0.4} fill={metal} stroke={c.stroke} strokeWidth={0.45} />
+        <Path d="M22.2 10 L25.8 10 L27 14.2 L21 14.2 Z" fill={hub} stroke={c.stroke} strokeWidth={c.sw} />
+        <Rect x={22.6} y={38} width={2.8} height={7.4} fill={plunger} stroke={c.stroke} strokeWidth={c.sw} />
+        <Rect x={17.5} y={45} width={13} height={2.6} rx={1.2} fill={plunger} stroke={c.stroke} strokeWidth={c.sw} />
+        <Rect x={19} y={14} width={10} height={22.5} rx={1.2} fill="url(#syringe-barrel)" stroke={c.stroke} strokeWidth={c.sw} />
+        <Rect x={19.9} y={15} width={8.2} height={16} rx={0.6} fill="url(#syringe-liquid)" />
+        <Rect x={19.9} y={31} width={8.2} height={2.6} rx={0.6} fill={plunger} />
+        <Rect x={20.6} y={16} width={1} height={14} rx={0.5} fill="#FFFFFF" opacity={0.6} />
+        {[17.5, 20.5, 23.5, 26.5, 29.5].map((y, i) => (
+          <Line
+            key={y}
+            x1={i % 2 === 0 ? 24.8 : 26}
+            y1={y}
+            x2={28}
+            y2={y}
+            stroke={c.stroke}
+            strokeWidth={0.6}
+            strokeLinecap="round"
+          />
+        ))}
+        <Rect x={15} y={36.2} width={18} height={2.4} rx={1.2} fill={plunger} stroke={c.stroke} strokeWidth={c.sw} />
+      </G>
+      <Path
+        d="M41.4 9.6 C42 10.9 43.1 11.9 43.1 13.1 C43.1 14.1 42.3 14.9 41.4 14.9 C40.5 14.9 39.7 14.1 39.7 13.1 C39.7 11.9 40.8 10.9 41.4 9.6 Z"
+        fill="url(#syringe-liquid)"
+        stroke={c.stroke}
+        strokeWidth={0.55}
+      />
+      <Ellipse cx={40.8} cy={12.9} rx={0.45} ry={0.75} fill="#FFFFFF" opacity={0.6} />
     </G>
   );
 }
@@ -600,6 +548,63 @@ export function FormAsthmaPump({ fill }: { fill: string }) {
       <Rect x={30} y={29} width={9} height={5.5} rx={2.5} fill={bootDark} stroke={c.stroke} strokeWidth={0.65} />
       <Ellipse cx={36.5} cy={31.8} rx={2.2} ry={1.6} fill="#1A1A1A" opacity={0.55} />
       <Rect x={31} y={30.2} width={4} height={2.2} rx={1} fill={c.glossSoft} opacity={0.45} />
+    </G>
+  );
+}
+
+/** Mist rays fanning left from the pump nozzle: [dx, dy] step per dot. */
+const SPRAY_RAYS: [number, number][] = [
+  [-3.4, -1.4],
+  [-3.6, 0],
+  [-3.4, 1.4],
+];
+const SPRAY_NOZZLE = { x: 23.2, y: 12.4 };
+
+export function FormSpray({ fill }: { fill: string }) {
+  const c = shapeColors(fill);
+  const cap = adjustBrightness(fill, 1.15);
+  const collar = adjustBrightness(fill, 0.8);
+  return (
+    <G>
+      <Defs>
+        <LinearGradient id="spray-body" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={c.shadow} />
+          <Stop offset="45%" stopColor={c.fill} />
+          <Stop offset="100%" stopColor={c.highlight} />
+        </LinearGradient>
+        <LinearGradient id="spray-cap" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor={adjustBrightness(cap, 0.82)} />
+          <Stop offset="55%" stopColor={cap} />
+          <Stop offset="100%" stopColor={adjustBrightness(cap, 1.12)} />
+        </LinearGradient>
+      </Defs>
+      <GroundShadow cx={28} cy={43} rx={10} />
+      <Rect x={19} y={21.5} width={18} height={20.5} rx={4.5} fill="url(#spray-body)" stroke={c.stroke} strokeWidth={c.sw} />
+      <Rect x={21.6} y={25} width={1.6} height={6} rx={0.8} fill={c.gloss} opacity={0.75} />
+      <Rect x={21.6} y={32.6} width={1.6} height={2.2} rx={0.8} fill={c.gloss} opacity={0.75} />
+      <Rect x={22} y={16} width={12} height={6} rx={1.6} fill={collar} stroke={c.stroke} strokeWidth={c.sw} />
+      <Rect x={23.4} y={8.5} width={9.2} height={8} rx={2.2} fill="url(#spray-cap)" stroke={c.stroke} strokeWidth={c.sw} />
+      <Rect x={24.6} y={9.8} width={1.4} height={5.4} rx={0.7} fill={c.glossSoft} />
+      <Rect x={SPRAY_NOZZLE.x} y={SPRAY_NOZZLE.y - 0.9} width={3} height={1.8} rx={0.6} fill={c.stroke} />
+      {SPRAY_RAYS.flatMap(([dx, dy], ray) =>
+        [1, 2, 3, 4].map((step) => {
+          const cx = SPRAY_NOZZLE.x - 1.2 + dx * step;
+          const cy = SPRAY_NOZZLE.y + dy * step;
+          return (
+            <Ellipse
+              key={`${ray}-${step}`}
+              cx={cx}
+              cy={cy}
+              rx={1.35}
+              ry={0.85}
+              fill={c.stroke}
+              opacity={0.9 - step * 0.13}
+              rotation={(Math.atan2(dy, dx) * 180) / Math.PI}
+              origin={`${cx}, ${cy}`}
+            />
+          );
+        }),
+      )}
     </G>
   );
 }

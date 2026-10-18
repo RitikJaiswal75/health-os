@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "2.0.3",
+    "version": "2.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.health.os",
-      "versionCode": 6,
+      "versionCode": 21,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
