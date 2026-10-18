@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.health.os",
-      "versionCode": 6,
+      "versionCode": 21,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
