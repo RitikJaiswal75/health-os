@@ -1,4 +1,4 @@
-import { computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
+import { computeDateCompletion, computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
 import { mergeAndRankResults, CACHE_TTL_HOURS, sanitizeFtsQuery, parseCachedResults } from '../src/features/catalog/catalogService';
 import { mapIndianMedicineRow, parseIndianMedicineJson } from '../src/features/catalog/indiaMedicineParser';
 import { mapIndiaApiResults } from '../src/features/catalog/indiaCatalogApi';
@@ -23,6 +23,15 @@ describe('dateUtils', () => {
     expect(computeDonutRatio(2, 4)).toBe(0.5);
     expect(computeDonutRatio(4, 4)).toBe(1);
     expect(computeDonutRatio(0, 0)).toBe(0);
+  });
+
+  it('does not fill the completion ring for skipped doses', () => {
+    const takenAndSkipped = computeDateCompletion([{ status: 'taken' }, { status: 'skipped' }]);
+    expect(computeDonutRatio(takenAndSkipped.taken, takenAndSkipped.scheduled)).toBe(0.5);
+
+    const onlySkipped = computeDateCompletion([{ status: 'skipped' }]);
+    expect(onlySkipped).toEqual({ taken: 0, scheduled: 1 });
+    expect(computeDonutRatio(onlySkipped.taken, onlySkipped.scheduled)).toBe(0);
   });
 
   it('formats date key', () => {

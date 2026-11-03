@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { Appbar, Button, Card, Dialog, Portal, RadioButton, Text } from 'react-native-paper';
-import { formatDateKey, formatScheduledTime, parseDateKey } from '@/src/core/dates/dateUtils';
+import { computeDateCompletion, formatDateKey, formatScheduledTime, parseDateKey } from '@/src/core/dates/dateUtils';
 import { HistoryDateNavigator } from '@/src/core/components/HistoryDateNavigator';
 import type { DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
@@ -50,10 +50,7 @@ export default function HistoryScreen() {
 
     const dosesByDate = new DoseEventRepository(dbState.db).getForDates(dateKeys, activeMedIds);
     for (const [key, dayDoses] of dosesByDate) {
-      completion[key] = {
-        scheduled: dayDoses.filter((d) => d.status !== 'skipped').length,
-        taken: dayDoses.filter((d) => d.status === 'taken').length,
-      };
+      completion[key] = computeDateCompletion(dayDoses);
     }
     return completion;
   }, [dbState, earliestHistoryDate, refreshKey]);

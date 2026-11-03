@@ -1,5 +1,6 @@
 import { format, parseISO, startOfDay, addDays, isSameDay } from 'date-fns';
 import { getDateFnsLocale } from '@/src/i18n/dateLocale';
+import type { DateCompletion, DoseStatus } from '../types/domain';
 
 export function formatDateKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
@@ -76,6 +77,15 @@ export function clampCalendarDate(date: Date, min: Date, max: Date): Date {
   if (value < minValue) return startOfDay(min);
   if (value > maxValue) return startOfDay(max);
   return startOfDay(date);
+}
+
+/** Only taken doses fill the ring; skipped doses still count toward the day's total. */
+export function computeDateCompletion(doses: { status: string }[]): DateCompletion {
+  const takenStatus: DoseStatus = 'taken';
+  return {
+    scheduled: doses.length,
+    taken: doses.filter((d) => d.status === takenStatus).length,
+  };
 }
 
 export function computeDonutRatio(taken: number, scheduled: number): number {

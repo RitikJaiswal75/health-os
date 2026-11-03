@@ -7,11 +7,9 @@ import { DateCompletionRing } from './DateCompletionRing';
 import { healthOsTheme, tokens } from '../../core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 import { getDateFnsLocale } from '@/src/i18n/dateLocale';
+import type { DateCompletion } from '../types/domain';
 
-export interface DateCompletion {
-  taken: number;
-  scheduled: number;
-}
+export type { DateCompletion };
 
 const DAY_SIZE = 40;
 const CHIP_BORDER_WIDTH = 1.5;

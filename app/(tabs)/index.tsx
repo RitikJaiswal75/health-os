@@ -4,7 +4,7 @@ import { Appbar, Button, Card, Dialog, FAB, Menu, Portal, RadioButton, Text } fr
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { navigateToAddMedication } from '@/src/features/reliability/reliabilityService';
-import { formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip } from '@/src/core/dates/dateUtils';
+import { computeDateCompletion, formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip } from '@/src/core/dates/dateUtils';
 import { DateStrip, type DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
@@ -71,10 +71,7 @@ export default function HomeScreen() {
     for (const date of stripDates) {
       const key = formatDateKey(date);
       const dayDoses = doseRepo.getForDate(key, activeMedIds);
-      completion[key] = {
-        scheduled: dayDoses.filter((d) => d.status !== 'skipped').length,
-        taken: dayDoses.filter((d) => d.status === 'taken').length,
-      };
+      completion[key] = computeDateCompletion(dayDoses);
     }
 
     const allDoses = doseRepo.getForDate(dateKey, activeMedIds);
