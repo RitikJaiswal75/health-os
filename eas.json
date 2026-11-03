@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 12.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -24,7 +24,6 @@
       }
     },
     "production": {
-      "autoIncrement": true,
       "environment": "production",
       "env": {
         "SHAREABLE_APK": "1",
@@ -45,6 +44,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed"
+      }
+    }
   }
 }

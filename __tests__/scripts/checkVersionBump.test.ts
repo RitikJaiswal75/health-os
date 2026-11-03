@@ -1,6 +1,7 @@
 import {
   checkAdvertisedVersion,
   checkVersionBump,
+  promoteLatestVersion,
   readExpoVersionInfo,
 } from '../../scripts/release/checks';
 
@@ -72,5 +73,33 @@ describe('checkAdvertisedVersion', () => {
     expect(checkAdvertisedVersion({ version: 1, android: { latestVersion: '2.1.0' } }, '2.0.2')).toEqual([
       'app-update.json android.latestVersion 2.1.0 is newer than the app version 2.0.2.',
     ]);
+  });
+});
+
+describe('promoteLatestVersion', () => {
+  const CONFIG = {
+    version: 1,
+    android: {
+      latestVersion: '2.0.4',
+      minSupportedVersion: '2.0.3',
+      storeUrl: 'https://play.google.com/store/apps/details?id=com.health.os',
+    },
+  };
+
+  it('raises latestVersion and keeps minSupportedVersion and storeUrl', () => {
+    expect(promoteLatestVersion(CONFIG, 'android', '2.0.5')).toEqual({
+      ...CONFIG,
+      android: { ...CONFIG.android, latestVersion: '2.0.5' },
+    });
+  });
+
+  it('returns the same object when the released version is not newer', () => {
+    expect(promoteLatestVersion(CONFIG, 'android', '2.0.4')).toBe(CONFIG);
+    expect(promoteLatestVersion(CONFIG, 'android', '2.0.3')).toBe(CONFIG);
+  });
+
+  it('returns null for an invalid version or a missing platform entry', () => {
+    expect(promoteLatestVersion(CONFIG, 'android', '2.0.5-beta')).toBeNull();
+    expect(promoteLatestVersion(CONFIG, 'ios', '2.0.5')).toBeNull();
   });
 });

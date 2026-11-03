@@ -1,0 +1,241 @@
+# Release pipeline. Runs on every merge to main that touches the app, and releases only
+# when expo.base.json carries a version that has no `v<version>` tag yet:
+#
+#   prepare ─┬─ apk         shareable arm64 APK → GitHub Release (tags v<version>)
+#            └─ play        EAS cloud build (.aab) → eas submit → Play production track
+#                 └─ app-update   waits for manual approval (environment `play-store-live`),
+#                                 then raises latestVersion in app-update.json, commits it,
+#                                 and writes it to Cloudflare KV.
+#
+# Approve `app-update` only once Play shows the release live at 100%. Raising latestVersion
+# earlier sends users to a store page with no update for them.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'src/**'
+      - 'modules/**'
+      - 'plugins/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'expo.base.json'
+      - 'app.config.js'
+      - 'eas.json'
+      - 'scripts/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      should_release: ${{ steps.tag.outputs.should_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: version
+        run: |
+          echo "version=$(node -p "require('./expo.base.json').expo.version")" >> "$GITHUB_OUTPUT"
+          echo "version_code=$(node -p "require('./expo.base.json').expo.android.versionCode")" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if this version was already released
+        id: tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" > /dev/null; then
+            echo "::notice::v${VERSION} is already tagged; nothing to release. Bump version in expo.base.json to release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  apk:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    concurrency:
+      group: release-apk-v${{ needs.prepare.outputs.version }}
+      cancel-in-progress: false
+    env:
+      GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          # v3 defaulted to deprecated `tools`, which Google removed from sdkmanager.
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shareable arm64 APK
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # Without a token, skip source map upload instead of failing the build.
+          SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
+        run: npm run android:apk
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: Health OS v${{ needs.prepare.outputs.version }}
+          body: |
+            Direct-download arm64 APK for sideloading (no Play Store).
+
+            Download **health-os-release.apk** from the assets below and install on your phone.
+
+            Bump `version` in `expo.base.json` before pushing to publish a new GitHub Release tag.
+          files: dist/health-os-release.apk
+          generate_release_notes: true
+          make_latest: true
+
+  play:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    # EAS builds in its own cloud; this job only waits for the build and the submission.
+    timeout-minutes: 120
+    concurrency:
+      group: release-play-v${{ needs.prepare.outputs.version }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build .aab on EAS
+        id: build
+        run: |
+          eas build --platform android --profile production --non-interactive --wait --json > eas-build.json
+          build_id=$(node -p "require('./eas-build.json')[0].id")
+          echo "id=${build_id}" >> "$GITHUB_OUTPUT"
+          echo "EAS build: https://expo.dev/accounts/ritikj1/projects/health-os-app/builds/${build_id}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Submit to Play (production track)
+        run: eas submit --platform android --profile production --id "${{ steps.build.outputs.id }}" --non-interactive --wait
+
+      - name: Summary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
+        run: |
+          {
+            echo "### v${VERSION} (versionCode ${VERSION_CODE}) submitted to Play production"
+            echo ""
+            echo "Once Play Console shows it live at 100%, approve the **app-update** job to advertise it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  app-update:
+    needs: [prepare, play]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Add yourself as a required reviewer on this environment (Settings → Environments)
+    # so the job pauses until you approve it. Without reviewers it runs right after submit.
+    environment: play-store-live
+    permissions:
+      contents: write
+    concurrency:
+      group: app-update-config
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      # Approval can come days later, so work on the current main, not the release commit.
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/app-config/package-lock.json
+
+      - name: Raise latestVersion in app-update.json
+        id: promote
+        run: npx --yes tsx@4 scripts/promote-app-update.ts --version "$VERSION"
+
+      - name: Validate app-update config
+        working-directory: workers/app-config
+        run: npx --yes tsx@4 scripts/config-set.ts config/app-update.json --kind app-update --validate-only
+
+      # Commit before writing KV so the committed file never lags what is live.
+      # GITHUB_TOKEN pushes don't trigger workflows, so deploy-app-config won't re-run.
+      - name: Commit app-update.json
+        if: steps.promote.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workers/app-config/config/app-update.json
+          git commit -m "chore(app-update): advertise v${VERSION} as latest [skip ci]"
+          for attempt in 1 2 3 4; do
+            git push origin HEAD:main && exit 0
+            sleep $((attempt * 5))
+            git pull --rebase origin main
+          done
+          echo "::error::Could not push app-update.json to main (branch protection?)."
+          exit 1
+
+      - name: Install worker dependencies
+        working-directory: workers/app-config
+        run: npm ci
+
+      - name: Write app-update config to KV
+        working-directory: workers/app-config
+        run: npm run config:set -- config/app-update.json --kind app-update --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify served config matches committed file
+        run: npx --yes tsx@4 scripts/verify-app-update-deploy.ts

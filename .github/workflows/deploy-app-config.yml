@@ -51,6 +51,25 @@ jobs:
             appUpdateConfig:
               - 'workers/app-config/config/app-update.json'
 
+      # A release merge (app version bumped) hands app-update.json to release.yml, which
+      # writes it to KV only after the Play release is approved as live.
+      - name: Detect release merge
+        id: release
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          head_version=$(node -p "require('./expo.base.json').expo.version")
+          before_version=""
+          if git fetch --depth=1 origin "$BEFORE" 2>/dev/null; then
+            before_version=$(git show "$BEFORE:expo.base.json" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).expo.version))")
+          fi
+          if [ -n "$before_version" ] && [ "$before_version" != "$head_version" ]; then
+            echo "::notice::App version $before_version → $head_version: app-update.json is deployed by the Release workflow after Play approval."
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install worker dependencies
         working-directory: workers/app-config
         run: npm ci
@@ -64,7 +83,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Write app-update config to KV
-        if: steps.changes.outputs.appUpdateConfig == 'true'
+        if: steps.changes.outputs.appUpdateConfig == 'true' && steps.release.outputs.is_release != 'true'
         working-directory: workers/app-config
         run: npm run config:set -- config/app-update.json --kind app-update --remote
         env:
@@ -72,5 +91,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Verify served config matches committed file
-        if: steps.changes.outputs.worker == 'true' || steps.changes.outputs.appUpdateConfig == 'true'
+        # On a release merge the committed file is ahead of KV until approval, so skip.
+        if: steps.release.outputs.is_release != 'true' && (steps.changes.outputs.worker == 'true' || steps.changes.outputs.appUpdateConfig == 'true')
         run: npx --yes tsx@4 scripts/verify-app-update-deploy.ts

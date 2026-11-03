@@ -1,5 +1,5 @@
 import { UPDATE_PLATFORMS } from '../../src/features/appUpdate/constants';
-import type { AppUpdateConfig } from '../../src/features/appUpdate/types';
+import type { AppUpdateConfig, UpdatePlatform } from '../../src/features/appUpdate/types';
 import { compareParsedVersions, parseVersion } from '../../src/features/appUpdate/versionCompare';
 import type { ExpoVersionInfo } from './types';
 
@@ -68,4 +68,23 @@ export function checkAdvertisedVersion(config: AppUpdateConfig, headVersion: str
       `app-update.json ${platform}.latestVersion ${latest} is newer than the app version ${headVersion}.`,
     ];
   });
+}
+
+/**
+ * Raises `platform.latestVersion` to the released version once the store build is live.
+ * Never lowers it (an older release approved late must not undo a newer one) and keeps
+ * `minSupportedVersion`, which the release PR owns. Returns `null` when the platform
+ * entry is missing, since the store URL and policy can't be invented here.
+ */
+export function promoteLatestVersion(
+  config: AppUpdateConfig,
+  platform: UpdatePlatform,
+  releasedVersion: string,
+): AppUpdateConfig | null {
+  const entry = config[platform];
+  const released = parseVersion(releasedVersion);
+  const current = parseVersion(entry?.latestVersion);
+  if (!entry || !released || !current) return null;
+  if (compareParsedVersions(released, current) <= 0) return config;
+  return { ...config, [platform]: { ...entry, latestVersion: releasedVersion } };
 }

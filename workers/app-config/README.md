@@ -129,11 +129,24 @@ Example: Crashlytics and Sentry both receive every report:
 
 ### Release steps
 
-1. App PR: bump `version` and `android.versionCode` in `expo.base.json`, and `version` in `package.json`. The PR check fails without this.
-2. Build the `.aab` and upload it to Play.
-3. **Wait until the release is live at 100% in production.** Raising `latestVersion` earlier sends users to a store page with no update for them.
-4. Config PR: raise `latestVersion` (and optionally `minSupportedVersion`) in `config/app-update.json`. The PR check validates it and rejects a version newer than the app on that branch.
-5. Before raising `minSupportedVersion`, check that the new build didn't raise `minSdk`. Users on older Android can't install it and would be locked out.
+Releases are automated by [`.github/workflows/release.yml`](../../.github/workflows/release.yml). It runs on merges to `main` and releases when `expo.base.json` has a version with no `v<version>` tag yet.
+
+1. Release PR: bump `version` and `android.versionCode` in `expo.base.json`, and `version` in `package.json`. The PR check fails without this. If the release should force older installs to update, set `android.minSupportedVersion` in `config/app-update.json` in the same PR. (To set it above the current `latestVersion`, also set `latestVersion` to the new version, since `min` can't exceed `latest`.) The pipeline never changes `minSupportedVersion`.
+2. On merge, the workflow runs these jobs:
+   - `apk`: builds the shareable arm64 APK and publishes it as a GitHub Release.
+   - `play`: builds the `.aab` on EAS and submits it to the Play **production** track with `eas submit`.
+   - `app-update`: waits for approval on the `play-store-live` environment.
+   This merge doesn't deploy `app-update.json`. `deploy-app-config.yml` skips it on release merges.
+3. **Wait until Play Console shows the release live at 100%**, then approve `app-update` in the Actions run. It sets `latestVersion` to the released version, commits `app-update.json` to `main`, writes it to KV, and checks that `/v1/app-update` serves it. Approving earlier sends users to a store page with no update for them.
+4. Before raising `minSupportedVersion`, check that the new build didn't raise `minSdk`. Users on older Android can't install it and would be locked out.
+
+One-time setup for the release pipeline:
+
+- Actions secret `EXPO_TOKEN`: a robot token from expo.dev, under Account settings → Access tokens.
+- Upload a Google Play service account key to EAS (expo.dev → project → Credentials → Android → Google Service Account Key for Play Store submissions). `eas submit` uses it, so it never goes into GitHub. The first upload of a new app to Play must be done by hand in Play Console.
+- GitHub environment `play-store-live` (Settings → Environments) with yourself as a required reviewer. Without a reviewer, `app-update` runs right after the submit.
+- `main` must accept pushes from `github-actions[bot]` (for the `app-update.json` commit). If branch protection blocks it, allow GitHub Actions to bypass the rule.
+- `eas.json` uses `appVersionSource: "local"`, so the `.aab` takes `versionCode` from `expo.base.json`. It must be higher than any versionCode Play already has.
 
 Emergency kill switch, when waiting for a merge is too slow:
 
