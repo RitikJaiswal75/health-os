@@ -1,7 +1,13 @@
 import { UPDATE_PLATFORMS } from '../../src/features/appUpdate/constants';
 import type { AppUpdateConfig } from '../../src/features/appUpdate/types';
 import { compareParsedVersions, parseVersion } from '../../src/features/appUpdate/versionCompare';
+import { APP_PATH_PATTERNS } from './constants';
 import type { ExpoVersionInfo } from './types';
+
+/** True when any path is part of the shipped app, so a version bump is required. */
+export function touchesAppPaths(paths: readonly string[]): boolean {
+  return paths.some((path) => APP_PATH_PATTERNS.some((pattern) => pattern.test(path)));
+}
 
 export function readExpoVersionInfo(expoBaseJson: unknown): ExpoVersionInfo {
   const expo = (expoBaseJson as { expo?: { version?: unknown; android?: { versionCode?: unknown } } })
@@ -67,5 +73,23 @@ export function checkAdvertisedVersion(config: AppUpdateConfig, headVersion: str
     return [
       `app-update.json ${platform}.latestVersion ${latest} is newer than the app version ${headVersion}.`,
     ];
+  });
+}
+
+/** Every advertised platform must point at the version this branch bumps to. */
+export function checkLatestVersionMatches(config: AppUpdateConfig, headVersion: string): string[] {
+  const head = parseVersion(headVersion);
+  if (!head) return [`expo.base.json version "${headVersion}" is not a valid x.y.z version.`];
+
+  const advertised = UPDATE_PLATFORMS.filter((platform) => config[platform]?.latestVersion);
+  if (advertised.length === 0) {
+    return [`app-update.json must set latestVersion ${headVersion} for at least one platform.`];
+  }
+
+  return advertised.flatMap((platform) => {
+    const latest = config[platform]?.latestVersion ?? '';
+    const parsed = parseVersion(latest);
+    if (parsed && compareParsedVersions(parsed, head) === 0) return [];
+    return [`app-update.json ${platform}.latestVersion ${latest} must equal the app version ${headVersion}.`];
   });
 }
