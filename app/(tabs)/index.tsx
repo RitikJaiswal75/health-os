@@ -18,7 +18,10 @@ import { InventoryService } from '@/src/features/inventory/inventoryService';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
 import type { DoseEvent } from '@/src/db/schema';
 import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
-import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
+import {
+  rescheduleReminders,
+  scheduleSnoozeAt,
+} from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
 import { AppUpdateBanner } from '@/src/core/components/AppUpdateBanner';
@@ -43,8 +46,7 @@ export default function HomeScreen() {
       if (dbState.status !== 'ready') return;
       cleanupSnoozeConflicts(dbState.db);
       generateUpcomingDoseEvents(dbState.db, 14);
-      const reconciler = new ReminderReconciler(dbState.db);
-      void scheduleAlarms(reconciler.reconcile(7));
+      void rescheduleReminders(dbState.db);
       setRefreshKey((key) => key + 1);
     }, [dbState]),
   );
@@ -110,6 +112,7 @@ export default function HomeScreen() {
     new DoseEventRepository(dbState.db).updateStatus(dose.id, 'skipped');
     removePendingDuplicatingResolvedDoses(dbState.db);
     removeDuplicateDoseEvents(dbState.db);
+    void rescheduleReminders(dbState.db);
     refresh();
   };
 
@@ -148,6 +151,7 @@ export default function HomeScreen() {
       doseRepo.updateStatus(editDose.id, editStatus, {
         takenAt: editStatus === 'taken' ? new Date().toISOString() : undefined,
       });
+      void rescheduleReminders(dbState.db);
     }
     setEditDose(null);
     refresh();
@@ -159,6 +163,7 @@ export default function HomeScreen() {
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
     inventory.compensateOnDelete(editDose.id, editDose.status as DoseStatus);
     doseRepo.delete(editDose.id);
+    void rescheduleReminders(dbState.db);
     setEditDose(null);
     refresh();
   };

@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsc/tsconfig.tsbuildinfo",
     "paths": {
       "@/*": ["./*"]
     }
@@ -17,6 +20,10 @@
   ],
   "exclude": [
     "node_modules",
+    "dist",
+    "build",
+    "android",
+    "ios",
     "scripts",
     "__tests__",
     "jest.setup.js"

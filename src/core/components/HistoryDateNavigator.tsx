@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { StyleSheet, View } from 'react-native';
 import { addDays, format, startOfDay } from 'date-fns';
 import { Button, IconButton } from 'react-native-paper';
 import { clampCalendarDate } from '../dates/dateUtils';
-import { DateStrip } from './DateStrip';
+import { ScrollableDateStrip, type DateCompletion } from './DateStrip';
+import { HistoryCalendarDialog } from './HistoryCalendarDialog';
 import { healthOsTheme, tokens } from '../theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 import { getDateFnsLocale } from '@/src/i18n/dateLocale';
@@ -14,6 +14,7 @@ interface HistoryDateNavigatorProps {
   onSelectDate: (date: Date) => void;
   minDate: Date;
   maxDate?: Date;
+  completionByDate?: Record<string, DateCompletion>;
 }
 
 export function HistoryDateNavigator({
@@ -21,6 +22,7 @@ export function HistoryDateNavigator({
   onSelectDate,
   minDate,
   maxDate = new Date(),
+  completionByDate,
 }: HistoryDateNavigatorProps) {
   const { t } = useT();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -34,23 +36,6 @@ export function HistoryDateNavigator({
 
   const canGoBack = selectedDay.getTime() > earliest.getTime();
   const canGoForward = selectedDay.getTime() < today.getTime();
-
-  const onPickerChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') {
-      setPickerOpen(false);
-      if (event.type === 'dismissed' || !date) return;
-    } else if (event.type === 'dismissed') {
-      setPickerOpen(false);
-      return;
-    }
-
-    if (!date) return;
-
-    onSelectDate(clampCalendarDate(date, earliest, today));
-    if (Platform.OS === 'ios' && event.type === 'set') {
-      setPickerOpen(false);
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -80,18 +65,23 @@ export function HistoryDateNavigator({
         />
       </View>
 
-      <DateStrip selectedDate={selectedDate} onSelectDate={onSelectDate} mode="past" days={7} />
+      <ScrollableDateStrip
+        selectedDate={selectedDate}
+        onSelectDate={onSelectDate}
+        minDate={earliest}
+        maxDate={today}
+        completionByDate={completionByDate}
+      />
 
-      {pickerOpen && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          minimumDate={earliest}
-          maximumDate={today}
-          onChange={onPickerChange}
-        />
-      )}
+      <HistoryCalendarDialog
+        visible={pickerOpen}
+        selectedDate={selectedDate}
+        minDate={earliest}
+        maxDate={today}
+        completionByDate={completionByDate}
+        onSelectDate={(date) => onSelectDate(clampCalendarDate(date, earliest, today))}
+        onDismiss={() => setPickerOpen(false)}
+      />
     </View>
   );
 }

@@ -1,11 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { DoseEventRepository, MedicationRepository } from './medicationRepository';
 import { purgeOrphanDoseEvents } from './doseGenerationService';
-import {
-  dismissReminderNotification,
-  ReminderReconciler,
-  scheduleAlarms,
-} from '../reminders/reminderService';
+import { dismissReminderNotification, rescheduleReminders } from '../reminders/reminderService';
 import { getNativePendingReminders } from '../reminders/reminderNativePending';
 
 export async function removeMedicationWithReminders(
@@ -34,7 +30,6 @@ export async function removeMedicationWithReminders(
     }
   }
 
-  const remaining = new ReminderReconciler(db).reconcile(7);
-  await scheduleAlarms(remaining);
+  await rescheduleReminders(db);
   return true;
 }

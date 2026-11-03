@@ -35,6 +35,7 @@ export default function ReminderScreen() {
   }>();
   const dbState = useDatabaseBootstrap();
   const [snoozeDialog, setSnoozeDialog] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const db = dbState.status === 'ready' ? dbState.db : null;
   const medRepo = useMemo(() => (db ? new MedicationRepository(db) : null), [db]);
   const { t } = useT();
@@ -66,7 +67,7 @@ export default function ReminderScreen() {
     }
 
     return [];
-  }, [db, medRepo, medicationId, doseEventId, scheduledAt]);
+  }, [db, medRepo, medicationId, doseEventId, scheduledAt, refreshKey]);
 
   const dismiss = async () => {
     const handled = {
@@ -95,7 +96,12 @@ export default function ReminderScreen() {
 
     if (scheduledAt) {
       const remaining = doseRepo.findPendingDosesAtMinute(scheduledAt);
-      if (remaining.length === 0) void dismiss();
+      if (remaining.length === 0) {
+        void dismiss();
+      } else {
+        // Keep the screen open with only the doses still pending at this slot.
+        setRefreshKey((key) => key + 1);
+      }
       return;
     }
 
@@ -216,7 +222,6 @@ export default function ReminderScreen() {
               key={item.dose.id}
               medication={item.medication}
               doseAmount={item.dose.doseAmount}
-              showTakenButton={false}
               onTaken={() => requestTaken(item.medication.id, item)}
             />
           ))}

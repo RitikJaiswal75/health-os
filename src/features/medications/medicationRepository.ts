@@ -7,7 +7,6 @@ import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
 import {
   canLogDoseForTodayOrPast,
   dedupeDoseEvents,
-  doseBelongsToDateKey,
   filterPendingDuplicatingResolved,
   filterPendingReplacedBySnooze,
   parseSnoozedFromNotes,
@@ -412,6 +411,11 @@ export class DoseEventRepository {
   }
 
   getForDate(dateKey: string, activeMedicationIds?: Set<string>): DoseEvent[] {
+    return this.getForDates([dateKey], activeMedicationIds).get(dateKey) ?? [];
+  }
+
+  /** Same as getForDate for many days, loading medications and dose rows once. */
+  getForDates(dateKeys: string[], activeMedicationIds?: Set<string>): Map<string, DoseEvent[]> {
     const medRepo = new MedicationRepository(this.db);
     const scheduleById = new Map<string, Schedule>();
     const schedulesByMedId = new Map<string, Schedule[]>();
@@ -426,21 +430,41 @@ export class DoseEventRepository {
       }
     }
 
-    const doses = this.db
+    const buckets = new Map<string, DoseEvent[]>(dateKeys.map((key) => [key, []]));
+    const rows = this.db
       .getAllSync(`SELECT * FROM dose_events ORDER BY scheduled_at ASC`)
       .map(mapDoseEventRow)
-      .filter((dose) => doseBelongsToDateKey(dose, dateKey))
-      .filter((dose) => !activeMedicationIds || activeMedicationIds.has(dose.medicationId))
-      .filter((dose) =>
-        doseVisibleForScheduleOnDateKey(dose, dateKey, scheduleById, schedulesByMedId),
-      );
+      .filter((dose) => !activeMedicationIds || activeMedicationIds.has(dose.medicationId));
 
-    return sortDosesForDisplay(
-      filterPendingDuplicatingResolved(
-        filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
-      ),
-      medicationCreatedAt,
-    );
+    for (const dose of rows) {
+      // A snoozed dose also belongs to the day it was originally scheduled.
+      const candidateKeys = new Set([scheduledAtToDateKey(dose.scheduledAt)]);
+      if (dose.status === 'snoozed') {
+        const snoozedFrom = parseSnoozedFromNotes(dose.notes);
+        if (snoozedFrom) candidateKeys.add(scheduledAtToDateKey(snoozedFrom));
+      }
+      for (const key of candidateKeys) {
+        const bucket = buckets.get(key);
+        if (
+          bucket &&
+          doseVisibleForScheduleOnDateKey(dose, key, scheduleById, schedulesByMedId)
+        ) {
+          bucket.push(dose);
+        }
+      }
+    }
+
+    for (const [key, doses] of buckets) {
+      buckets.set(
+        key,
+        sortDosesForDisplay(
+          filterPendingDuplicatingResolved(filterPendingReplacedBySnooze(dedupeDoseEvents(doses))),
+          medicationCreatedAt,
+        ),
+      );
+    }
+
+    return buckets;
   }
 
   /** True when any dose row already occupies this schedule slot (including skipped/missed). */

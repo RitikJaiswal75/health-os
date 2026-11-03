@@ -4,6 +4,9 @@ const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getSentryExpoConfig(__dirname);
 
+// Default is ~one worker per core; cap it so bundling doesn't saturate the machine.
+config.maxWorkers = 2;
+
 config.resolver.assetExts.push('wasm', 'db');
 
 config.server.enhanceMiddleware = (middleware) => {

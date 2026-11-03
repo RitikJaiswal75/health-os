@@ -73,19 +73,20 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#121212",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#BB86FC",
           "defaultChannel": "medication-reminders"
         }
       ],
       "./modules/medication-alarm/app.plugin.js",
       "./plugins/withDevClientMainApplication.js",
       "./plugins/withReleaseApkOptimization.js",
+      "./plugins/withNativeBuildJobLimit.js",
       "./plugins/withObservabilityGradle.js",
       [
         "@sentry/react-native/expo",
         {
-          "url": "https://de.sentry.io/",
+          "url": "https://sentry.io",
           "organization": "healthos",
           "project": "health-os",
           "experimental_android": {

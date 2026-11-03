@@ -1,5 +1,5 @@
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import type { ReactNode } from 'react';
+import { act, type ReactNode } from 'react';
+import { createRoot, type TestInstance } from 'test-renderer';
 
 let mockPathname = '/';
 let mockState: 'none' | 'soft' | 'force' = 'force';
@@ -49,17 +49,27 @@ function EditDoseDialog() {
   );
 }
 
-function renderWithOpenDialog(): ReactTestRenderer {
-  let renderer!: ReactTestRenderer;
+function renderWithOpenDialog(): TestInstance {
+  const renderer = createRoot();
   act(() => {
-    renderer = create(
+    renderer.render(
       <>
         <EditDoseDialog />
         <ForceUpdateOverlay />
       </>,
     );
   });
-  return renderer;
+  return renderer.container;
+}
+
+function findAllByType(node: TestInstance, type: string): TestInstance[] {
+  return node.queryAll((child) => child.type === type);
+}
+
+function findByType(node: TestInstance, type: string): TestInstance {
+  const [match, ...rest] = findAllByType(node, type);
+  if (!match || rest.length > 0) throw new Error(`Expected exactly one ${type}`);
+  return match;
 }
 
 describe('ForceUpdateOverlay', () => {
@@ -69,31 +79,28 @@ describe('ForceUpdateOverlay', () => {
   });
 
   it('blocks from a native modal so an open Portal dialog cannot sit above it', () => {
-    const renderer = renderWithOpenDialog();
-    const modal = renderer.root.findByType('Modal' as never);
+    const root = renderWithOpenDialog();
+    const modal = findByType(root, 'Modal');
 
     expect(modal.props.visible).toBe(true);
-    expect(modal.findByProps({ accessibilityRole: 'alert' })).toBeTruthy();
+    expect(modal.queryAll((node) => node.props.accessibilityRole === 'alert')).toHaveLength(1);
     // The block must not live in the Portal host, which shares a layer with dialogs.
-    const portalHost = renderer.root.findByType('PortalHost' as never);
-    expect(portalHost.findAllByType('Modal' as never)).toHaveLength(0);
+    const portalHost = findByType(root, 'PortalHost');
+    expect(findAllByType(portalHost, 'Modal')).toHaveLength(0);
   });
 
   it('swallows Android back while blocking', () => {
-    const renderer = renderWithOpenDialog();
-    const modal = renderer.root.findByType('Modal' as never);
+    const modal = findByType(renderWithOpenDialog(), 'Modal');
     expect(() => modal.props.onRequestClose()).not.toThrow();
   });
 
   it('stays hidden on the exempt reminder route even with a dialog open', () => {
     mockPathname = '/reminder';
-    const renderer = renderWithOpenDialog();
-    expect(renderer.root.findByType('Modal' as never).props.visible).toBe(false);
+    expect(findByType(renderWithOpenDialog(), 'Modal').props.visible).toBe(false);
   });
 
   it('stays hidden when no force update is required', () => {
     mockState = 'soft';
-    const renderer = renderWithOpenDialog();
-    expect(renderer.root.findByType('Modal' as never).props.visible).toBe(false);
+    expect(findByType(renderWithOpenDialog(), 'Modal').props.visible).toBe(false);
   });
 });

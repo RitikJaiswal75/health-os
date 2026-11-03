@@ -28,7 +28,7 @@ import { useWizardStore } from '@/src/features/medications/wizardStore';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { removeMedicationWithReminders } from '@/src/features/medications/medicationDeletionService';
-import { ReminderReconciler, scheduleAlarms } from '@/src/features/reminders/reminderService';
+import { rescheduleReminders } from '@/src/features/reminders/reminderService';
 import { generateUpcomingDoseEvents, resyncPendingDosesAfterScheduleUpdate } from '@/src/features/medications/doseGenerationService';
 import {
   findDuplicateMedicationConflict,
@@ -96,7 +96,9 @@ export function MedicationReviewView() {
   const dbState = useDatabaseBootstrap();
   const [quantity, setQuantity] = useState(String(draft.currentQuantity || ''));
   const [refillDialog, setRefillDialog] = useState(false);
-  const [refillThreshold, setRefillThreshold] = useState('');
+  const [refillThreshold, setRefillThreshold] = useState(
+    draft.refillThreshold != null ? String(draft.refillThreshold) : '',
+  );
   const [refillOn, setRefillOn] = useState(draft.refillEnabled);
   const [nickname, setNickname] = useState(draft.nickname ?? '');
   const [notes, setNotes] = useState(draft.notes ?? '');
@@ -142,7 +144,10 @@ export function MedicationReviewView() {
 
   const isEditing = !!editingMedicationId;
 
-  useEffect(() => {
+  // New edit session: reset the form fields from the draft during render, not in an effect.
+  const [syncedSessionKey, setSyncedSessionKey] = useState(editSessionKey);
+  if (syncedSessionKey !== editSessionKey) {
+    setSyncedSessionKey(editSessionKey);
     setQuantity(String(draft.currentQuantity || ''));
     setRefillOn(draft.refillEnabled);
     setRefillThreshold(
@@ -150,7 +155,7 @@ export function MedicationReviewView() {
     );
     setNickname(draft.nickname ?? '');
     setNotes(draft.notes ?? '');
-  }, [editSessionKey]);
+  }
 
   const previewColor = draft.pillColor ?? SHAPE_PREVIEW_COLOR;
   const showDualTone = supportsDualColor(draft.pillShape) && draft.pillColor2 != null;
@@ -182,8 +187,7 @@ export function MedicationReviewView() {
     if (dbState.status !== 'ready') return;
 
     generateUpcomingDoseEvents(dbState.db, 14);
-    const reconciler = new ReminderReconciler(dbState.db);
-    await scheduleAlarms(reconciler.reconcile(7));
+    await rescheduleReminders(dbState.db);
   };
 
   const handleSave = async () => {

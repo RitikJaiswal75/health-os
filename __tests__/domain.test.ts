@@ -1121,6 +1121,40 @@ describe('doseSlotUtils', () => {
       .toBe('evening-dose');
   });
 
+  it('groups doses by day in one pass, matching getForDate', () => {
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const row = (id: string, scheduledAt: string, status: string) => ({
+      id,
+      medication_id: 'med-1',
+      schedule_id: null,
+      scheduled_at: scheduledAt,
+      status,
+      notes: null,
+      dose_amount: 1,
+      created_at: '2026-09-01T07:00:00',
+      updated_at: '2026-09-01T07:00:00',
+    });
+    const doseRows = [
+      row('d1-am', '2026-09-08T08:00:00', 'taken'),
+      row('d1-pm', '2026-09-08T20:00:00', 'pending'),
+      row('d2-am', '2026-09-09T08:00:00', 'taken'),
+      row('d3-am', '2026-09-10T08:00:00', 'pending'),
+    ];
+    const mockDb = {
+      getAllSync: jest.fn((sql: string) => (sql.includes('FROM dose_events') ? doseRows : [])),
+    };
+    const repo = new DoseEventRepository(mockDb);
+
+    const byDate = repo.getForDates(['2026-09-08', '2026-09-09']);
+    const ids = (key: string) => byDate.get(key).map((dose: { id: string }) => dose.id).sort();
+
+    expect([...byDate.keys()]).toEqual(['2026-09-08', '2026-09-09']);
+    expect(ids('2026-09-08')).toEqual(['d1-am', 'd1-pm']);
+    expect(ids('2026-09-09')).toEqual(['d2-am']);
+    expect(repo.getForDate('2026-09-08').map((dose: { id: string }) => dose.id).sort())
+      .toEqual(['d1-am', 'd1-pm']);
+  });
+
   it('removes pending doses that duplicate a skipped dose', () => {
     const deleted: string[] = [];
     const mockDb = {
