@@ -49,10 +49,13 @@ object AlarmSoundController {
         wakeLock = null
     }
 
-    private fun stopPlaybackOnly() {
+    /** Silences the sound but keeps the wake lock; returns true if it was playing. */
+    fun stopPlaybackOnly(): Boolean {
+        var wasPlaying = false
         mediaPlayer?.run {
             try {
-                if (isPlaying) stop()
+                wasPlaying = isPlaying
+                if (wasPlaying) stop()
             } catch (_: Exception) {
                 // Player may already be stopped.
             }
@@ -63,6 +66,7 @@ object AlarmSoundController {
             }
         }
         mediaPlayer = null
+        return wasPlaying
     }
 
     private fun acquireWakeLock(context: Context) {

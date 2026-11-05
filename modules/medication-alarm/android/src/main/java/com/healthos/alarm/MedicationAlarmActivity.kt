@@ -2,6 +2,7 @@ package com.healthos.alarm
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -24,6 +25,15 @@ class MedicationAlarmActivity : ReactActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)
+    }
+
+    // Either volume key silences the ringing alarm; the reminder, notification and wake lock stay.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            // Only swallow the key when it silenced a ringing alarm; otherwise adjust volume as usual.
+            if (AlarmSoundController.stopPlaybackOnly()) return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun createReactActivityDelegate(): ReactActivityDelegate {
