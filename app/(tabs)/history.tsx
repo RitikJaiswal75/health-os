@@ -72,7 +72,7 @@ export default function HistoryScreen() {
     if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
     const doseRepo = new DoseEventRepository(dbState.db);
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.applyStatusChange(editDose.id, editDose.status as DoseStatus, editStatus);
+    inventory.applyStatusChange(editDose.id, editDose.status, editStatus);
     doseRepo.updateStatus(editDose.id, editStatus);
     void rescheduleReminders(dbState.db);
     setEditDose(null);
@@ -83,7 +83,7 @@ export default function HistoryScreen() {
     if (!editDose || dbState.status !== 'ready' || !medRepo) return;
     const doseRepo = new DoseEventRepository(dbState.db);
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.compensateOnDelete(editDose.id, editDose.status as DoseStatus);
+    inventory.compensateOnDelete(editDose.id, editDose.status);
     doseRepo.delete(editDose.id);
     void rescheduleReminders(dbState.db);
     setEditDose(null);
@@ -117,7 +117,7 @@ export default function HistoryScreen() {
                 style={styles.card}
                 onPress={() => {
                   setEditDose(dose);
-                  setEditStatus(dose.status as DoseStatus);
+                  setEditStatus(dose.status);
                 }}
               >
                 <Card.Content>
@@ -130,7 +130,7 @@ export default function HistoryScreen() {
                         })
                       : t('home.statusLine', {
                           time: formatScheduledTime(dose.scheduledAt),
-                          status: getDoseStatusLabel(dose.status as DoseStatus),
+                          status: getDoseStatusLabel(dose.status),
                         })}
                   </Text>
                 </Card.Content>

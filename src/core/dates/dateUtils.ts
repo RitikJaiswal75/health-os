@@ -80,11 +80,10 @@ export function clampCalendarDate(date: Date, min: Date, max: Date): Date {
 }
 
 /** Only taken doses fill the ring; skipped doses still count toward the day's total. */
-export function computeDateCompletion(doses: { status: string }[]): DateCompletion {
-  const takenStatus: DoseStatus = 'taken';
+export function computeDateCompletion(doses: { status: DoseStatus }[]): DateCompletion {
   return {
     scheduled: doses.length,
-    taken: doses.filter((d) => d.status === takenStatus).length,
+    taken: doses.filter((d) => d.status === 'taken').length,
   };
 }
 

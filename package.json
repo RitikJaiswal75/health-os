@@ -28,7 +28,7 @@
     "postinstall": "node scripts/patch-rn-compat.js",
     "prepare": "husky",
     "verify-android-manifest": "node scripts/verify-android-manifest.js",
-    "quality": "npm run typecheck && npm run lint && npm test"
+    "quality": "npm run typecheck && npm run typecheck:tests && npm run lint && npm test"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -1,7 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
 import { canLogDoseForTodayOrPast } from '../medications/doseSlotUtils';
-import type { DoseStatus } from '../../core/types/domain';
 import { InventoryService } from './inventoryService';
 import { notifyRefillIfNeeded } from './refillReminderService';
 import { reportError } from '@/src/core/observability/crashReporter';
@@ -28,7 +27,7 @@ export function markDoseAsTaken(
   try {
     const { previousQty, newQty, changed } = inventory.applyStatusChange(
       dose.id,
-      dose.status as DoseStatus,
+      dose.status,
       'taken',
       resolvedVariantId,
     );

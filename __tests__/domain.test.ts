@@ -34,6 +34,11 @@ describe('dateUtils', () => {
     expect(computeDonutRatio(onlySkipped.taken, onlySkipped.scheduled)).toBe(0);
   });
 
+  it('rejects unknown dose statuses at compile time', () => {
+    // @ts-expect-error status must be a DoseStatus
+    computeDateCompletion([{ status: 'taken ' }]);
+  });
+
   it('formats date key', () => {
     expect(formatDateKey(new Date('2026-09-08T12:00:00'))).toBe('2026-09-08');
   });

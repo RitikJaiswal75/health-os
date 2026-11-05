@@ -1,3 +1,4 @@
+import type { DoseStatus } from '../core/types/domain';
 import type { DoseEvent, Medication, MedicationVariant, Schedule } from './schema';
 
 type Row = Record<string, unknown>;
@@ -87,7 +88,7 @@ export function mapDoseEventRow(row: unknown): DoseEvent {
     variantId: pick<string | null>(record, 'variantId', 'variant_id') ?? null,
     scheduleId: pick<string | null>(record, 'scheduleId', 'schedule_id') ?? null,
     scheduledAt: pickRequired<string>(record, 'scheduledAt', 'scheduled_at'),
-    status: pickRequired<string>(record, 'status', 'status'),
+    status: pickRequired<DoseStatus>(record, 'status', 'status'),
     takenAt: pick<string | null>(record, 'takenAt', 'taken_at') ?? null,
     doseAmount: pick<number>(record, 'doseAmount', 'dose_amount') ?? 1,
     notes: pick<string | null>(record, 'notes', 'notes') ?? null,
