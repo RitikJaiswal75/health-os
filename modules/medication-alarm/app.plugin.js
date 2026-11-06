@@ -63,72 +63,77 @@ function withMedicationAlarmPackage(config) {
   });
 }
 
-function withAlarmMainActivity(config) {
-  return withMainActivity(config, (config) => {
-    let contents = config.modResults.contents;
-    if (contents.includes('AlarmLaunchHelper')) {
-      return config;
-    }
-
-    contents = contents.replace(
-      'import android.os.Bundle',
-      'import android.os.Bundle\nimport android.content.Intent\nimport com.healthos.alarm.AlarmLaunchHelper',
-    );
-
-    contents = contents.replace(
-      'super.onCreate(null)',
-      'AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)\n    super.onCreate(null)',
-    );
-
-    if (!contents.includes('override fun onNewIntent')) {
-      contents = contents.replace(
-        /(\s+\/\*\*\s*\n\s+\* Align the back button behavior)/,
-        `
-  override fun onNewIntent(intent: Intent) {
-    super.onNewIntent(intent)
-    setIntent(intent)
-    AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)
-    com.healthos.alarm.MedicationAlarmModule.captureReminderLaunchFromActivity(intent)
-  }
-
-$1`,
-      );
-    }
-
-    config.modResults.contents = contents;
-    return config;
-  });
-}
+const LAUNCH_FLAGS_CALL = 'AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)';
+const NEW_INTENT_CAPTURE = 'MedicationAlarmModule.captureReminderLaunchFromActivity(intent)';
+const VOLUME_KEY_CALL = 'AlarmLaunchHelper.silenceAlarmOnVolumeKey(keyCode)';
+// The lock-screen call must sit in onCreate before super.onCreate (not just anywhere in the file).
+const ONCREATE_FLAGS = /override fun onCreate[\s\S]*?applyReminderLaunchFlags\(this, intent\)[\s\S]*?super\.onCreate\(/;
 
 // Volume up/down silences a ringing alarm. It lives in MainActivity because that is the activity
 // the reminder intent opens (MedicationAlarmReceiver.buildReminderActivityIntent).
 const VOLUME_KEY_HANDLER = `  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-    if (AlarmLaunchHelper.silenceAlarmOnVolumeKey(keyCode)) return true
+    if (${VOLUME_KEY_CALL}) return true
     return super.onKeyDown(keyCode, event)
   }
 `;
 
-/**
- * Pure string patch (unit tested). Idempotent, and independent of the launch-flag patch above so a
- * MainActivity patched by an earlier prebuild still gets the handler.
- */
-function patchMainActivity(source) {
-  if (source.includes('silenceAlarmOnVolumeKey')) return source;
-  let contents = source;
-  if (!contents.includes('import android.view.KeyEvent')) {
-    contents = contents.replace('import android.os.Bundle', 'import android.os.Bundle\nimport android.view.KeyEvent');
-  }
-  if (!contents.includes('import com.healthos.alarm.AlarmLaunchHelper')) {
-    contents = contents.replace(
-      'import android.os.Bundle',
-      'import android.os.Bundle\nimport com.healthos.alarm.AlarmLaunchHelper',
-    );
-  }
-  // Insert before the closing brace of the class (the last one in the file).
-  return contents.replace(/\}\s*$/, `\n${VOLUME_KEY_HANDLER}}\n`);
+function addImport(contents, fqcn) {
+  const line = `import ${fqcn}`;
+  if (contents.includes(line)) return contents;
+  return contents.replace('import android.os.Bundle', `import android.os.Bundle\n${line}`);
 }
 
-function withAlarmVolumeKeys(config) {
+/**
+ * Pure string patch of the generated MainActivity (unit tested). Each step has its own marker, so
+ * the result never depends on which steps ran before (Expo runs mods in reverse order, and a
+ * shared "already patched" guard once made the lock-screen step skip itself). It throws if an
+ * anchor is missing, so prebuild fails loudly instead of shipping an app that cannot show the
+ * reminder over the lock screen.
+ */
+function patchMainActivity(source) {
+  let contents = source;
+
+  if (!ONCREATE_FLAGS.test(contents)) {
+    contents = addImport(addImport(contents, 'android.content.Intent'), 'com.healthos.alarm.AlarmLaunchHelper');
+    contents = contents.replace('super.onCreate(null)', `${LAUNCH_FLAGS_CALL}\n    super.onCreate(null)`);
+  }
+
+  if (!contents.includes('override fun onNewIntent')) {
+    contents = contents.replace(
+      /(\s+\/\*\*\s*\n\s+\* Align the back button behavior)/,
+      `
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    ${LAUNCH_FLAGS_CALL}
+    com.healthos.alarm.${NEW_INTENT_CAPTURE}
+  }
+
+$1`,
+    );
+  }
+
+  if (!contents.includes(VOLUME_KEY_CALL)) {
+    contents = addImport(addImport(contents, 'android.view.KeyEvent'), 'com.healthos.alarm.AlarmLaunchHelper');
+    // Before the closing brace of the class (the last one in the file).
+    contents = contents.replace(/\}\s*$/, `\n${VOLUME_KEY_HANDLER}}\n`);
+  }
+
+  const missing = [
+    [ONCREATE_FLAGS.test(contents), 'launch flags in onCreate'],
+    [contents.includes(NEW_INTENT_CAPTURE), 'new-intent capture'],
+    [contents.includes(VOLUME_KEY_CALL), 'volume-key handler'],
+  ].filter(([ok]) => !ok);
+  if (missing.length > 0) {
+    throw new Error(
+      `medication-alarm: could not patch MainActivity (missing: ${missing.map(([, name]) => name).join(', ')}). ` +
+        'The generated MainActivity changed; update modules/medication-alarm/app.plugin.js.',
+    );
+  }
+  return contents;
+}
+
+function withAlarmMainActivity(config) {
   return withMainActivity(config, (config) => {
     config.modResults.contents = patchMainActivity(config.modResults.contents);
     return config;
@@ -199,12 +204,11 @@ function withMedicationAlarm(config) {
   config = withMedicationAlarmManifest(config);
   config = withMedicationAlarmPackage(config);
   config = withAlarmMainActivity(config);
-  config = withAlarmVolumeKeys(config);
   config = withMedicationAlarmSources(config);
   return config;
 }
 
 module.exports = Object.assign(
-  createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.7.1'),
+  createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.7.2'),
   { patchMainActivity },
 );

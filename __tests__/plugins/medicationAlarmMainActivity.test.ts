@@ -4,8 +4,10 @@ const { patchMainActivity } = medicationAlarmPlugin as {
   patchMainActivity: (contents: string) => string;
 };
 
-const UNPATCHED = `package com.health.os
+// Shape of the MainActivity that `expo prebuild` generates (the parts the patch anchors on).
+const TEMPLATE = `package com.health.os
 
+import android.os.Build
 import android.os.Bundle
 import com.facebook.react.ReactActivity
 
@@ -13,40 +15,67 @@ class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
   }
-}
-`;
 
-// What an earlier prebuild left behind: launch flags patched in, but no volume-key handler.
-const PATCHED_WITHOUT_KEYS = `package com.health.os
+  override fun getMainComponentName(): String = "main"
 
-import android.os.Bundle
-import android.content.Intent
-import com.healthos.alarm.AlarmLaunchHelper
-import com.facebook.react.ReactActivity
-
-class MainActivity : ReactActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)
-    super.onCreate(null)
+  /**
+    * Align the back button behavior with Android S
+    */
+  override fun invokeDefaultOnBackPressed() {
+    super.invokeDefaultOnBackPressed()
   }
 }
 `;
+
+const LOCK_SCREEN = 'AlarmLaunchHelper.applyReminderLaunchFlags(this, intent)';
+const NEW_INTENT = 'MedicationAlarmModule.captureReminderLaunchFromActivity(intent)';
+const VOLUME_KEYS = 'AlarmLaunchHelper.silenceAlarmOnVolumeKey(keyCode)';
 
 describe('medication-alarm MainActivity patch', () => {
-  it('routes volume keys to the alarm helper in the activity that shows the reminder', () => {
-    const patched = patchMainActivity(UNPATCHED);
+  it('adds lock-screen launch flags, new-intent capture and the volume-key handler', () => {
+    const patched = patchMainActivity(TEMPLATE);
+    expect(patched).toContain(LOCK_SCREEN);
+    expect(patched).toContain(NEW_INTENT);
+    expect(patched).toContain(VOLUME_KEYS);
     expect(patched).toContain('import android.view.KeyEvent');
-    expect(patched).toContain('override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean');
-    expect(patched).toContain('AlarmLaunchHelper.silenceAlarmOnVolumeKey(keyCode)');
     expect(patched).toContain('return super.onKeyDown(keyCode, event)');
   });
 
-  it('adds the handler to a MainActivity patched by an earlier prebuild', () => {
-    expect(patchMainActivity(PATCHED_WITHOUT_KEYS)).toContain('silenceAlarmOnVolumeKey(keyCode)');
+  it('puts the lock-screen flags before super.onCreate so the window is configured in time', () => {
+    const patched = patchMainActivity(TEMPLATE);
+    expect(patched.indexOf(LOCK_SCREEN)).toBeLessThan(patched.indexOf('super.onCreate(null)'));
+  });
+
+  it('still adds the lock-screen flags to a MainActivity that only has the volume-key handler', () => {
+    // What the plugin used to produce when the volume-key step ran before the launch-flags step.
+    const volumeOnly = patchMainActivity(TEMPLATE)
+      .replace(`    ${LOCK_SCREEN}\n`, '')
+      .replace(/\n {2}override fun onNewIntent[\s\S]*?\n {2}}\n/, '\n');
+    expect(volumeOnly).not.toContain(LOCK_SCREEN);
+
+    const repaired = patchMainActivity(volumeOnly);
+    expect(repaired).toContain(LOCK_SCREEN);
+    expect(repaired).toContain(NEW_INTENT);
+  });
+
+  it('imports each class once', () => {
+    const patched = patchMainActivity(TEMPLATE);
+    for (const line of [
+      'import com.healthos.alarm.AlarmLaunchHelper',
+      'import android.content.Intent',
+      'import android.view.KeyEvent',
+    ]) {
+      expect(patched.split(line).length - 1).toBe(1);
+    }
   });
 
   it('is idempotent', () => {
-    const once = patchMainActivity(UNPATCHED);
+    const once = patchMainActivity(TEMPLATE);
     expect(patchMainActivity(once)).toBe(once);
+  });
+
+  it('fails the build instead of silently shipping an activity without lock-screen support', () => {
+    const renamed = TEMPLATE.replace('super.onCreate(null)', 'super.onCreate(savedInstanceState)');
+    expect(() => patchMainActivity(renamed)).toThrow(/MainActivity/);
   });
 });
