@@ -36,6 +36,12 @@ export function getMedicationTypeLabel(type?: MedicationType | string): string {
 
 export type DoseStatus = 'pending' | 'taken' | 'skipped' | 'missed' | 'snoozed';
 
+/** Per-day dose counts behind the date strip's completion ring. */
+export type DateCompletion = {
+  taken: number;
+  scheduled: number;
+};
+
 /** Display labels for dose status values (DB stores lowercase `taken`, `pending`, etc.). */
 export const DOSE_STATUS_LABEL: Record<DoseStatus, string> = {
   pending: 'Pending',

@@ -74,3 +74,6 @@ workers/app-config/.wrangler/
 # Firebase / Sentry local secrets (never commit)
 google-services.json
 GoogleService-Info.plist
+
+# Impeccable design plugin local hook
+.github/hooks/impeccable.json

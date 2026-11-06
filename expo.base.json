@@ -3,7 +3,7 @@
     "name": "Health OS",
     "owner": "ritikj1",
     "slug": "health-os-app",
-    "version": "2.0.4",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/Logo-adaptive.png",
     "scheme": "healthos",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.health.os",
-      "versionCode": 21,
+      "versionCode": 27,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
@@ -73,19 +73,20 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#121212",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#BB86FC",
           "defaultChannel": "medication-reminders"
         }
       ],
       "./modules/medication-alarm/app.plugin.js",
       "./plugins/withDevClientMainApplication.js",
       "./plugins/withReleaseApkOptimization.js",
+      "./plugins/withNativeBuildJobLimit.js",
       "./plugins/withObservabilityGradle.js",
       [
         "@sentry/react-native/expo",
         {
-          "url": "https://de.sentry.io/",
+          "url": "https://sentry.io",
           "organization": "healthos",
           "project": "health-os",
           "experimental_android": {

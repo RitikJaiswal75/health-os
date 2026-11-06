@@ -3,6 +3,7 @@ import { InteractionManager } from 'react-native';
 import { useRootNavigationState } from 'expo-router';
 import { flushDeferredReminderNavigation, setReminderRouterReady } from './reminderQueue';
 import { syncPendingNativeReminders } from './pendingReminderSync';
+import { flushPendingRefillNavigation } from '../inventory/refillNotificationNavigation';
 
 const ROUTER_SETTLE_MS = 350;
 
@@ -22,6 +23,7 @@ export function ReminderRouterReadyGate() {
       timeout = setTimeout(() => {
         if (cancelled) return;
         flushDeferredReminderNavigation();
+        flushPendingRefillNavigation();
         void syncPendingNativeReminders();
       }, ROUTER_SETTLE_MS);
     });

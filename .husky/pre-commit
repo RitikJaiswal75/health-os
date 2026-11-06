@@ -1,0 +1,7 @@
+# Sequential on purpose: one heavy check at a time (see CLAUDE.md "Running checks").
+node scripts/hooks/checkStaged.js
+npx tsx scripts/check-version-bump.ts --pre-commit
+npm run --silent typecheck
+if git diff --cached --name-only | grep -q '^__tests__/'; then
+  npm run --silent typecheck:tests
+fi

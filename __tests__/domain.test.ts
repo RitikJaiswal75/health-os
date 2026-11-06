@@ -1,4 +1,4 @@
-import { computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
+import { computeDateCompletion, computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
 import { mergeAndRankResults, CACHE_TTL_HOURS, sanitizeFtsQuery, parseCachedResults } from '../src/features/catalog/catalogService';
 import { mapIndianMedicineRow, parseIndianMedicineJson } from '../src/features/catalog/indiaMedicineParser';
 import { mapIndiaApiResults } from '../src/features/catalog/indiaCatalogApi';
@@ -23,6 +23,20 @@ describe('dateUtils', () => {
     expect(computeDonutRatio(2, 4)).toBe(0.5);
     expect(computeDonutRatio(4, 4)).toBe(1);
     expect(computeDonutRatio(0, 0)).toBe(0);
+  });
+
+  it('does not fill the completion ring for skipped doses', () => {
+    const takenAndSkipped = computeDateCompletion([{ status: 'taken' }, { status: 'skipped' }]);
+    expect(computeDonutRatio(takenAndSkipped.taken, takenAndSkipped.scheduled)).toBe(0.5);
+
+    const onlySkipped = computeDateCompletion([{ status: 'skipped' }]);
+    expect(onlySkipped).toEqual({ taken: 0, scheduled: 1 });
+    expect(computeDonutRatio(onlySkipped.taken, onlySkipped.scheduled)).toBe(0);
+  });
+
+  it('rejects unknown dose statuses at compile time', () => {
+    // @ts-expect-error status must be a DoseStatus
+    computeDateCompletion([{ status: 'taken ' }]);
   });
 
   it('formats date key', () => {
@@ -1121,6 +1135,40 @@ describe('doseSlotUtils', () => {
       .toBe('evening-dose');
   });
 
+  it('groups doses by day in one pass, matching getForDate', () => {
+    const { DoseEventRepository } = require('../src/features/medications/medicationRepository');
+    const row = (id: string, scheduledAt: string, status: string) => ({
+      id,
+      medication_id: 'med-1',
+      schedule_id: null,
+      scheduled_at: scheduledAt,
+      status,
+      notes: null,
+      dose_amount: 1,
+      created_at: '2026-09-01T07:00:00',
+      updated_at: '2026-09-01T07:00:00',
+    });
+    const doseRows = [
+      row('d1-am', '2026-09-08T08:00:00', 'taken'),
+      row('d1-pm', '2026-09-08T20:00:00', 'pending'),
+      row('d2-am', '2026-09-09T08:00:00', 'taken'),
+      row('d3-am', '2026-09-10T08:00:00', 'pending'),
+    ];
+    const mockDb = {
+      getAllSync: jest.fn((sql: string) => (sql.includes('FROM dose_events') ? doseRows : [])),
+    };
+    const repo = new DoseEventRepository(mockDb);
+
+    const byDate = repo.getForDates(['2026-09-08', '2026-09-09']);
+    const ids = (key: string) => byDate.get(key).map((dose: { id: string }) => dose.id).sort();
+
+    expect([...byDate.keys()]).toEqual(['2026-09-08', '2026-09-09']);
+    expect(ids('2026-09-08')).toEqual(['d1-am', 'd1-pm']);
+    expect(ids('2026-09-09')).toEqual(['d2-am']);
+    expect(repo.getForDate('2026-09-08').map((dose: { id: string }) => dose.id).sort())
+      .toEqual(['d1-am', 'd1-pm']);
+  });
+
   it('removes pending doses that duplicate a skipped dose', () => {
     const deleted: string[] = [];
     const mockDb = {
@@ -1484,6 +1532,59 @@ describe('doseGenerationService', () => {
     const createdAgain = generateUpcomingDoseEvents(mockDb, 7);
     expect(createdAgain).toBe(0);
     expect(createSpy).toHaveBeenCalledTimes(created);
+  });
+
+  describe('backfillMissedDoses', () => {
+    const today = new Date('2026-09-13T00:00:00');
+    const baseSchedule = {
+      id: 's1',
+      medicationId: 'm1',
+      type: 'fixed_daily',
+      timesOfDay: JSON.stringify([{ hour: 8, minute: 0, doseAmount: 1 }]),
+      isActive: true,
+    };
+
+    function run(startDate: string, beforeDateKey?: string) {
+      const { backfillMissedDoses } = require('../src/features/medications/doseGenerationService');
+      const created: { scheduledAt: string; status?: string }[] = [];
+      const doseRepo = {
+        createPending: (input: { scheduledAt: string; status?: string }) => {
+          created.push(input);
+        },
+      };
+      const count = backfillMissedDoses(
+        doseRepo,
+        { ...baseSchedule, startDate },
+        today,
+        beforeDateKey,
+      );
+      return { count, created };
+    }
+
+    it('records yesterday as missed when the schedule started yesterday', () => {
+      const { count, created } = run('2026-09-12');
+      expect(count).toBe(1);
+      expect(created).toEqual([
+        expect.objectContaining({ scheduledAt: '2026-09-12T08:00:00', status: 'missed' }),
+      ]);
+    });
+
+    it('creates nothing when the schedule starts today or later', () => {
+      expect(run('2026-09-13').count).toBe(0);
+      expect(run('2026-09-20').count).toBe(0);
+    });
+
+    it('caps the backfill at 15 days back', () => {
+      const { count, created } = run('2026-01-01');
+      expect(count).toBe(15);
+      expect(created[0]?.scheduledAt).toBe('2026-08-29T08:00:00');
+      expect(created[14]?.scheduledAt).toBe('2026-09-12T08:00:00');
+    });
+
+    it('only fills days before the first recorded day when one is given', () => {
+      expect(run('2026-09-12', '2026-09-12').count).toBe(0);
+      expect(run('2026-09-10', '2026-09-12').count).toBe(2);
+    });
   });
 
   it('creates only the remaining pending doses after completed doses for today', () => {
@@ -2250,5 +2351,13 @@ describe('InventoryService', () => {
     expect(remaining).toBe(40);
     expect(state.med.current_quantity).toBe(40);
     expect(state.variant.current_quantity).toBe(40);
+  });
+});
+
+describe('historyFloorDate', () => {
+  const { historyFloorDate } = require('../src/core/dates/dateUtils');
+
+  it('lets History browse back ten years, whatever data exists', () => {
+    expect(formatDateKey(historyFloorDate(new Date('2026-09-13T15:00:00')))).toBe('2016-09-13');
   });
 });

@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import type { DoseStatus } from '../core/types/domain';
 
 export const medications = sqliteTable('medications', {
   id: text('id').primaryKey(),
@@ -58,7 +59,7 @@ export const doseEvents = sqliteTable('dose_events', {
   variantId: text('variant_id').references(() => medicationVariants.id),
   scheduleId: text('schedule_id').references(() => schedules.id),
   scheduledAt: text('scheduled_at').notNull(),
-  status: text('status').notNull().default('pending'),
+  status: text('status').$type<DoseStatus>().notNull().default('pending'),
   takenAt: text('taken_at'),
   doseAmount: real('dose_amount').notNull().default(1),
   notes: text('notes'),

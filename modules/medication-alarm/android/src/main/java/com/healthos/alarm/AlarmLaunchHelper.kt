@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.view.KeyEvent
 import android.view.WindowManager
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
@@ -44,6 +45,11 @@ object AlarmLaunchHelper {
         pendingLaunch = params
         return true
     }
+
+    /** Volume up/down silences a ringing alarm; true when the key was used up (so no volume change). */
+    fun silenceAlarmOnVolumeKey(keyCode: Int): Boolean =
+        (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) &&
+            AlarmSoundController.stopPlaybackOnly()
 
     fun consumeReminderLaunch(): WritableMap? {
         val launch = pendingLaunch

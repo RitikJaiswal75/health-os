@@ -4,7 +4,7 @@ import { Appbar, Button, Card, Dialog, FAB, Menu, Portal, RadioButton, Text } fr
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { navigateToAddMedication } from '@/src/features/reliability/reliabilityService';
-import { formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip } from '@/src/core/dates/dateUtils';
+import { computeDateCompletion, formatDateKey, formatLocalDateTime, formatScheduledTime, getDateStrip } from '@/src/core/dates/dateUtils';
 import { DateStrip, type DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
@@ -18,7 +18,10 @@ import { InventoryService } from '@/src/features/inventory/inventoryService';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
 import type { DoseEvent } from '@/src/db/schema';
 import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
-import { ReminderReconciler, scheduleAlarms, scheduleSnoozeAt } from '@/src/features/reminders/reminderService';
+import {
+  rescheduleReminders,
+  scheduleSnoozeAt,
+} from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
 import { AppUpdateBanner } from '@/src/core/components/AppUpdateBanner';
@@ -43,8 +46,7 @@ export default function HomeScreen() {
       if (dbState.status !== 'ready') return;
       cleanupSnoozeConflicts(dbState.db);
       generateUpcomingDoseEvents(dbState.db, 14);
-      const reconciler = new ReminderReconciler(dbState.db);
-      void scheduleAlarms(reconciler.reconcile(7));
+      void rescheduleReminders(dbState.db);
       setRefreshKey((key) => key + 1);
     }, [dbState]),
   );
@@ -69,10 +71,7 @@ export default function HomeScreen() {
     for (const date of stripDates) {
       const key = formatDateKey(date);
       const dayDoses = doseRepo.getForDate(key, activeMedIds);
-      completion[key] = {
-        scheduled: dayDoses.filter((d) => d.status !== 'skipped').length,
-        taken: dayDoses.filter((d) => d.status === 'taken').length,
-      };
+      completion[key] = computeDateCompletion(dayDoses);
     }
 
     const allDoses = doseRepo.getForDate(dateKey, activeMedIds);
@@ -110,6 +109,7 @@ export default function HomeScreen() {
     new DoseEventRepository(dbState.db).updateStatus(dose.id, 'skipped');
     removePendingDuplicatingResolvedDoses(dbState.db);
     removeDuplicateDoseEvents(dbState.db);
+    void rescheduleReminders(dbState.db);
     refresh();
   };
 
@@ -144,10 +144,11 @@ export default function HomeScreen() {
     } else {
       const doseRepo = new DoseEventRepository(dbState.db);
       const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-      inventory.applyStatusChange(editDose.id, editDose.status as DoseStatus, editStatus);
+      inventory.applyStatusChange(editDose.id, editDose.status, editStatus);
       doseRepo.updateStatus(editDose.id, editStatus, {
         takenAt: editStatus === 'taken' ? new Date().toISOString() : undefined,
       });
+      void rescheduleReminders(dbState.db);
     }
     setEditDose(null);
     refresh();
@@ -157,8 +158,9 @@ export default function HomeScreen() {
     if (!editDose || dbState.status !== 'ready' || !medRepo) return;
     const doseRepo = new DoseEventRepository(dbState.db);
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.compensateOnDelete(editDose.id, editDose.status as DoseStatus);
+    inventory.compensateOnDelete(editDose.id, editDose.status);
     doseRepo.delete(editDose.id);
+    void rescheduleReminders(dbState.db);
     setEditDose(null);
     refresh();
   };
@@ -237,7 +239,7 @@ export default function HomeScreen() {
                         isLogged
                           ? () => {
                               setEditDose(dose);
-                              setEditStatus(dose.status as DoseStatus);
+                              setEditStatus(dose.status);
                             }
                           : undefined
                       }
@@ -252,7 +254,7 @@ export default function HomeScreen() {
                               })
                             : t('home.statusLine', {
                                 time: formatScheduledTime(dose.scheduledAt),
-                                status: getDoseStatusLabel(dose.status as DoseStatus),
+                                status: getDoseStatusLabel(dose.status),
                               })}
                           {med && med.currentQuantity > 0
                             ? ` · ${t('home.remaining', { count: med.currentQuantity })}`

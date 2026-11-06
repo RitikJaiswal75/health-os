@@ -1,5 +1,7 @@
-import { format, parseISO, startOfDay, addDays, isSameDay } from 'date-fns';
+import { format, parseISO, startOfDay, addDays, isSameDay, subYears } from 'date-fns';
 import { getDateFnsLocale } from '@/src/i18n/dateLocale';
+import type { DateCompletion, DoseStatus } from '../types/domain';
+import { HISTORY_FLOOR_YEARS } from './constants';
 
 export function formatDateKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
@@ -69,6 +71,11 @@ export function isFutureDateKey(dateKey: string, now: Date = new Date()): boolea
   return parseDateKey(dateKey).getTime() > startOfDay(now).getTime();
 }
 
+/** First day the History strip offers. Fixed, so users can go back with or without any data. */
+export function historyFloorDate(today: Date = new Date()): Date {
+  return subYears(startOfDay(today), HISTORY_FLOOR_YEARS);
+}
+
 export function clampCalendarDate(date: Date, min: Date, max: Date): Date {
   const value = startOfDay(date).getTime();
   const minValue = startOfDay(min).getTime();
@@ -76,6 +83,14 @@ export function clampCalendarDate(date: Date, min: Date, max: Date): Date {
   if (value < minValue) return startOfDay(min);
   if (value > maxValue) return startOfDay(max);
   return startOfDay(date);
+}
+
+/** Only taken doses fill the ring; skipped doses still count toward the day's total. */
+export function computeDateCompletion(doses: { status: DoseStatus }[]): DateCompletion {
+  return {
+    scheduled: doses.length,
+    taken: doses.filter((d) => d.status === 'taken').length,
+  };
 }
 
 export function computeDonutRatio(taken: number, scheduled: number): number {

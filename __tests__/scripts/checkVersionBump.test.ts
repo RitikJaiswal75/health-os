@@ -1,7 +1,9 @@
 import {
   checkAdvertisedVersion,
+  checkLatestVersionMatches,
   checkVersionBump,
   readExpoVersionInfo,
+  touchesAppPaths,
 } from '../../scripts/release/checks';
 
 const BASE = { version: '2.0.2', versionCode: 5 };
@@ -72,5 +74,41 @@ describe('checkAdvertisedVersion', () => {
     expect(checkAdvertisedVersion({ version: 1, android: { latestVersion: '2.1.0' } }, '2.0.2')).toEqual([
       'app-update.json android.latestVersion 2.1.0 is newer than the app version 2.0.2.',
     ]);
+  });
+});
+
+describe('checkLatestVersionMatches', () => {
+  it('passes when every platform advertises the bumped app version', () => {
+    expect(checkLatestVersionMatches({ version: 1, android: { latestVersion: '2.1.0' } }, '2.1.0')).toEqual([]);
+  });
+
+  it('fails when latestVersion lags behind the bumped app version', () => {
+    expect(checkLatestVersionMatches({ version: 1, android: { latestVersion: '2.0.4' } }, '2.1.0')).toEqual([
+      'app-update.json android.latestVersion 2.0.4 must equal the app version 2.1.0.',
+    ]);
+  });
+
+  it('fails when latestVersion is ahead of the app version', () => {
+    expect(checkLatestVersionMatches({ version: 1, android: { latestVersion: '2.2.0' } }, '2.1.0')).toHaveLength(1);
+  });
+
+  it('fails when no platform advertises a latestVersion', () => {
+    expect(checkLatestVersionMatches({ version: 1 }, '2.1.0')).toEqual([
+      'app-update.json must set latestVersion 2.1.0 for at least one platform.',
+    ]);
+  });
+});
+
+describe('touchesAppPaths', () => {
+  it('matches the CI app filter and the app-update config', () => {
+    expect(touchesAppPaths(['app/(tabs)/index.tsx'])).toBe(true);
+    expect(touchesAppPaths(['src/core/dates/dateUtils.ts'])).toBe(true);
+    expect(touchesAppPaths(['package.json'])).toBe(true);
+    expect(touchesAppPaths(['workers/app-config/config/app-update.json'])).toBe(true);
+  });
+
+  it('ignores docs, tests and tooling', () => {
+    expect(touchesAppPaths(['CLAUDE.md', '__tests__/domain.test.ts', '.husky/pre-commit', 'scripts/hooks/checkStaged.js'])).toBe(false);
+    expect(touchesAppPaths(['website/src/app.tsx'])).toBe(false);
   });
 });

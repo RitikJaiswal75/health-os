@@ -6,6 +6,10 @@ import { openReminderFromData } from './reminderDeepLink';
 import { syncPendingNativeReminders } from './pendingReminderSync';
 import { subscribeReminderLaunchIntent } from './reminderLaunchIntent';
 import { isReminderRouterReady } from './reminderRouterReady';
+import {
+  consumeLaunchRefillResponse,
+  openRefillFromNotification,
+} from '../inventory/refillNotificationNavigation';
 
 const ACTIVE_POLL_MS = 1500;
 
@@ -14,8 +18,16 @@ export function ReminderNotificationBootstrap() {
     void ensureNotificationSetup();
     const launchSub = subscribeReminderLaunchIntent();
 
+    consumeLaunchRefillResponse();
+
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      openReminderFromData(response.notification.request.content.data);
+      const { request } = response.notification;
+      if (openRefillFromNotification(request.content.data, request.identifier)) {
+        // Warm taps also become the "last response"; clear so a reload doesn't replay it.
+        Notifications.clearLastNotificationResponse();
+        return;
+      }
+      openReminderFromData(request.content.data);
       if (isReminderRouterReady()) {
         void syncPendingNativeReminders();
       }

@@ -1,10 +1,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
 import { canLogDoseForTodayOrPast } from '../medications/doseSlotUtils';
-import type { DoseStatus } from '../../core/types/domain';
 import { InventoryService } from './inventoryService';
 import { notifyRefillIfNeeded } from './refillReminderService';
 import { reportError } from '@/src/core/observability/crashReporter';
+import { rescheduleReminders } from '../reminders/reminderService';
 
 /** Mark a dose taken, adjust inventory, and fire refill notification if needed. */
 export function markDoseAsTaken(
@@ -27,7 +27,7 @@ export function markDoseAsTaken(
   try {
     const { previousQty, newQty, changed } = inventory.applyStatusChange(
       dose.id,
-      dose.status as DoseStatus,
+      dose.status,
       'taken',
       resolvedVariantId,
     );
@@ -41,6 +41,9 @@ export function markDoseAsTaken(
     if (med && changed) {
       void notifyRefillIfNeeded(med, previousQty, newQty);
     }
+
+    // Cancel the alarm for a dose taken ahead of its scheduled time.
+    void rescheduleReminders(db);
 
     return true;
   } catch (error) {

@@ -111,8 +111,36 @@ export async function scheduleAlarms(occurrences: AlarmScheduleInput[]): Promise
     return;
   }
 
-  if (occurrences.length === 0) return;
+  if (occurrences.length === 0) {
+    // Still clear what's scheduled, or the last resolved dose keeps its notification.
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    return;
+  }
   await scheduleExpoNotifications(dedupeAlarms(occurrences));
+}
+
+let rescheduleTail: Promise<void> = Promise.resolve();
+let queuedReschedule: Promise<void> | null = null;
+
+/**
+ * Re-sync OS alarms with current dose rows so resolved doses stop ringing.
+ * Runs are serialized, and calls made while one is waiting share it; each run reads
+ * dose rows when it starts, so the last run always reflects the latest state.
+ */
+export function rescheduleReminders(db: SQLiteDatabase): Promise<void> {
+  if (queuedReschedule) return queuedReschedule;
+
+  const run = rescheduleTail.then(async () => {
+    queuedReschedule = null;
+    try {
+      await scheduleAlarms(new ReminderReconciler(db).reconcile(7));
+    } catch (error) {
+      reportError('ALARM_SCHEDULE_FAILED', error);
+    }
+  });
+  queuedReschedule = run;
+  rescheduleTail = run;
+  return run;
 }
 
 export async function cancelAlarm(alarmId: string): Promise<void> {
@@ -151,8 +179,7 @@ export async function scheduleSnoozeAt(
   db?: SQLiteDatabase,
 ): Promise<void> {
   if (db) {
-    const reconciler = new ReminderReconciler(db);
-    await scheduleAlarms(reconciler.reconcile(7));
+    await rescheduleReminders(db);
     return;
   }
 

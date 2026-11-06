@@ -1,5 +1,15 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx jest*)",
+      "Bash(npm test*)",
+      "Bash(npm run test:changed*)",
+      "Bash(npm run typecheck*)",
+      "Bash(npx eslint*)",
+      "Bash(npm run lint*)"
+    ]
   }
 }

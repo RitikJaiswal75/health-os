@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, FAB, Text } from 'react-native-paper';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { navigateToAddMedication } from '@/src/features/reliability/reliabilityService';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { InventoryService } from '@/src/features/inventory/inventoryService';
@@ -14,6 +14,8 @@ import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissi
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 import { t } from '@/src/i18n/translate';
+import { HIGHLIGHT_MEDICATION_PARAM } from '@/src/features/inventory/constants';
+import { useHighlightAutoClear } from '@/src/features/inventory/useHighlightAutoClear';
 
 function formatStrengthLine(med: Medication): string {
   const subtitle = formatStrengthSubtitle(
@@ -38,6 +40,25 @@ export default function LibraryScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [refillMed, setRefillMed] = useState<Medication | null>(null);
   const { t } = useT();
+  const params = useLocalSearchParams<{ [HIGHLIGHT_MEDICATION_PARAM]?: string }>();
+  const highlightedId = params[HIGHLIGHT_MEDICATION_PARAM] ?? null;
+  const scrollRef = useRef<ScrollView>(null);
+  const cardOffsets = useRef(new Map<string, number>());
+
+  // Refill notification tap: scroll to that medication; the highlight clears itself after a delay.
+  useHighlightAutoClear(highlightedId);
+  useEffect(() => {
+    if (!highlightedId) return;
+    const y = cardOffsets.current.get(highlightedId);
+    if (y != null) scrollRef.current?.scrollTo({ y: Math.max(y - 16, 0), animated: true });
+  }, [highlightedId]);
+
+  const handleCardLayout = (medId: string, y: number) => {
+    cardOffsets.current.set(medId, y);
+    if (medId === highlightedId) {
+      scrollRef.current?.scrollTo({ y: Math.max(y - 16, 0), animated: true });
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -69,12 +90,16 @@ export default function LibraryScreen() {
 
       <ReminderPermissionBanner />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
         {meds.length === 0 ? (
           <Text style={styles.empty}>{t('library.empty')}</Text>
         ) : (
           meds.map((med) => (
-            <Card key={med.id} style={styles.card}>
+            <Card
+              key={med.id}
+              style={[styles.card, med.id === highlightedId && styles.cardHighlighted]}
+              onLayout={(event) => handleCardLayout(med.id, event.nativeEvent.layout.y)}
+            >
               <Card.Content style={styles.cardContent}>
                 <Pressable
                   style={styles.rowMain}
@@ -138,6 +163,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: healthOsTheme.colors.background },
   content: { padding: 16, paddingBottom: 96 },
   card: { marginBottom: 8, backgroundColor: healthOsTheme.colors.surface },
+  cardHighlighted: {
+    borderWidth: 2,
+    borderColor: healthOsTheme.colors.primary,
+    backgroundColor: healthOsTheme.colors.primaryContainer,
+  },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',

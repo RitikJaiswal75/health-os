@@ -7,7 +7,6 @@ import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
 import {
   canLogDoseForTodayOrPast,
   dedupeDoseEvents,
-  doseBelongsToDateKey,
   filterPendingDuplicatingResolved,
   filterPendingReplacedBySnooze,
   parseSnoozedFromNotes,
@@ -369,17 +368,20 @@ export class DoseEventRepository {
     scheduleId?: string;
     scheduledAt: string;
     doseAmount?: number;
+    /** 'missed' is used when backfilling slots that were already in the past at creation. */
+    status?: 'pending' | 'missed';
   }): DoseEvent {
     const id = uuidv4();
     const now = new Date().toISOString();
     this.db.runSync(
       `INSERT INTO dose_events (id, medication_id, schedule_id, scheduled_at, status, dose_amount, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.medicationId,
         input.scheduleId ?? null,
         input.scheduledAt,
+        input.status ?? 'pending',
         input.doseAmount != null && input.doseAmount > 0 ? input.doseAmount : 1,
         now,
         now,
@@ -412,6 +414,11 @@ export class DoseEventRepository {
   }
 
   getForDate(dateKey: string, activeMedicationIds?: Set<string>): DoseEvent[] {
+    return this.getForDates([dateKey], activeMedicationIds).get(dateKey) ?? [];
+  }
+
+  /** Same as getForDate for many days, loading medications and dose rows once. */
+  getForDates(dateKeys: string[], activeMedicationIds?: Set<string>): Map<string, DoseEvent[]> {
     const medRepo = new MedicationRepository(this.db);
     const scheduleById = new Map<string, Schedule>();
     const schedulesByMedId = new Map<string, Schedule[]>();
@@ -426,21 +433,50 @@ export class DoseEventRepository {
       }
     }
 
-    const doses = this.db
+    const buckets = new Map<string, DoseEvent[]>(dateKeys.map((key) => [key, []]));
+    const rows = this.db
       .getAllSync(`SELECT * FROM dose_events ORDER BY scheduled_at ASC`)
       .map(mapDoseEventRow)
-      .filter((dose) => doseBelongsToDateKey(dose, dateKey))
-      .filter((dose) => !activeMedicationIds || activeMedicationIds.has(dose.medicationId))
-      .filter((dose) =>
-        doseVisibleForScheduleOnDateKey(dose, dateKey, scheduleById, schedulesByMedId),
-      );
+      .filter((dose) => !activeMedicationIds || activeMedicationIds.has(dose.medicationId));
 
-    return sortDosesForDisplay(
-      filterPendingDuplicatingResolved(
-        filterPendingReplacedBySnooze(dedupeDoseEvents(doses)),
-      ),
-      medicationCreatedAt,
+    for (const dose of rows) {
+      // A snoozed dose also belongs to the day it was originally scheduled.
+      const candidateKeys = new Set([scheduledAtToDateKey(dose.scheduledAt)]);
+      if (dose.status === 'snoozed') {
+        const snoozedFrom = parseSnoozedFromNotes(dose.notes);
+        if (snoozedFrom) candidateKeys.add(scheduledAtToDateKey(snoozedFrom));
+      }
+      for (const key of candidateKeys) {
+        const bucket = buckets.get(key);
+        if (
+          bucket &&
+          doseVisibleForScheduleOnDateKey(dose, key, scheduleById, schedulesByMedId)
+        ) {
+          bucket.push(dose);
+        }
+      }
+    }
+
+    for (const [key, doses] of buckets) {
+      buckets.set(
+        key,
+        sortDosesForDisplay(
+          filterPendingDuplicatingResolved(filterPendingReplacedBySnooze(dedupeDoseEvents(doses))),
+          medicationCreatedAt,
+        ),
+      );
+    }
+
+    return buckets;
+  }
+
+  /** First local calendar day on which the medication has a dose row, whatever its status. */
+  firstDoseDateKey(medicationId: string): string | undefined {
+    const rows = this.db.getAllSync<{ scheduled_at: string }>(
+      `SELECT scheduled_at FROM dose_events WHERE medication_id = ?`,
+      [medicationId],
     );
+    return rows.map((row) => scheduledAtToDateKey(row.scheduled_at)).sort()[0];
   }
 
   /** True when any dose row already occupies this schedule slot (including skipped/missed). */

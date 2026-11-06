@@ -2,7 +2,7 @@ name: Release APK
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - 'app/**'
       - 'src/**'
@@ -64,10 +64,22 @@ jobs:
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           # Without a token, skip source map upload instead of failing the build.
-          SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
+          # Branch builds never upload source maps, so they do not pollute Sentry releases.
+          SENTRY_DISABLE_AUTO_UPLOAD: ${{ (github.ref != 'refs/heads/main' || secrets.SENTRY_AUTH_TOKEN == '') && 'true' || 'false' }}
         run: npm run android:apk
 
+      # Every push gets a downloadable APK from the run page (Actions > run > Artifacts).
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-os-apk-${{ github.sha }}
+          path: dist/health-os-release.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      # Only main publishes a GitHub Release.
       - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}

@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import type { Medication } from '@/src/db/schema';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from '@/src/features/reminders/notificationSetup';
 import { t } from '@/src/i18n/translate';
+import { REFILL_NOTIFICATION_TYPE } from './constants';
 
 export async function notifyRefillIfNeeded(
   med: Medication,
@@ -21,6 +22,7 @@ export async function notifyRefillIfNeeded(
     content: {
       title: t('refill.notifyTitle'),
       body: t('refill.notifyBody', { name: label, count: newQty }),
+      data: { type: REFILL_NOTIFICATION_TYPE, medicationId: med.id },
       ...(Platform.OS === 'android' ? { channelId: MEDICATION_REMINDER_CHANNEL } : {}),
     },
     trigger: null,
