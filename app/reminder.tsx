@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository, DoseEventRepository } from '@/src/features/medications/medicationRepository';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
@@ -39,6 +40,12 @@ export default function ReminderScreen() {
   const db = dbState.status === 'ready' ? dbState.db : null;
   const medRepo = useMemo(() => (db ? new MedicationRepository(db) : null), [db]);
   const { t } = useT();
+  const insets = useSafeAreaInsets();
+  // Full-screen modal with no header: keep content clear of the status and gesture bars.
+  const containerStyle = [
+    styles.container,
+    { paddingTop: CONTAINER_PADDING + insets.top, paddingBottom: CONTAINER_PADDING + insets.bottom },
+  ];
 
   const items = useMemo((): ReminderItem[] => {
     if (!db || !medRepo) return [];
@@ -170,7 +177,7 @@ export default function ReminderScreen() {
   if (items.length === 0) {
     if (dbState.status === 'loading') {
       return (
-        <View style={styles.container} accessibilityLabel={t('reminder.loadingA11y')}>
+        <View style={containerStyle} accessibilityLabel={t('reminder.loadingA11y')}>
           <Text variant="headlineSmall" style={styles.heading}>
             {t('reminder.loading')}
           </Text>
@@ -180,7 +187,7 @@ export default function ReminderScreen() {
 
     if (dbState.status === 'error') {
       return (
-        <View style={styles.container} accessibilityLabel={t('reminder.unavailableA11y')}>
+        <View style={containerStyle} accessibilityLabel={t('reminder.unavailableA11y')}>
           <Text variant="headlineSmall" style={styles.heading}>
             {t('reminder.unavailable')}
           </Text>
@@ -192,7 +199,7 @@ export default function ReminderScreen() {
     }
 
     return (
-      <View style={styles.container} accessibilityLabel={t('reminder.screenA11y')}>
+      <View style={containerStyle} accessibilityLabel={t('reminder.screenA11y')}>
         <Text variant="headlineSmall" style={styles.heading}>
           {t('reminder.gone')}
         </Text>
@@ -210,38 +217,48 @@ export default function ReminderScreen() {
   const isGrouped = items.length > 1;
 
   return (
-    <View style={styles.container} accessibilityLabel={t('reminder.screenA11y')}>
+    <View style={containerStyle} accessibilityLabel={t('reminder.screenA11y')}>
       <Text variant="headlineSmall" style={styles.heading}>
         {isGrouped ? t('reminder.dueMany') : t('reminder.dueTitle')}
       </Text>
 
-      {isGrouped ? (
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-          {items.map((item) => (
+      {/* Scrolls in both modes so large font sizes never clip the medication details. */}
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={isGrouped ? styles.listContent : styles.singleContent}
+      >
+        {isGrouped ? (
+          items.map((item) => (
             <ReminderMedicationRow
               key={item.dose.id}
               medication={item.medication}
               doseAmount={item.dose.doseAmount}
               onTaken={() => requestTaken(item.medication.id, item)}
             />
-          ))}
-        </ScrollView>
-      ) : (
-        <ReminderSingleMedicationCard
-          medication={items[0]!.medication}
-          doseAmount={items[0]!.dose.doseAmount}
-        />
-      )}
+          ))
+        ) : (
+          <ReminderSingleMedicationCard
+            medication={items[0]!.medication}
+            doseAmount={items[0]!.dose.doseAmount}
+          />
+        )}
+      </ScrollView>
 
       <View style={styles.actions}>
         {isGrouped ? (
-          <Button mode="contained" onPress={handleTakeAll} accessibilityLabel={t('reminder.takeAll')}>
+          <Button
+            mode="contained"
+            onPress={handleTakeAll}
+            contentStyle={styles.primaryButtonContent}
+            accessibilityLabel={t('reminder.takeAll')}
+          >
             {t('reminder.takeAllLabel')}
           </Button>
         ) : (
           <Button
             mode="contained"
             onPress={() => requestTaken(items[0]!.medication.id, items[0])}
+            contentStyle={styles.primaryButtonContent}
             accessibilityLabel={t('home.markTaken')}
           >
             {t('common.taken')}
@@ -269,10 +286,12 @@ export default function ReminderScreen() {
   );
 }
 
+const CONTAINER_PADDING = 24;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
+    paddingHorizontal: CONTAINER_PADDING,
     gap: 16,
     backgroundColor: healthOsTheme.colors.background,
   },
@@ -287,5 +306,10 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 8,
   },
+  singleContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  primaryButtonContent: { minHeight: 56 },
   actions: { gap: 12, width: '100%' },
 });
