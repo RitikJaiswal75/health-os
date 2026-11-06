@@ -20,7 +20,22 @@ jest.mock('react-native-paper', () => {
   return { Dialog, Portal: 'Portal', Button: 'Button', Text: 'Text' };
 });
 jest.mock('react-native-calendars', () => ({
-  Calendar: 'Calendar',
+  // Host 'Calendar' element (queried by findCalendar) that also renders the selected day's cell,
+  // so DayCell runs inside the dialog's real completion context.
+  Calendar: (props: {
+    current: string;
+    markedDates: Record<string, { selected?: boolean }>;
+    dayComponent: ComponentType<object>;
+  }) => {
+    const { createElement: h } = jest.requireActual('react');
+    const [year, month, day] = props.current.split('-').map(Number);
+    const date = { dateString: props.current, year, month, day, timestamp: 0 };
+    return h(
+      'Calendar',
+      props,
+      h(props.dayComponent, { date, state: '', marking: props.markedDates[props.current] }),
+    );
+  },
   // Records every locale (re)definition so the test can tell renders from language changes.
   LocaleConfig: {
     defaultLocale: '',
@@ -33,7 +48,9 @@ jest.mock('react-native-calendars', () => ({
     }),
   },
 }));
-jest.mock('@/src/core/components/DateCompletionRing', () => ({ DateCompletionRing: () => null }));
+jest.mock('@/src/core/components/DateCompletionRing', () => ({
+  DateCompletionRing: (props: object) => jest.requireActual('react').createElement('Ring', props),
+}));
 jest.mock('@/src/core/theme/paperTheme', () => ({ healthOsTheme: { colors: {} } }));
 jest.mock('@/src/i18n/useT', () => ({ useT: () => ({ t: (key: string) => key }) }));
 jest.mock('@/src/i18n/dateLocale', () => ({ getDateFnsLocale: () => mockLocale }));
@@ -127,6 +144,17 @@ describe('HistoryCalendarDialog', () => {
     });
   });
 
+  it('shows the selected-day marker next to the ring when the day has scheduled doses', () => {
+    const renderer = createRoot();
+    renderDialog(renderer, { completionByDate: { '2026-10-15': { taken: 1, scheduled: 2 } } });
+
+    const rings = renderer.container.queryAll((node) => node.type === 'Ring');
+    const markers = renderer.container.queryAll((node) => node.props.testID === 'selected-day-marker');
+    expect(rings).toHaveLength(1);
+    expect(rings[0]?.props).toMatchObject({ taken: 1, scheduled: 2, selected: true });
+    expect(markers).toHaveLength(1);
+  });
+
   describe('day cell', () => {
     function renderDayCell(props: object): TestInstance {
       const renderer = createRoot();
@@ -152,6 +180,15 @@ describe('HistoryCalendarDialog', () => {
       const cell = renderDayCell({ date: dayData('2026-11-05'), state: 'disabled' });
       expect(cell.props.disabled).toBe(true);
       expect(cell.props.accessibilityState).toEqual({ selected: false, disabled: true });
+    });
+
+    it('draws a selected-day marker alongside the ring only for the selected day', () => {
+      const markerCount = (marking?: { selected: boolean }) => {
+        const cell = renderDayCell({ date: dayData('2026-10-15'), state: '', marking });
+        return cell.queryAll((node) => node.props.testID === 'selected-day-marker').length;
+      };
+      expect(markerCount({ selected: true })).toBe(1);
+      expect(markerCount(undefined)).toBe(0);
     });
 
     it('reports selection from the marking', () => {

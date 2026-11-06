@@ -12,6 +12,10 @@ import { getDateFnsLocale } from '@/src/i18n/dateLocale';
 
 const CELL_SIZE = 36;
 const CALENDAR_LOCALE = 'healthos';
+// Ring stroke is 3.5; leave a 1.5 gap so the marker never touches the progress arc.
+const SELECTED_MARKER_INSET = 5;
+// Primary at ~35% opacity: clearly lighter than the ring track, day text stays readable.
+const SELECTED_MARKER_COLOR = 'rgba(187, 134, 252, 0.35)';
 
 type HistoryCalendarDialogProps = {
   visible: boolean;
@@ -83,6 +87,7 @@ function DayCell({ date, state, marking, onPress }: DayCellProps) {
             selected={selected}
             size={CELL_SIZE}
           />
+          {selected && <View testID="selected-day-marker" style={styles.selectedMarker} />}
         </View>
       )}
       <Text
@@ -168,6 +173,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
+  },
+  // Filled disc inside the completion ring, so selection reads whether or not the day has doses.
+  selectedMarker: {
+    position: 'absolute',
+    top: SELECTED_MARKER_INSET,
+    left: SELECTED_MARKER_INSET,
+    width: CELL_SIZE - 2 * SELECTED_MARKER_INSET,
+    height: CELL_SIZE - 2 * SELECTED_MARKER_INSET,
+    borderRadius: CELL_SIZE / 2,
+    backgroundColor: SELECTED_MARKER_COLOR,
   },
   day: {
     color: healthOsTheme.colors.onSurface,
