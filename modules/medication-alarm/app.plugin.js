@@ -100,6 +100,41 @@ $1`,
   });
 }
 
+// Volume up/down silences a ringing alarm. It lives in MainActivity because that is the activity
+// the reminder intent opens (MedicationAlarmReceiver.buildReminderActivityIntent).
+const VOLUME_KEY_HANDLER = `  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    if (AlarmLaunchHelper.silenceAlarmOnVolumeKey(keyCode)) return true
+    return super.onKeyDown(keyCode, event)
+  }
+`;
+
+/**
+ * Pure string patch (unit tested). Idempotent, and independent of the launch-flag patch above so a
+ * MainActivity patched by an earlier prebuild still gets the handler.
+ */
+function patchMainActivity(source) {
+  if (source.includes('silenceAlarmOnVolumeKey')) return source;
+  let contents = source;
+  if (!contents.includes('import android.view.KeyEvent')) {
+    contents = contents.replace('import android.os.Bundle', 'import android.os.Bundle\nimport android.view.KeyEvent');
+  }
+  if (!contents.includes('import com.healthos.alarm.AlarmLaunchHelper')) {
+    contents = contents.replace(
+      'import android.os.Bundle',
+      'import android.os.Bundle\nimport com.healthos.alarm.AlarmLaunchHelper',
+    );
+  }
+  // Insert before the closing brace of the class (the last one in the file).
+  return contents.replace(/\}\s*$/, `\n${VOLUME_KEY_HANDLER}}\n`);
+}
+
+function withAlarmVolumeKeys(config) {
+  return withMainActivity(config, (config) => {
+    config.modResults.contents = patchMainActivity(config.modResults.contents);
+    return config;
+  });
+}
+
 function withMedicationAlarmManifest(config) {
   return withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;
@@ -121,23 +156,6 @@ function withMedicationAlarmManifest(config) {
           { action: [{ $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } }] },
           { action: [{ $: { 'android:name': 'com.health.os.ALARM_FIRE' } }] },
         ],
-      });
-    }
-
-    if (!application.activity) application.activity = [];
-    const hasActivity = application.activity.some(
-      (a) => a.$?.['android:name'] === 'com.healthos.alarm.MedicationAlarmActivity',
-    );
-    if (!hasActivity) {
-      application.activity.push({
-        $: {
-          'android:name': 'com.healthos.alarm.MedicationAlarmActivity',
-          'android:exported': 'false',
-          'android:launchMode': 'singleTask',
-          'android:showWhenLocked': 'true',
-          'android:turnScreenOn': 'true',
-          'android:theme': '@style/Theme.AppCompat.NoActionBar',
-        },
       });
     }
 
@@ -181,8 +199,12 @@ function withMedicationAlarm(config) {
   config = withMedicationAlarmManifest(config);
   config = withMedicationAlarmPackage(config);
   config = withAlarmMainActivity(config);
+  config = withAlarmVolumeKeys(config);
   config = withMedicationAlarmSources(config);
   return config;
 }
 
-module.exports = createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.7.0');
+module.exports = Object.assign(
+  createRunOncePlugin(withMedicationAlarm, 'medication-alarm', '1.7.1'),
+  { patchMainActivity },
+);

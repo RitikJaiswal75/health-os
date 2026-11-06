@@ -1534,6 +1534,59 @@ describe('doseGenerationService', () => {
     expect(createSpy).toHaveBeenCalledTimes(created);
   });
 
+  describe('backfillMissedDoses', () => {
+    const today = new Date('2026-09-13T00:00:00');
+    const baseSchedule = {
+      id: 's1',
+      medicationId: 'm1',
+      type: 'fixed_daily',
+      timesOfDay: JSON.stringify([{ hour: 8, minute: 0, doseAmount: 1 }]),
+      isActive: true,
+    };
+
+    function run(startDate: string, beforeDateKey?: string) {
+      const { backfillMissedDoses } = require('../src/features/medications/doseGenerationService');
+      const created: { scheduledAt: string; status?: string }[] = [];
+      const doseRepo = {
+        createPending: (input: { scheduledAt: string; status?: string }) => {
+          created.push(input);
+        },
+      };
+      const count = backfillMissedDoses(
+        doseRepo,
+        { ...baseSchedule, startDate },
+        today,
+        beforeDateKey,
+      );
+      return { count, created };
+    }
+
+    it('records yesterday as missed when the schedule started yesterday', () => {
+      const { count, created } = run('2026-09-12');
+      expect(count).toBe(1);
+      expect(created).toEqual([
+        expect.objectContaining({ scheduledAt: '2026-09-12T08:00:00', status: 'missed' }),
+      ]);
+    });
+
+    it('creates nothing when the schedule starts today or later', () => {
+      expect(run('2026-09-13').count).toBe(0);
+      expect(run('2026-09-20').count).toBe(0);
+    });
+
+    it('caps the backfill at 15 days back', () => {
+      const { count, created } = run('2026-01-01');
+      expect(count).toBe(15);
+      expect(created[0]?.scheduledAt).toBe('2026-08-29T08:00:00');
+      expect(created[14]?.scheduledAt).toBe('2026-09-12T08:00:00');
+    });
+
+    it('only fills days before the first recorded day when one is given', () => {
+      expect(run('2026-09-12', '2026-09-12').count).toBe(0);
+      expect(run('2026-09-10', '2026-09-12').count).toBe(2);
+    });
+  });
+
   it('creates only the remaining pending doses after completed doses for today', () => {
     const { pendingDosesNeededAfterCompleted } = require('../src/features/medications/doseGenerationService');
 
@@ -2298,5 +2351,13 @@ describe('InventoryService', () => {
     expect(remaining).toBe(40);
     expect(state.med.current_quantity).toBe(40);
     expect(state.variant.current_quantity).toBe(40);
+  });
+});
+
+describe('historyFloorDate', () => {
+  const { historyFloorDate } = require('../src/core/dates/dateUtils');
+
+  it('lets History browse back ten years, whatever data exists', () => {
+    expect(formatDateKey(historyFloorDate(new Date('2026-09-13T15:00:00')))).toBe('2016-09-13');
   });
 });

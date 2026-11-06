@@ -29,7 +29,11 @@ import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { removeMedicationWithReminders } from '@/src/features/medications/medicationDeletionService';
 import { rescheduleReminders } from '@/src/features/reminders/reminderService';
-import { generateUpcomingDoseEvents, resyncPendingDosesAfterScheduleUpdate } from '@/src/features/medications/doseGenerationService';
+import {
+  createMedicationAndBackfill,
+  generateUpcomingDoseEvents,
+  updateMedicationAndBackfill,
+} from '@/src/features/medications/doseGenerationService';
 import {
   findDuplicateMedicationConflict,
   proposedSchedulePeriod,
@@ -210,17 +214,12 @@ export function MedicationReviewView() {
       }
 
       if (isEditing && editingMedicationId) {
-        const saved = medRepo.update(editingMedicationId, input);
-        if (!saved) {
+        if (!updateMedicationAndBackfill(dbState.db, editingMedicationId, input)) {
           setSaveError(t('review.saveMissing'));
           return;
         }
-        const schedules = medRepo.getActiveSchedules(editingMedicationId);
-        if (schedules[0]) {
-          resyncPendingDosesAfterScheduleUpdate(dbState.db, schedules[0].id);
-        }
       } else {
-        medRepo.create(input);
+        createMedicationAndBackfill(dbState.db, input);
       }
 
       setInventory(parseInt(quantity, 10) || 0, refillOn, parseInt(refillThreshold, 10) || undefined);

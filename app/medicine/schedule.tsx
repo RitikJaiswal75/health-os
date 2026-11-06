@@ -6,6 +6,8 @@ import { Button, RadioButton, Text, TextInput } from 'react-native-paper';
 import { router } from 'expo-router';
 import { TimeDosageDialog } from '@/src/core/components/TimeDosageDialog';
 import { DoseAmountDialog } from '@/src/core/components/DoseAmountDialog';
+import { addDays, startOfDay } from 'date-fns';
+import { MAX_START_DATE_DAYS_BACK } from '@/src/core/dates/constants';
 import { formatDateKey, formatDisplayDate, formatTime24, hasScheduleEndDate, parseDateKey } from '@/src/core/dates/dateUtils';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { formatDoseLabel, FREQUENCY_OPTIONS, getDefaultDoseAmount, type ScheduleType } from '@/src/core/types/domain';
@@ -435,6 +437,12 @@ export default function ScheduleScreen() {
           value={parseDateKey(datePicker === 'start' ? draft.startDate : draft.endDate ?? draft.startDate)}
           mode="date"
           display="default"
+          // Only a new medication is limited; editing keeps whatever start date it already has.
+          minimumDate={
+            datePicker === 'start' && !editingMedicationId
+              ? addDays(startOfDay(new Date()), -MAX_START_DATE_DAYS_BACK)
+              : undefined
+          }
           onChange={onDateChange}
         />
       )}

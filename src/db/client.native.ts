@@ -8,7 +8,10 @@ import {
 } from '../core/storage/durableStorage';
 import type { DbBootstrapResult } from './clientTypes';
 import { CatalogCacheRepository } from '../features/catalog/catalogService';
-import { generateUpcomingDoseEvents } from '../features/medications/doseGenerationService';
+import {
+  generateUpcomingDoseEvents,
+  repairMissingPastDosesOnce,
+} from '../features/medications/doseGenerationService';
 import { ReminderReconciler, scheduleAlarms } from '../features/reminders/reminderService';
 
 export type { DbBootstrapResult, SQLiteDatabase } from './clientTypes';
@@ -55,6 +58,11 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
 
     new CatalogCacheRepository(db).sweepExpired();
     generateUpcomingDoseEvents(db, 14);
+    try {
+      repairMissingPastDosesOnce(db);
+    } catch {
+      // Best effort: a failed repair must never block startup. The flag stays unset, so it retries.
+    }
 
     const reconciler = new ReminderReconciler(db);
     await scheduleAlarms(reconciler.reconcile(7));

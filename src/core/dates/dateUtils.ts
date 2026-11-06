@@ -1,6 +1,7 @@
-import { format, parseISO, startOfDay, addDays, isSameDay } from 'date-fns';
+import { format, parseISO, startOfDay, addDays, isSameDay, subYears } from 'date-fns';
 import { getDateFnsLocale } from '@/src/i18n/dateLocale';
 import type { DateCompletion, DoseStatus } from '../types/domain';
+import { HISTORY_FLOOR_YEARS } from './constants';
 
 export function formatDateKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
@@ -68,6 +69,11 @@ export function isToday(date: Date): boolean {
 
 export function isFutureDateKey(dateKey: string, now: Date = new Date()): boolean {
   return parseDateKey(dateKey).getTime() > startOfDay(now).getTime();
+}
+
+/** First day the History strip offers. Fixed, so users can go back with or without any data. */
+export function historyFloorDate(today: Date = new Date()): Date {
+  return subYears(startOfDay(today), HISTORY_FLOOR_YEARS);
 }
 
 export function clampCalendarDate(date: Date, min: Date, max: Date): Date {

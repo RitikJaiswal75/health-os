@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { Appbar, Button, Card, Dialog, Portal, RadioButton, Text } from 'react-native-paper';
-import { computeDateCompletion, formatDateKey, formatScheduledTime, parseDateKey } from '@/src/core/dates/dateUtils';
+import { computeDateCompletion, formatDateKey, formatScheduledTime, historyFloorDate, parseDateKey } from '@/src/core/dates/dateUtils';
 import { HistoryDateNavigator } from '@/src/core/components/HistoryDateNavigator';
 import type { DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
@@ -25,11 +25,15 @@ export default function HistoryScreen() {
   const dbState = useDatabaseBootstrap();
   const { t } = useT();
   const dateKey = formatDateKey(selectedDate);
-  const earliestHistoryDate = useMemo(() => {
-    if (dbState.status !== 'ready') return startOfDay(new Date());
-    const earliestKey = new DoseEventRepository(dbState.db).getEarliestHistoryDateKey();
+  // The strip itself goes back to a fixed floor, with or without data. Only the completion rings
+  // need the first real dose, so we never scan years of empty days.
+  const historyFloor = historyFloorDate();
+  const earliestDoseDate = useMemo(() => {
+    const earliestKey =
+      dbState.status === 'ready' ? new DoseEventRepository(dbState.db).getEarliestHistoryDateKey() : null;
     return earliestKey ? parseDateKey(earliestKey) : startOfDay(new Date());
-  }, [dbState]);
+    // refreshKey: re-read on tab focus, or a medication added meanwhile never gets its rings.
+  }, [dbState, refreshKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -43,9 +47,9 @@ export default function HistoryScreen() {
 
     const activeMedIds = new Set(new MedicationRepository(dbState.db).getAll().map((med) => med.id));
     const today = startOfDay(new Date());
-    const dayCount = Math.max(differenceInCalendarDays(today, earliestHistoryDate), 0) + 1;
+    const dayCount = Math.max(differenceInCalendarDays(today, earliestDoseDate), 0) + 1;
     const dateKeys = Array.from({ length: dayCount }, (_, i) =>
-      formatDateKey(addDays(earliestHistoryDate, i)),
+      formatDateKey(addDays(earliestDoseDate, i)),
     );
 
     const dosesByDate = new DoseEventRepository(dbState.db).getForDates(dateKeys, activeMedIds);
@@ -53,7 +57,7 @@ export default function HistoryScreen() {
       completion[key] = computeDateCompletion(dayDoses);
     }
     return completion;
-  }, [dbState, earliestHistoryDate, refreshKey]);
+  }, [dbState, earliestDoseDate, refreshKey]);
 
   const doses =
     dbState.status === 'ready'
@@ -103,7 +107,7 @@ export default function HistoryScreen() {
         <HistoryDateNavigator
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
-          minDate={earliestHistoryDate}
+          minDate={historyFloor}
           completionByDate={completionByDate}
         />
         {doses.length === 0 ? (

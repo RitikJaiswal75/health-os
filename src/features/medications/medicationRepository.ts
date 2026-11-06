@@ -368,17 +368,20 @@ export class DoseEventRepository {
     scheduleId?: string;
     scheduledAt: string;
     doseAmount?: number;
+    /** 'missed' is used when backfilling slots that were already in the past at creation. */
+    status?: 'pending' | 'missed';
   }): DoseEvent {
     const id = uuidv4();
     const now = new Date().toISOString();
     this.db.runSync(
       `INSERT INTO dose_events (id, medication_id, schedule_id, scheduled_at, status, dose_amount, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.medicationId,
         input.scheduleId ?? null,
         input.scheduledAt,
+        input.status ?? 'pending',
         input.doseAmount != null && input.doseAmount > 0 ? input.doseAmount : 1,
         now,
         now,
@@ -465,6 +468,15 @@ export class DoseEventRepository {
     }
 
     return buckets;
+  }
+
+  /** First local calendar day on which the medication has a dose row, whatever its status. */
+  firstDoseDateKey(medicationId: string): string | undefined {
+    const rows = this.db.getAllSync<{ scheduled_at: string }>(
+      `SELECT scheduled_at FROM dose_events WHERE medication_id = ?`,
+      [medicationId],
+    );
+    return rows.map((row) => scheduledAtToDateKey(row.scheduled_at)).sort()[0];
   }
 
   /** True when any dose row already occupies this schedule slot (including skipped/missed). */
