@@ -54,11 +54,6 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
       );
     }
 
-    db.runSync(
-      `INSERT OR IGNORE INTO reminder_health (id, updated_at) VALUES ('singleton', ?)`,
-      [new Date().toISOString()],
-    );
-
     new CatalogCacheRepository(db).sweepExpired();
     // Dose generation and alarms are best effort: if they fail the user must still see their data.
     try {

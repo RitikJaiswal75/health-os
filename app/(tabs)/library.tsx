@@ -6,7 +6,7 @@ import { navigateToAddMedication } from '@/src/features/reliability/reliabilityS
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { InventoryService } from '@/src/features/inventory/inventoryService';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
-import type { Medication } from '@/src/db/schema';
+import type { Medication } from '@/src/db/types';
 import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillShapeIcon';
 import { RefillQuantityDialog } from '@/src/core/components/RefillQuantityDialog';
 import { formatStrengthSubtitle, getMedicationTypeLabel } from '@/src/core/types/domain';
@@ -16,6 +16,7 @@ import { useT } from '@/src/i18n/useT';
 import { t } from '@/src/i18n/translate';
 import { HIGHLIGHT_MEDICATION_PARAM } from '@/src/features/inventory/constants';
 import { useHighlightAutoClear } from '@/src/features/inventory/useHighlightAutoClear';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 function formatStrengthLine(med: Medication): string {
   const subtitle = formatStrengthSubtitle(
@@ -77,7 +78,13 @@ export default function LibraryScreen() {
     const medRepo = new MedicationRepository(dbState.db);
     const doseRepo = new DoseEventRepository(dbState.db);
     const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.addRefillQuantity(refillMed.id, quantity);
+    try {
+      inventory.addRefillQuantity(refillMed.id, quantity);
+    } catch (error) {
+      // Nothing was saved (one transaction); keep the dialog open so the user can retry.
+      reportError('INVENTORY_LEDGER_FAILED', error);
+      return;
+    }
     setRefillMed(null);
     setRefreshKey((key) => key + 1);
   };

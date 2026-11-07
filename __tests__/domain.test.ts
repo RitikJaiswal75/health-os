@@ -1085,8 +1085,7 @@ describe('doseSlotUtils', () => {
       ]),
     };
     const repo = new DoseEventRepository(mockDb);
-    expect(repo.existsForScheduleAt('sched-1', '2026-09-08T08:00:00')).toBe(true);
-    expect(repo.existsForMedicationAt('med-1', '2026-09-08T08:00:00')).toBe(true);
+    expect(repo.occupiedSlotKeys('med-1').has('2026-09-08-08-00')).toBe(true);
   });
 
   it('returns the earliest available history date from doses or medications', () => {
@@ -1480,9 +1479,6 @@ describe('doseGenerationService', () => {
             isActive: true,
           };
         }
-        if (sql.includes('existsForScheduleAt') || sql.includes('schedule_id')) {
-          return null;
-        }
         return null;
       }),
       getAllSync: jest.fn((sql: string) => {
@@ -1522,7 +1518,9 @@ describe('doseGenerationService', () => {
         isActive: true,
       },
     ]);
-    const existsSpy = jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockReturnValue(false);
+    const occupiedSpy = jest
+      .spyOn(DoseEventRepository.prototype, 'occupiedSlotKeys')
+      .mockReturnValue(new Set());
     const createSpy = jest
       .spyOn(DoseEventRepository.prototype, 'createPending')
       .mockReturnValue({ id: 'dose-1', status: 'pending' } as never);
@@ -1530,7 +1528,10 @@ describe('doseGenerationService', () => {
     const created = generateUpcomingDoseEvents(mockDb, 7);
     expect(created).toBeGreaterThan(0);
 
-    existsSpy.mockReturnValue(true);
+    const { normalizedSlotKey } = require('../src/features/medications/doseSlotUtils');
+    occupiedSpy.mockReturnValue(
+      new Set(createSpy.mock.calls.map((call) => normalizedSlotKey((call[0] as { scheduledAt: string }).scheduledAt))),
+    );
     const createdAgain = generateUpcomingDoseEvents(mockDb, 7);
     expect(createdAgain).toBe(0);
     expect(createSpy).toHaveBeenCalledTimes(created);
@@ -1741,8 +1742,7 @@ describe('doseGenerationService', () => {
     ]);
     jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([]);
     jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
-    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockReturnValue(false);
-    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest.spyOn(DoseEventRepository.prototype, 'occupiedSlotKeys').mockReturnValue(new Set());
     jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
       created.push((input as { scheduledAt: string }).scheduledAt);
       return { id: `dose-${created.length}`, status: 'pending' };
@@ -1827,13 +1827,9 @@ describe('doseGenerationService', () => {
     ]);
     jest.spyOn(DoseEventRepository.prototype, 'getPendingForSchedule').mockReturnValue([]);
     jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
-    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockImplementation(
-      (...args: unknown[]) => {
-        const scheduledAt = String(args[1]);
-        return scheduledAt === '2026-09-13T08:00:00' || scheduledAt === '2026-09-13T20:00:00';
-      },
-    );
-    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest
+      .spyOn(DoseEventRepository.prototype, 'occupiedSlotKeys')
+      .mockReturnValue(new Set(['2026-09-13-08-00', '2026-09-13-20-00']));
     jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
       created.push((input as { scheduledAt: string }).scheduledAt);
       return { id: `dose-${created.length}`, status: 'pending' };
@@ -1928,10 +1924,9 @@ describe('doseGenerationService', () => {
       },
     ]);
     jest.spyOn(DoseEventRepository.prototype, 'getSnoozedForSchedule').mockReturnValue([]);
-    jest.spyOn(DoseEventRepository.prototype, 'existsForScheduleAt').mockImplementation((...args: unknown[]) => {
-      return String(args[1]) === '2026-09-13T11:00:00';
-    });
-    jest.spyOn(DoseEventRepository.prototype, 'existsForMedicationAt').mockReturnValue(false);
+    jest
+      .spyOn(DoseEventRepository.prototype, 'occupiedSlotKeys')
+      .mockReturnValue(new Set(['2026-09-13-11-00']));
     jest.spyOn(DoseEventRepository.prototype, 'createPending').mockImplementation((input: unknown) => {
       created.push((input as { scheduledAt: string }).scheduledAt);
       return { id: `dose-${created.length}`, status: 'pending' };
@@ -2330,6 +2325,7 @@ describe('InventoryService', () => {
         return null;
       }),
       getAllSync: jest.fn(() => [state.variant]),
+      withTransactionSync: (task: () => void) => task(),
     };
 
     const { InventoryService } = require('../src/features/inventory/inventoryService');

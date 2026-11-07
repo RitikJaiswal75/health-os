@@ -15,6 +15,7 @@ import {
   saveDoseEdit,
 } from '../src/features/inventory/doseTakenService';
 import { notifyRefillIfNeeded } from '../src/features/inventory/refillReminderService';
+import { InventoryService } from '../src/features/inventory/inventoryService';
 import { ReminderReconciler } from '../src/features/reminders/reminderService';
 
 // The real ReminderReconciler (DB -> alarms) without the notification plumbing around it.
@@ -49,6 +50,15 @@ function setUp(quantity: number) {
     [medication.id],
   );
   return { db, doseRepo, medId: medication.id, doseId: row!.id };
+}
+
+/** Make every write whose SQL starts with `prefix` fail like a full disk. */
+function failOn(db: SQLiteDatabase, prefix: string): void {
+  const runSync = db.runSync.bind(db);
+  jest.spyOn(db, 'runSync').mockImplementation(((sql: string, params: unknown[]) => {
+    if (sql.trim().startsWith(prefix)) throw new Error('disk I/O error');
+    return runSync(sql, params as never);
+  }) as typeof db.runSync);
 }
 
 function stock(db: SQLiteDatabase, medId: string): number {
@@ -104,6 +114,36 @@ describe('dose writes', () => {
     // The retry deducts exactly once.
     expect(markDoseAsTaken(db, doseId)).toBe(true);
     expect(stock(db, medId)).toBe(8);
+  });
+
+  it('leaves stock and status untouched when the ledger write fails', () => {
+    const { db, doseRepo, medId, doseId } = setUp(1);
+    failOn(db, 'INSERT INTO inventory_transactions');
+
+    expect(markDoseAsTaken(db, doseId)).toBe(false);
+    expect(stock(db, medId)).toBe(1);
+    expect(doseRepo.getById(doseId)!.status).toBe('pending');
+  });
+
+  it('an edit or delete that fails reports false instead of throwing into the button handler', () => {
+    const { db, doseRepo, medId, doseId } = setUp(10);
+    markDoseAsTaken(db, doseId);
+    const taken = doseRepo.getById(doseId)!;
+    failOn(db, 'UPDATE medications');
+
+    expect(saveDoseEdit(db, taken, 'skipped')).toBe(false);
+    expect(deleteDose(db, taken)).toBe(false);
+    expect(stock(db, medId)).toBe(8);
+  });
+
+  it('a refill that fails part way changes neither quantity', () => {
+    const { db, medId } = setUp(10);
+    const medRepo = new MedicationRepository(db);
+    const inventory = new InventoryService(db, medRepo, new DoseEventRepository(db));
+    failOn(db, 'UPDATE medication_variants');
+
+    expect(() => inventory.addRefillQuantity(medId, 30)).toThrow('disk I/O error');
+    expect(stock(db, medId)).toBe(10);
   });
 
   it('reports an already-taken dose as logged, so the alarm screen can close', () => {

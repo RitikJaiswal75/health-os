@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import type { DoseEvent } from '../../db/schema';
+import type { DoseEvent } from '../../db/types';
 import {
   formatLocalDateTime,
   isFutureDateKey,
@@ -31,11 +31,13 @@ export function slotKeyFromScheduledAt(scheduledAt: string): string {
   return format(parseScheduledAt(scheduledAt), 'yyyy-MM-dd-HH-mm');
 }
 
+/** Slot key after normalizing legacy UTC values, so UTC and local rows for one slot match. */
+export function normalizedSlotKey(scheduledAt: string): string {
+  return slotKeyFromScheduledAt(normalizeScheduledAtStorage(scheduledAt));
+}
+
 export function slotKeysEqual(a: string, b: string): boolean {
-  return (
-    slotKeyFromScheduledAt(normalizeScheduledAtStorage(a)) ===
-    slotKeyFromScheduledAt(normalizeScheduledAtStorage(b))
-  );
+  return normalizedSlotKey(a) === normalizedSlotKey(b);
 }
 
 export function filterPendingReplacedBySnooze(doses: DoseEvent[]): DoseEvent[] {
@@ -142,11 +144,6 @@ export function normalizeScheduledAtStorage(iso: string): string {
     return formatLocalDateTime(parseScheduledAt(iso));
   }
   return iso.length >= 19 ? iso.slice(0, 19) : iso;
-}
-
-export function readScheduledAtFromRow(row: unknown): string | null {
-  const record = row as Record<string, string | undefined>;
-  return record.scheduled_at ?? record.scheduledAt ?? null;
 }
 
 /** Which calendar day a dose belongs on for Today/history lists. */

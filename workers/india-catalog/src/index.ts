@@ -58,7 +58,7 @@ export default {
       return json({ results: [] });
     }
 
-    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 20), 1), 50);
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
 
     try {
       const { results } = await env.DB.prepare(

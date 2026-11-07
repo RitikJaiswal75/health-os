@@ -1,6 +1,6 @@
 // Calendar edge cases: DST days are 23h, and short months lack the 29th–31st.
 import { execFileSync } from 'child_process';
-import type { Schedule } from '../src/db/schema';
+import type { Schedule } from '../src/db/types';
 import { expandOccurrences } from '../src/features/reminders/occurrenceExpander';
 
 const base = {

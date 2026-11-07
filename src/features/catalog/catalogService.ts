@@ -153,13 +153,14 @@ export async function loadCachedOrFetch(
     const cached = cache.get(source, query);
     if (cached) {
       const parsed = parseCachedResults(cached);
-      if (parsed.length > 0 || cached === '[]') return parsed;
+      if (parsed.length > 0) return parsed;
       cache.delete(source, query);
     }
   }
 
   const results = await fetcher(query, signal);
-  if (!signal?.aborted) {
+  // Fetchers return [] when offline or on a server error, so only real results are cached.
+  if (!signal?.aborted && results.length > 0) {
     cache?.set(source, query, JSON.stringify(results));
   }
   return results;

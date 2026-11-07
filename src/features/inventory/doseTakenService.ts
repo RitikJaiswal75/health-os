@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { DoseEvent } from '../../db/schema';
+import type { DoseEvent } from '../../db/types';
 import type { DoseStatus } from '../../core/types/domain';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
 import { canLogDoseForTodayOrPast } from '../medications/doseSlotUtils';
@@ -66,20 +66,31 @@ export function saveDoseEdit(db: SQLiteDatabase, dose: DoseEvent, status: DoseSt
   if (status === 'taken' && dose.status !== 'taken') return markDoseAsTaken(db, dose.id);
 
   const { doseRepo, inventory } = services(db);
-  db.withTransactionSync(() => {
-    inventory.applyStatusChange(dose.id, dose.status as DoseStatus, status);
-    doseRepo.updateStatus(dose.id, status);
-  });
+  try {
+    db.withTransactionSync(() => {
+      inventory.applyStatusChange(dose.id, dose.status as DoseStatus, status);
+      doseRepo.updateStatus(dose.id, status);
+    });
+  } catch (error) {
+    reportError('DOSE_MARK_FAILED', error);
+    return false;
+  }
   void rescheduleReminders(db);
   return true;
 }
 
-/** Delete a logged dose, returning its stock if it was taken. */
-export function deleteDose(db: SQLiteDatabase, dose: DoseEvent): void {
+/** Delete a logged dose, returning its stock if it was taken. Returns false when the save failed. */
+export function deleteDose(db: SQLiteDatabase, dose: DoseEvent): boolean {
   const { doseRepo, inventory } = services(db);
-  db.withTransactionSync(() => {
-    inventory.compensateOnDelete(dose.id, dose.status as DoseStatus);
-    doseRepo.delete(dose.id);
-  });
+  try {
+    db.withTransactionSync(() => {
+      inventory.compensateOnDelete(dose.id, dose.status as DoseStatus);
+      doseRepo.delete(dose.id);
+    });
+  } catch (error) {
+    reportError('DOSE_MARK_FAILED', error);
+    return false;
+  }
   void rescheduleReminders(db);
+  return true;
 }

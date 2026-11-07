@@ -19,6 +19,17 @@ describe('india-catalog worker', () => {
     await expect(response.json()).resolves.toEqual({ results: [hit] });
   });
 
+  it('uses the default limit when limit is not a number', async () => {
+    const bind = jest.fn(() => ({ all: async () => ({ results: [] }) }));
+    const env = { DB: { prepare: () => ({ bind }) } } as unknown as Env;
+    const response = await worker.fetch(
+      new Request('https://drugs.healthos.ritik.cc/search?q=dolo&limit=abc'),
+      env,
+    );
+    expect(response.status).toBe(200);
+    expect(bind).toHaveBeenCalledWith('"dolo"*', 20);
+  });
+
   it('reports a database failure as an error, not as "no results"', async () => {
     const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
     const response = await search(

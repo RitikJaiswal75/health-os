@@ -2,15 +2,14 @@ import {
   addDays,
   addMinutes,
   differenceInCalendarDays,
-  format,
   getDaysInMonth,
   startOfDay,
   isBefore,
   isAfter,
 } from 'date-fns';
-import type { Schedule } from '../../db/schema';
+import type { Schedule } from '../../db/types';
 import type { TimeOfDay } from '../../core/types/domain';
-import { formatLocalDateTime, formatDateKey, parseDateKey, parseScheduledAt } from '../../core/dates/dateUtils';
+import { formatLocalDateTime, formatDateKey, parseDateKey } from '../../core/dates/dateUtils';
 
 export interface DoseOccurrence {
   medicationId: string;
@@ -106,8 +105,4 @@ function shouldFireOnDate(schedule: Schedule, date: Date): boolean {
 
 export function computeSnoozeTime(minutes: number, from: Date = new Date()): string {
   return formatLocalDateTime(addMinutes(from, minutes));
-}
-
-export function formatOccurrenceKey(occurrence: DoseOccurrence): string {
-  return `${occurrence.scheduleId}:${format(parseScheduledAt(occurrence.scheduledAt), 'yyyy-MM-dd-HH-mm')}`;
 }

@@ -1,5 +1,5 @@
 import type { DoseStatus } from '../core/types/domain';
-import type { DoseEvent, Medication, MedicationVariant, Schedule } from './schema';
+import type { DoseEvent, Medication, MedicationVariant, Schedule } from './types';
 
 type Row = Record<string, unknown>;
 

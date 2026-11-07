@@ -1,9 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { DoseEvent } from '../../db/schema';
+import type { DoseEvent } from '../../db/types';
 import { MedicationRepository, DoseEventRepository } from '../medications/medicationRepository';
 import type { DoseStatus } from '../../core/types/domain';
 import { inventoryDeductAmount } from '../../core/types/domain';
-import { reportError } from '@/src/core/observability/crashReporter';
 
 export interface InventoryChangeResult {
   previousQty: number;
@@ -60,28 +59,6 @@ export class InventoryService {
     return this.medications.getDefaultVariant(medicationId)?.id;
   }
 
-  private recordTransactionSafe(input: {
-    medicationId: string;
-    variantId?: string;
-    type: 'dose_taken' | 'dose_deleted' | 'refill' | 'adjustment' | 'initial';
-    quantityDelta: number;
-    balanceAfter: number;
-    doseEventId?: string;
-  }): void {
-    try {
-      this.medications.recordInventoryTransaction({
-        medicationId: input.medicationId,
-        variantId: input.variantId,
-        type: input.type,
-        quantityDelta: input.quantityDelta,
-        balanceAfter: input.balanceAfter,
-        doseEventId: input.doseEventId,
-      });
-    } catch (error) {
-      reportError('INVENTORY_LEDGER_FAILED', error);
-    }
-  }
-
   decrementOnTaken(doseEventId: string, variantId?: string): InventoryChangeResult {
     const dose = this.doses.getById(doseEventId);
     if (!dose) throw new Error('Dose event not found');
@@ -125,7 +102,7 @@ export class InventoryService {
       }
     }
 
-    this.recordTransactionSafe({
+    this.medications.recordInventoryTransaction({
       medicationId: med.id,
       variantId: resolvedVariantId,
       type: 'dose_taken',
@@ -173,7 +150,7 @@ export class InventoryService {
       }
     }
 
-    this.recordTransactionSafe({
+    this.medications.recordInventoryTransaction({
       medicationId: med.id,
       variantId: resolvedVariantId,
       type: 'dose_deleted',
@@ -216,29 +193,32 @@ export class InventoryService {
     const now = new Date().toISOString();
     const resolvedVariantId = this.resolveVariantId(medicationId);
 
-    this.db.runSync(
-      `UPDATE medications SET current_quantity = ?, updated_at = ? WHERE id = ?`,
-      [newQty, now, medicationId],
-    );
+    // Medication, variant and ledger together, or the two stock counts drift apart.
+    this.db.withTransactionSync(() => {
+      this.db.runSync(
+        `UPDATE medications SET current_quantity = ?, updated_at = ? WHERE id = ?`,
+        [newQty, now, medicationId],
+      );
 
-    if (resolvedVariantId) {
-      const variant = this.medications
-        .getVariants(medicationId)
-        .find((entry) => entry.id === resolvedVariantId);
-      if (variant) {
-        this.db.runSync(`UPDATE medication_variants SET current_quantity = ? WHERE id = ?`, [
-          asQuantity(variant.currentQuantity) + amount,
-          resolvedVariantId,
-        ]);
+      if (resolvedVariantId) {
+        const variant = this.medications
+          .getVariants(medicationId)
+          .find((entry) => entry.id === resolvedVariantId);
+        if (variant) {
+          this.db.runSync(`UPDATE medication_variants SET current_quantity = ? WHERE id = ?`, [
+            asQuantity(variant.currentQuantity) + amount,
+            resolvedVariantId,
+          ]);
+        }
       }
-    }
 
-    this.recordTransactionSafe({
-      medicationId,
-      variantId: resolvedVariantId,
-      type: 'refill',
-      quantityDelta: amount,
-      balanceAfter: newQty,
+      this.medications.recordInventoryTransaction({
+        medicationId,
+        variantId: resolvedVariantId,
+        type: 'refill',
+        quantityDelta: amount,
+        balanceAfter: newQty,
+      });
     });
 
     return newQty;

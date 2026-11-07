@@ -187,7 +187,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 | Language | TypeScript (strict) |
 | Navigation | Expo Router |
 | UI | React Native Paper (MD3 dark) + Reanimated |
-| Database | expo-sqlite + Drizzle ORM |
+| Database | expo-sqlite (raw SQL) |
 | State | Zustand (wizard draft) |
 | Alarms | Custom `medication-alarm` native module (Android) |
 | Catalog | Cloudflare Worker (India, per-query) + RxTerms + NIH DSLD |
@@ -201,7 +201,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 app/                  Expo Router screens (tabs, medicine wizard, reminder)
 src/core/             Theme, UI primitives, dates, domain types
 src/features/         Medications, reminders, inventory, catalog, reliability
-src/db/               Drizzle schema, migrations, repositories
+src/db/               Row types, migrations, bootstrap
 modules/medication-alarm/   Android alarm native module
 data/                 Local-only catalog source for worker seeding (gitignored)
 workers/india-catalog/  Cloudflare Worker for per-query India medicine search

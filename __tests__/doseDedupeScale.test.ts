@@ -1,5 +1,5 @@
 import { addDays, format } from 'date-fns';
-import type { DoseEvent } from '../src/db/schema';
+import type { DoseEvent } from '../src/db/types';
 import { filterPendingDuplicatingResolved } from '../src/features/medications/doseSlotUtils';
 
 function dose(id: string, medicationId: string, day: Date, hour: number, status: string): DoseEvent {

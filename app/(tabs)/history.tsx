@@ -9,7 +9,7 @@ import type { DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
 import { deleteDose, saveDoseEdit } from '@/src/features/inventory/doseTakenService';
-import type { DoseEvent } from '@/src/db/schema';
+import type { DoseEvent } from '@/src/db/types';
 import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
 import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
@@ -79,7 +79,7 @@ export default function HistoryScreen() {
 
   const handleDelete = () => {
     if (!editDose || dbState.status !== 'ready') return;
-    deleteDose(dbState.db, editDose);
+    if (!deleteDose(dbState.db, editDose)) return;
     setEditDose(null);
     refresh();
   };

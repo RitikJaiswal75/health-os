@@ -2,7 +2,7 @@ import { Image, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { PillShapeIcon, SHAPE_PREVIEW_COLOR } from '@/src/core/components/PillShapeIcon';
 import { formatTakeDoseInstruction, supportsDualColor, type PillShape } from '@/src/core/types/domain';
-import type { Medication } from '@/src/db/schema';
+import type { Medication } from '@/src/db/types';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 

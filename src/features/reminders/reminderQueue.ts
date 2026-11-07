@@ -225,7 +225,3 @@ export function resetReminderQueueForTests(): void {
   deferredShows.length = 0;
   handledReminderKeys.clear();
 }
-
-export function getQueuedReminderCount(): number {
-  return queuedReminders.length + deferredShows.length + (activeReminder ? 1 : 0);
-}

@@ -19,4 +19,14 @@ describe('runAddColumnMigration', () => {
       expect.arrayContaining(['dose_unit_value', 'dose_unit_unit']),
     );
   });
+
+  it('rethrows errors other than "duplicate column" (e.g. a full disk)', () => {
+    const db = {
+      execSync: () => {
+        throw new Error('database or disk is full');
+      },
+    } as unknown as SQLiteDatabase;
+
+    expect(() => runAddColumnMigration(db, MIGRATION_003)).toThrow('database or disk is full');
+  });
 });

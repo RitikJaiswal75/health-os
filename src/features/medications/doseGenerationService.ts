@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { addDays, format, isBefore, max, startOfDay } from 'date-fns';
-import type { Schedule } from '../../db/schema';
+import type { Schedule } from '../../db/types';
 import {
   MedicationRepository,
   DoseEventRepository,
@@ -12,6 +12,7 @@ import {
   doseBelongsToDateKey,
   doseDedupeKey,
   normalizeScheduledAtStorage,
+  normalizedSlotKey,
   pendingDuplicatingResolved,
   pickCanonicalDose,
 } from './doseSlotUtils';
@@ -289,6 +290,16 @@ export function repairMissingPastDosesOnce(db: SQLiteDatabase): number {
   return created;
 }
 
+/**
+ * Latest day the next dose of this schedule can fall on. Monthly and long-interval schedules can be
+ * further away than the horizon, and without a row they would get no alarm.
+ */
+function nextDoseDeadline(schedule: Schedule, from: Date): Date {
+  if (schedule.type === 'monthly') return addDays(from, 32);
+  if (schedule.type === 'interval_days') return addDays(from, (schedule.intervalDays ?? 1) + 1);
+  return from;
+}
+
 /** Generate pending dose_events for all active schedules within the horizon. Idempotent. */
 export function generateUpcomingDoseEvents(
   db: SQLiteDatabase,
@@ -318,7 +329,7 @@ function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): num
 
   for (const med of medRepo.getAll()) {
     for (const schedule of medRepo.getActiveSchedules(med.id)) {
-      const occurrences = expandOccurrences(schedule, from, to);
+      const occurrences = expandOccurrences(schedule, from, max([to, nextDoseDeadline(schedule, from)]));
       const times = parseTimesOfDay(schedule.timesOfDay);
       pruneStalePendingDoses(doseRepo, schedule.id, occurrences);
       const remainingToday = trimExtraPendingDosesForDate(
@@ -327,12 +338,15 @@ function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): num
         times.length,
       );
       const neededToday = pendingDosesNeededAfterCompleted(times.length, remainingToday.length);
+      // Read once, after the prune and trim above: one query per schedule, not one per planned dose.
+      const occupied = doseRepo.occupiedSlotKeys(med.id);
       let createdToday = 0;
       for (const occ of occurrences) {
         const occDateKey = formatDateKey(parseScheduledAt(occ.scheduledAt));
-        if (doseRepo.existsForScheduleAt(schedule.id, occ.scheduledAt)) continue;
-        if (doseRepo.existsForMedicationAt(occ.medicationId, occ.scheduledAt)) continue;
+        const slotKey = normalizedSlotKey(occ.scheduledAt);
+        if (occupied.has(slotKey)) continue;
         if (occDateKey === todayKey && createdToday >= neededToday) continue;
+        occupied.add(slotKey);
         doseRepo.createPending({
           medicationId: occ.medicationId,
           scheduleId: occ.scheduleId,

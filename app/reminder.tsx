@@ -17,8 +17,7 @@ import {
   cleanupSnoozeConflicts,
   deletePendingAtSlot,
 } from '@/src/features/medications/snoozeCleanupService';
-import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
-import type { DoseEvent, Medication } from '@/src/db/schema';
+import type { DoseEvent, Medication } from '@/src/db/types';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 
@@ -89,11 +88,11 @@ export default function ReminderScreen() {
     await exitReminderScreen(handled);
   };
 
-  const completeTaken = (item: ReminderItem, variantId?: string) => {
+  const completeTaken = (item: ReminderItem) => {
     if (dbState.status !== 'ready' || !medRepo) return;
     const doseRepo = new DoseEventRepository(dbState.db);
     // Save failed (already reported): keep the alarm open so the dose isn't silently lost.
-    if (!markDoseAsTaken(dbState.db, item.dose.id, variantId)) return;
+    if (!markDoseAsTaken(dbState.db, item.dose.id)) return;
 
     if (scheduledAt) {
       const remaining = doseRepo.findPendingDosesAtMinute(scheduledAt);
@@ -109,27 +108,9 @@ export default function ReminderScreen() {
     void dismiss();
   };
 
-  const { requestTaken, sheet: variantSheet } = useVariantTakenFlow<ReminderItem>(
-    (id) => medRepo?.getVariants(id) ?? [],
-    (variantId, context) => {
-      if (context) completeTaken(context, variantId || undefined);
-    },
-  );
-
   const handleTakeAll = () => {
-    const multiVariant = items.find(
-      (item) => (medRepo?.getVariants(item.medication.id) ?? []).length > 1,
-    );
-    if (multiVariant) {
-      requestTaken(multiVariant.medication.id, multiVariant);
-      return;
-    }
-
     if (dbState.status !== 'ready') return;
-    const failed = items.filter((item) => {
-      const variants = medRepo?.getVariants(item.medication.id) ?? [];
-      return !markDoseAsTaken(dbState.db, item.dose.id, variants[0]?.id);
-    });
+    const failed = items.filter((item) => !markDoseAsTaken(dbState.db, item.dose.id));
     if (failed.length > 0) {
       // Keep the alarm open with the doses that are still pending.
       setRefreshKey((key) => key + 1);
@@ -224,7 +205,7 @@ export default function ReminderScreen() {
               key={item.dose.id}
               medication={item.medication}
               doseAmount={item.dose.doseAmount}
-              onTaken={() => requestTaken(item.medication.id, item)}
+              onTaken={() => completeTaken(item)}
             />
           ))
         ) : (
@@ -248,7 +229,7 @@ export default function ReminderScreen() {
         ) : (
           <Button
             mode="contained"
-            onPress={() => requestTaken(items[0]!.medication.id, items[0])}
+            onPress={() => completeTaken(items[0]!)}
             contentStyle={styles.primaryButtonContent}
             accessibilityLabel={t('home.markTaken')}
           >
@@ -266,7 +247,6 @@ export default function ReminderScreen() {
         </Button>
       </View>
 
-      {variantSheet}
 
       <SnoozeTimeDialog
         visible={snoozeDialog}

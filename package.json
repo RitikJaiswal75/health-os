@@ -37,7 +37,6 @@
     "@react-native-firebase/crashlytics": "26.4.0",
     "@sentry/react-native": "8.27.0",
     "date-fns": "^4.1.0",
-    "drizzle-orm": "^0.44.5",
     "expo": "~57.0.31",
     "expo-constants": "~57.0.18",
     "expo-dev-client": "~57.0.20",

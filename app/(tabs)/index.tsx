@@ -15,13 +15,12 @@ import {
   deletePendingAtSlot,
 } from '@/src/features/medications/snoozeCleanupService';
 import { deleteDose, markDoseAsTaken, saveDoseEdit } from '@/src/features/inventory/doseTakenService';
-import type { DoseEvent } from '@/src/db/schema';
+import type { DoseEvent } from '@/src/db/types';
 import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
 import {
   rescheduleReminders,
 } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
-import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
 import { AppUpdateBanner } from '@/src/core/components/AppUpdateBanner';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
@@ -58,47 +57,27 @@ export default function HomeScreen() {
     if (dbState.status !== 'ready' || !medRepo) {
       return { doses: [], meds: [], completionByDate: {} as Record<string, DateCompletion> };
     }
-    const doseRepo = new DoseEventRepository(dbState.db);
-    removePendingDuplicatingResolvedDoses(dbState.db);
-    removeDuplicateDoseEvents(dbState.db);
     const allMeds = medRepo.getAll();
     const activeMedIds = new Set(allMeds.map((med) => med.id));
-    const stripDates = getDateStrip(7, selectedDate);
+    // The strip is centred on the selected day, so one load covers both. getForDates also hides
+    // duplicate rows, so no cleanup writes are needed during render.
+    const stripKeys = getDateStrip(7, selectedDate).map(formatDateKey);
+    const dosesByDate = new DoseEventRepository(dbState.db).getForDates(stripKeys, activeMedIds);
     const completion: Record<string, DateCompletion> = {};
-
-    for (const date of stripDates) {
-      const key = formatDateKey(date);
-      const dayDoses = doseRepo.getForDate(key, activeMedIds);
-      completion[key] = computeDateCompletion(dayDoses);
+    for (const key of stripKeys) {
+      completion[key] = computeDateCompletion(dosesByDate.get(key) ?? []);
     }
 
-    const allDoses = doseRepo.getForDate(dateKey, activeMedIds);
-    return { doses: allDoses, meds: allMeds, completionByDate: completion };
+    return { doses: dosesByDate.get(dateKey) ?? [], meds: allMeds, completionByDate: completion };
   }, [dbState, dateKey, medRepo, selectedDate, refreshKey]);
 
   const refresh = useCallback(() => {
     setRefreshKey((key) => key + 1);
   }, []);
 
-  const { requestTaken, sheet: variantSheet } = useVariantTakenFlow<DoseEvent>(
-    (id) => medRepo?.getVariants(id) ?? [],
-    (variantId, dose) => {
-      if (!dose || dbState.status !== 'ready') return;
-      markDoseAsTaken(dbState.db, dose.id, variantId || undefined);
-      refresh();
-    },
-  );
-
   const handleTaken = (dose: DoseEvent) => {
-    if (dbState.status !== 'ready' || !medRepo || !canLogDoseForTodayOrPast(dose)) return;
-
-    const variants = medRepo.getVariants(dose.medicationId);
-    if (variants.length > 1) {
-      requestTaken(dose.medicationId, dose);
-      return;
-    }
-
-    markDoseAsTaken(dbState.db, dose.id, variants[0]?.id);
+    if (dbState.status !== 'ready' || !canLogDoseForTodayOrPast(dose)) return;
+    markDoseAsTaken(dbState.db, dose.id);
     refresh();
   };
 
@@ -137,7 +116,7 @@ export default function HomeScreen() {
 
   const handleDeleteDose = () => {
     if (!editDose || dbState.status !== 'ready') return;
-    deleteDose(dbState.db, editDose);
+    if (!deleteDose(dbState.db, editDose)) return;
     setEditDose(null);
     refresh();
   };
@@ -293,7 +272,6 @@ export default function HomeScreen() {
 
       <AppUpdateBanner />
 
-      {variantSheet}
 
       <SnoozeTimeDialog
         visible={!!snoozeDose}

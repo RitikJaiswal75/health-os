@@ -14,7 +14,11 @@ export type { AlarmScheduleInput } from './alarmGrouping';
 export class ReminderReconciler {
   constructor(private readonly db: SQLiteDatabase) {}
 
-  /** Build alarms from actionable dose rows (pending + snoozed), not raw schedule only. */
+  /**
+   * Build alarms from actionable dose rows (pending + snoozed), not raw schedule only: every dose in
+   * the next `daysAhead` days, plus each schedule's next dose when it is further away (monthly), so
+   * it still rings if the app is not opened before then.
+   */
   reconcile(daysAhead = 7): AlarmScheduleInput[] {
     const medRepo = new MedicationRepository(this.db);
     const doseRepo = new DoseEventRepository(this.db);
@@ -23,8 +27,18 @@ export class ReminderReconciler {
     const medsById = new Map(medRepo.getAll().map((med) => [med.id, med]));
 
     const alarms: AlarmScheduleInput[] = [];
+    const upcoming = doseRepo
+      .getUpcomingForReminders(now, Number.POSITIVE_INFINITY)
+      .map((dose) => ({ dose, trigger: parseScheduledAt(dose.scheduledAt).getTime() }))
+      .sort((a, b) => a.trigger - b.trigger);
+    const schedulesSeen = new Set<string>();
 
-    for (const dose of doseRepo.getUpcomingForReminders(now, toMillis)) {
+    for (const { dose, trigger } of upcoming) {
+      const scheduleKey = dose.scheduleId ?? dose.id;
+      const isNextForSchedule = !schedulesSeen.has(scheduleKey);
+      schedulesSeen.add(scheduleKey);
+      if (trigger > toMillis && !isNextForSchedule) continue;
+
       const med = medsById.get(dose.medicationId);
       if (!med) continue;
 

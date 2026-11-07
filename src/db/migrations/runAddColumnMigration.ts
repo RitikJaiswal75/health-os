@@ -8,8 +8,9 @@ export function runAddColumnMigration(db: SQLiteDatabase, sql: string): void {
   for (const statement of sql.split(';').map((s) => s.trim()).filter(Boolean)) {
     try {
       db.execSync(`${statement};`);
-    } catch {
-      // Column already exists on upgraded databases.
+    } catch (error) {
+      // Column already exists on upgraded databases; anything else (disk full) must surface.
+      if (!/duplicate column/i.test(error instanceof Error ? error.message : String(error))) throw error;
     }
   }
 }
