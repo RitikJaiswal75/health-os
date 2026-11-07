@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const HEALTH_OS_FOLDER = 'HealthOS';
 export const DB_FILENAME = 'health-os.db';
@@ -24,15 +25,15 @@ export async function resolveHealthOsDirectory(): Promise<string> {
 
 /**
  * Copies data from the old public folder into `privateDir` once, before the database is opened.
- * Returns the old folder when copied (so photo paths can be rewritten), else null. Files left by
- * an earlier install are unreadable: then this cleans up and the app starts with a fresh database.
+ * Files left by an earlier install are unreadable: then this cleans up and the app starts with a
+ * fresh database. Photo paths are repaired separately, on every launch (rewriteLegacyPhotoPaths).
  * shortcut: a failed copy is not retried, because the fresh database then exists; the old files stay
  * in Documents for a manual restore.
  */
-export async function adoptLegacyPublicData(privateDir: string): Promise<string | null> {
-  if (Platform.OS !== 'android') return null;
-  if ((await FileSystem.getInfoAsync(`${privateDir}${DB_FILENAME}`)).exists) return null;
-  if (!(await FileSystem.getInfoAsync(`${LEGACY_PUBLIC_DIR}${DB_FILENAME}`)).exists) return null;
+export async function adoptLegacyPublicData(privateDir: string): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  if ((await FileSystem.getInfoAsync(`${privateDir}${DB_FILENAME}`)).exists) return;
+  if (!(await FileSystem.getInfoAsync(`${LEGACY_PUBLIC_DIR}${DB_FILENAME}`)).exists) return;
 
   // Photos and WAL first, the database last: its presence marks the move as done.
   const toCopy = [PHOTOS_FOLDER, ...DB_FILES];
@@ -42,13 +43,23 @@ export async function adoptLegacyPublicData(privateDir: string): Promise<string 
       if (!(await FileSystem.getInfoAsync(from)).exists) continue;
       await FileSystem.copyAsync({ from, to: `${privateDir}${name}` });
     }
-    return LEGACY_PUBLIC_DIR;
   } catch {
     for (const name of toCopy) {
       await FileSystem.deleteAsync(`${privateDir}${name}`, { idempotent: true }).catch(() => undefined);
     }
-    return null;
   }
+}
+
+/**
+ * Points saved photo paths from the old public folder at `privateDir`. Safe to run on every launch:
+ * rows already in the private folder do not match, so it also repairs a launch that was killed
+ * after the copy but before this update.
+ */
+export function rewriteLegacyPhotoPaths(db: SQLiteDatabase, privateDir: string): void {
+  db.runSync(
+    `UPDATE medications SET photo_uri = ? || substr(photo_uri, ?) WHERE substr(photo_uri, 1, ?) = ?`,
+    [privateDir, LEGACY_PUBLIC_DIR.length + 1, LEGACY_PUBLIC_DIR.length, LEGACY_PUBLIC_DIR],
+  );
 }
 
 export async function resolvePhotosDirectory(): Promise<string> {

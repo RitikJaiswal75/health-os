@@ -1,7 +1,7 @@
 import { addDays, format } from 'date-fns';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { parseScheduledAt } from '../../core/dates/dateUtils';
+import { parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from './notificationSetup';
 import { dedupeAlarms, groupToSlotAlarms, type AlarmScheduleInput } from './alarmGrouping';
 import type { SQLiteDatabase } from 'expo-sqlite';
@@ -16,8 +16,8 @@ export class ReminderReconciler {
 
   /**
    * Build alarms from actionable dose rows (pending + snoozed), not raw schedule only: every dose in
-   * the next `daysAhead` days, plus each schedule's next dose when it is further away (monthly), so
-   * it still rings if the app is not opened before then.
+   * the next `daysAhead` days, plus all doses on each schedule's next day when that is further away
+   * (monthly), so they still ring if the app is not opened before then.
    */
   reconcile(daysAhead = 7): AlarmScheduleInput[] {
     const medRepo = new MedicationRepository(this.db);
@@ -31,13 +31,13 @@ export class ReminderReconciler {
       .getUpcomingForReminders(now, Number.POSITIVE_INFINITY)
       .map((dose) => ({ dose, trigger: parseScheduledAt(dose.scheduledAt).getTime() }))
       .sort((a, b) => a.trigger - b.trigger);
-    const schedulesSeen = new Set<string>();
+    const nextDayBySchedule = new Map<string, string>();
 
     for (const { dose, trigger } of upcoming) {
       const scheduleKey = dose.scheduleId ?? dose.id;
-      const isNextForSchedule = !schedulesSeen.has(scheduleKey);
-      schedulesSeen.add(scheduleKey);
-      if (trigger > toMillis && !isNextForSchedule) continue;
+      const dayKey = scheduledAtToDateKey(dose.scheduledAt);
+      if (!nextDayBySchedule.has(scheduleKey)) nextDayBySchedule.set(scheduleKey, dayKey);
+      if (trigger > toMillis && nextDayBySchedule.get(scheduleKey) !== dayKey) continue;
 
       const med = medsById.get(dose.medicationId);
       if (!med) continue;

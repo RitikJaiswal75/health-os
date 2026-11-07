@@ -3,14 +3,14 @@ import { generateUpcomingDoseEvents } from '../src/features/medications/doseGene
 import { scheduleAlarms } from '../src/features/reminders/reminderService';
 import { reportError } from '../src/core/observability/crashReporter';
 import { openDatabaseSync } from 'expo-sqlite';
-import { adoptLegacyPublicData } from '../src/core/storage/durableStorage';
-import { MedicationRepository } from '../src/features/medications/medicationRepository';
+import { rewriteLegacyPhotoPaths } from '../src/core/storage/durableStorage';
 import { createTestDb } from './helpers/sqliteDb';
 
 jest.mock('../src/core/storage/durableStorage', () => ({
   DB_FILENAME: 'health-os.db',
   resolveHealthOsDirectory: jest.fn(() => Promise.resolve('file:///data/HealthOS/')),
-  adoptLegacyPublicData: jest.fn(() => Promise.resolve(null)),
+  adoptLegacyPublicData: jest.fn(() => Promise.resolve()),
+  rewriteLegacyPhotoPaths: jest.fn(),
 }));
 jest.mock('../src/features/catalog/catalogService', () => ({
   CatalogCacheRepository: jest.fn(() => ({ sweepExpired: jest.fn() })),
@@ -47,21 +47,12 @@ describe('bootstrapDatabase', () => {
     expect(reportError).toHaveBeenCalledWith('ALARM_SCHEDULE_FAILED', expect.any(Error));
   });
 
-  it('points photo paths at the private folder after moving old public data', async () => {
+  it('repairs photo paths on every launch, even when this launch copied nothing', async () => {
     const db = createTestDb();
-    const { medication } = new MedicationRepository(db).create({
-      name: 'Metformin',
-      medicationType: 'tablet',
-      currentQuantity: 10,
-      photoUri: '/storage/emulated/0/Documents/HealthOS/photos/a.jpg',
-      schedule: { type: 'fixed_daily', timesOfDay: [{ hour: 8, minute: 0 }], startDate: '2026-09-13' },
-    });
     (openDatabaseSync as jest.Mock).mockReturnValueOnce(db);
-    (adoptLegacyPublicData as jest.Mock).mockResolvedValueOnce('/storage/emulated/0/Documents/HealthOS/');
+    // adoptLegacyPublicData resolves with nothing: the copy happened on an earlier launch.
 
     await expect(bootstrapDatabase()).resolves.toMatchObject({ status: 'ready' });
-    expect(new MedicationRepository(db).getById(medication.id)?.photoUri).toBe(
-      'file:///data/HealthOS/photos/a.jpg',
-    );
+    expect(rewriteLegacyPhotoPaths).toHaveBeenCalledWith(db, 'file:///data/HealthOS/');
   });
 });

@@ -6,6 +6,7 @@ import { runAddColumnMigration } from './migrations/runAddColumnMigration';
 import {
   adoptLegacyPublicData,
   resolveHealthOsDirectory,
+  rewriteLegacyPhotoPaths,
   DB_FILENAME,
 } from '../core/storage/durableStorage';
 import type { DbBootstrapResult } from './clientTypes';
@@ -32,7 +33,7 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
 
   try {
     const directory = await resolveHealthOsDirectory();
-    const legacyDirectory = await adoptLegacyPublicData(directory);
+    await adoptLegacyPublicData(directory);
 
     const db = SQLite.openDatabaseSync(
       DB_FILENAME,
@@ -46,13 +47,9 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
     runAddColumnMigration(db, MIGRATION_002);
     runAddColumnMigration(db, MIGRATION_003);
 
-    if (legacyDirectory) {
-      // Photos moved with the database; point saved photo paths at the new folder.
-      db.runSync(
-        `UPDATE medications SET photo_uri = ? || substr(photo_uri, ?) WHERE photo_uri LIKE ?`,
-        [directory, legacyDirectory.length + 1, `${legacyDirectory}%`],
-      );
-    }
+    // Photos moved with the database. Every launch, not only the one that copied: a launch killed
+    // after the copy would otherwise leave the paths pointing at the public originals.
+    rewriteLegacyPhotoPaths(db, directory);
 
     new CatalogCacheRepository(db).sweepExpired();
     // Dose generation and alarms are best effort: if they fail the user must still see their data.

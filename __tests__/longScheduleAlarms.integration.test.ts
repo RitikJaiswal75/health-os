@@ -51,6 +51,38 @@ describe('alarms for schedules with long gaps', () => {
     expect(alarms.map((alarm) => alarm.scheduledAt)).toEqual(['2026-09-11T09:00:00']);
   });
 
+  it('a monthly schedule with two times a day alarms both on its next day', () => {
+    const db = createTestDb();
+    new MedicationRepository(db).create(
+      medication({
+        type: 'monthly',
+        dayOfMonth: 25,
+        timesOfDay: [
+          { hour: 8, minute: 0, doseAmount: 1 },
+          { hour: 20, minute: 0, doseAmount: 1 },
+        ],
+      }),
+    );
+    generateUpcomingDoseEvents(db, 14);
+
+    const alarms = new ReminderReconciler(db).reconcile(7);
+    expect(alarms.map((alarm) => alarm.scheduledAt)).toEqual([
+      '2026-09-25T08:00:00',
+      '2026-09-25T20:00:00',
+    ]);
+  });
+
+  it('a monthly schedule that starts in the future still alarms its first dose', () => {
+    const db = createTestDb();
+    new MedicationRepository(db).create(
+      medication({ type: 'monthly', dayOfMonth: 25, startDate: '2026-09-30' }),
+    );
+    generateUpcomingDoseEvents(db, 14);
+
+    const alarms = new ReminderReconciler(db).reconcile(7);
+    expect(alarms.map((alarm) => alarm.scheduledAt)).toEqual(['2026-10-25T09:00:00']);
+  });
+
   it('a daily schedule still gets only the next 7 days', () => {
     const db = createTestDb();
     new MedicationRepository(db).create(medication({}));

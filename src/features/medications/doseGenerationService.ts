@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { addDays, format, isBefore, max, startOfDay } from 'date-fns';
+import { addDays, format, isAfter, isBefore, max, startOfDay } from 'date-fns';
 import type { Schedule } from '../../db/types';
 import {
   MedicationRepository,
@@ -291,13 +291,17 @@ export function repairMissingPastDosesOnce(db: SQLiteDatabase): number {
 }
 
 /**
- * Latest day the next dose of this schedule can fall on. Monthly and long-interval schedules can be
- * further away than the horizon, and without a row they would get no alarm.
+ * Day by which the next dose of this schedule has certainly happened, counted from today or from the
+ * start date when that is later. Monthly, long-interval and future-start schedules can be further
+ * away than the horizon, and without a row they would get no alarm.
  */
 function nextDoseDeadline(schedule: Schedule, from: Date): Date {
-  if (schedule.type === 'monthly') return addDays(from, 32);
-  if (schedule.type === 'interval_days') return addDays(from, (schedule.intervalDays ?? 1) + 1);
-  return from;
+  const start = parseDateKey(schedule.startDate);
+  const base = isAfter(start, from) ? start : from;
+  if (schedule.type === 'monthly') return addDays(base, 32);
+  if (schedule.type === 'interval_days') return addDays(base, (schedule.intervalDays ?? 1) + 1);
+  if (schedule.type === 'weekdays') return addDays(base, 8);
+  return addDays(base, 1);
 }
 
 /** Generate pending dose_events for all active schedules within the horizon. Idempotent. */
