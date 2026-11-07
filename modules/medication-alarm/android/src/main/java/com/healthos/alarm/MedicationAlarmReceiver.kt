@@ -16,12 +16,8 @@ import com.health.os.MainActivity
 class MedicationAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED -> {
-                val reschedule = Intent("com.health.os.BOOT_RESCHEDULE").apply {
-                    setPackage(context.packageName)
-                }
-                context.sendBroadcast(reschedule)
-            }
+            // AlarmManager forgets every alarm on reboot.
+            Intent.ACTION_BOOT_COMPLETED -> ScheduledAlarmStore.rearmAfterBoot(context)
             ACTION_ALARM_FIRE -> {
                 val medicationId = intent.getStringExtra("medicationId") ?: return
                 val alarmId = intent.getStringExtra("alarmId") ?: return

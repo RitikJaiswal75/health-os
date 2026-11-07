@@ -60,28 +60,13 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun parseScheduledAtMillis(scheduledAt: String): Long {
-        return if (scheduledAt.endsWith("Z") || scheduledAt.matches(Regex(".*[+-]\\d{2}:\\d{2}$"))) {
-            java.time.Instant.parse(scheduledAt).toEpochMilli()
-        } else {
-            val normalized = when {
-                scheduledAt.length >= 19 -> scheduledAt.substring(0, 19)
-                scheduledAt.length == 16 -> "${scheduledAt}:00"
-                else -> scheduledAt
-            }
-            java.time.LocalDateTime.parse(normalized)
-                .atZone(java.time.ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
-        }
-    }
-
     @ReactMethod
     fun scheduleAlarms(occurrences: ReadableArray, promise: Promise) {
         try {
             val prefs = reactContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val previous = prefs.getStringSet(KEY_SCHEDULED_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
             val next = mutableSetOf<String>()
+            val saved = mutableListOf<ScheduledAlarm>()
 
             for (i in 0 until occurrences.size()) {
                 val item = occurrences.getMap(i) ?: continue
@@ -89,8 +74,9 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
                 val medicationId = item.getString("medicationId") ?: continue
                 val scheduledAt = item.getString("scheduledAt") ?: continue
                 val doseEventId = if (item.hasKey("doseEventId")) item.getString("doseEventId") else null
-                val triggerAt = parseScheduledAtMillis(scheduledAt)
+                val triggerAt = ScheduledAlarmStore.parseScheduledAtMillis(scheduledAt)
                 next.add(id)
+                saved.add(ScheduledAlarm(id, medicationId, scheduledAt, doseEventId))
                 MedicationAlarmReceiver.schedule(
                     reactContext, id, medicationId, triggerAt, scheduledAt, doseEventId,
                 )
@@ -109,19 +95,10 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
             val persistedIds = next.toMutableSet()
             persistedIds.addAll(ringingAlarmIds)
             prefs.edit().putStringSet(KEY_SCHEDULED_IDS, persistedIds).apply()
+            ScheduledAlarmStore.save(reactContext, saved)
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("SCHEDULE_ERROR", e.message, e)
-        }
-    }
-
-    @ReactMethod
-    fun cancelAlarm(alarmId: String, promise: Promise) {
-        try {
-            MedicationAlarmReceiver.cancel(reactContext, alarmId)
-            promise.resolve(null)
-        } catch (e: Exception) {
-            promise.reject("CANCEL_ERROR", e.message, e)
         }
     }
 

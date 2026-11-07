@@ -4,11 +4,18 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 
 object AlarmSoundController {
+    /** A missed alarm rings this long, then goes quiet; the notification stays up. */
+    private const val RING_TIMEOUT_MS = 10 * 60 * 1000L
+
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val timeout = Runnable { stop() }
 
     fun ensurePlaying(context: Context) {
         if (mediaPlayer?.isPlaying == true) {
@@ -39,6 +46,7 @@ object AlarmSoundController {
             prepare()
             start()
         }
+        handler.postDelayed(timeout, RING_TIMEOUT_MS)
     }
 
     fun stop() {
@@ -51,6 +59,7 @@ object AlarmSoundController {
 
     /** Silences the sound but keeps the wake lock; returns true if it was playing. */
     fun stopPlaybackOnly(): Boolean {
+        handler.removeCallbacks(timeout)
         var wasPlaying = false
         mediaPlayer?.run {
             try {
@@ -76,7 +85,7 @@ object AlarmSoundController {
             PowerManager.PARTIAL_WAKE_LOCK,
             "HealthOS:MedicationAlarm",
         ).apply {
-            acquire(10 * 60 * 1000L)
+            acquire(RING_TIMEOUT_MS)
         }
     }
 }
