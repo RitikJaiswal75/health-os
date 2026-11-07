@@ -1,4 +1,4 @@
-/** FTS5 query sanitizer — mirrors src/features/catalog/catalogService.ts */
+/** FTS5 query sanitizer: quotes each token and prefix-matches the last. */
 export function sanitizeFtsQuery(query: string): string {
   const tokens = query
     .trim()

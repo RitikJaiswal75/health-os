@@ -91,6 +91,11 @@ export function isAbortError(error: unknown): boolean {
   return (error as { name?: string }).name === 'AbortError';
 }
 
+/** RN fetch rejects with this TypeError when offline or on DNS/TLS failure: expected, not a bug. */
+export function isNetworkError(error: unknown): boolean {
+  return error instanceof TypeError && error.message === 'Network request failed';
+}
+
 export async function searchRxTerms(query: string, signal?: AbortSignal): Promise<CatalogResult[]> {
   try {
     const url = `https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search?terms=${encodeURIComponent(query)}&maxList=20`;
@@ -106,7 +111,7 @@ export async function searchRxTerms(query: string, signal?: AbortSignal): Promis
     }));
   } catch (error) {
     if (isAbortError(error)) throw error;
-    reportError('CATALOG_FETCH_FAILED', error);
+    if (!isNetworkError(error)) reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
 }
@@ -127,7 +132,7 @@ export async function searchDsld(query: string, signal?: AbortSignal): Promise<C
     }));
   } catch (error) {
     if (isAbortError(error)) throw error;
-    reportError('CATALOG_FETCH_FAILED', error);
+    if (!isNetworkError(error)) reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
 }
@@ -182,16 +187,6 @@ export async function searchAllCatalogs(
   ]);
 
   return mergeAndRankResults([india, rx, dsld], query);
-}
-
-export function sanitizeFtsQuery(query: string): string {
-  const tokens = query
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-  if (tokens.length === 0) return '';
-  return `${tokens.map((token) => `"${token.replace(/"/g, '""')}"`).join(' ')}*`;
 }
 
 export function parseCachedResults(payload: string): CatalogResult[] {
