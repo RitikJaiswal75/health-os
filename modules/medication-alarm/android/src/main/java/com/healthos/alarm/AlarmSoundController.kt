@@ -19,7 +19,11 @@ object AlarmSoundController {
 
     fun ensurePlaying(context: Context) {
         if (mediaPlayer?.isPlaying == true) {
+            // A new alarm while one is ringing gets its own full ring time (and wake lock to match).
+            releaseWakeLock()
             acquireWakeLock(context.applicationContext)
+            handler.removeCallbacks(timeout)
+            handler.postDelayed(timeout, RING_TIMEOUT_MS)
             return
         }
         start(context)
@@ -51,6 +55,10 @@ object AlarmSoundController {
 
     fun stop() {
         stopPlaybackOnly()
+        releaseWakeLock()
+    }
+
+    private fun releaseWakeLock() {
         wakeLock?.let {
             if (it.isHeld) it.release()
         }

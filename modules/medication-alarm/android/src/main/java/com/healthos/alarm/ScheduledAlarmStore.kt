@@ -1,6 +1,9 @@
 package com.healthos.alarm
 
+import android.app.AlarmManager
 import android.content.Context
+import android.os.Build
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -36,6 +39,9 @@ object ScheduledAlarmStore {
 
     /** Set every saved alarm that is still in the future. Called on BOOT_COMPLETED. */
     fun rearmAfterBoot(context: Context) {
+        // Without "Alarms & reminders" setAlarmClock throws, and an exception here crashes the app on boot.
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) return
         val now = System.currentTimeMillis()
         for (alarm in load(context)) {
             // Recomputed from the wall-clock time, so a time-zone change while off is respected.
@@ -45,9 +51,13 @@ object ScheduledAlarmStore {
                 continue
             }
             if (triggerAt <= now) continue
-            MedicationAlarmReceiver.schedule(
-                context, alarm.alarmId, alarm.medicationId, triggerAt, alarm.scheduledAt, alarm.doseEventId,
-            )
+            try {
+                MedicationAlarmReceiver.schedule(
+                    context, alarm.alarmId, alarm.medicationId, triggerAt, alarm.scheduledAt, alarm.doseEventId,
+                )
+            } catch (error: Exception) {
+                Log.e("ScheduledAlarmStore", "Unable to re-arm alarm after boot", error)
+            }
         }
     }
 

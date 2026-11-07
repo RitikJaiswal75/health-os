@@ -15,8 +15,13 @@ import {
   saveDoseEdit,
 } from '../src/features/inventory/doseTakenService';
 import { notifyRefillIfNeeded } from '../src/features/inventory/refillReminderService';
+import { ReminderReconciler } from '../src/features/reminders/reminderService';
 
+// The real ReminderReconciler (DB -> alarms) without the notification plumbing around it.
+jest.mock('expo-notifications', () => ({}));
+jest.mock('../src/features/reminders/notificationSetup', () => ({}));
 jest.mock('../src/features/reminders/reminderService', () => ({
+  ...jest.requireActual('../src/features/reminders/reminderService'),
   rescheduleReminders: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../src/features/inventory/refillReminderService', () => ({
@@ -106,6 +111,15 @@ describe('dose writes', () => {
     expect(markDoseAsTaken(db, doseId)).toBe(true);
     expect(markDoseAsTaken(db, doseId)).toBe(true);
     expect(stock(db, medId)).toBe(8);
+  });
+
+  it('a snoozed dose still gets an alarm at its new time', () => {
+    const { db, doseRepo, doseId } = setUp(10);
+    jest.setSystemTime(new Date('2026-09-13T07:55:00'));
+    doseRepo.snooze(doseId, '2026-09-13T08:15:00', '2026-09-13T08:00:00');
+
+    const alarms = new ReminderReconciler(db).reconcile(7);
+    expect(alarms.find((alarm) => alarm.doseEventId === doseId)?.scheduledAt).toBe('2026-09-13T08:15:00');
   });
 
   it('keeps a medication whole when deleting it fails part way', () => {
