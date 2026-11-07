@@ -1,6 +1,7 @@
 import { addHours, isAfter, parseISO } from 'date-fns';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { reportError } from '@/src/core/observability/crashReporter';
+import { isNetworkError } from '@/src/core/observability/networkError';
 
 export const CACHE_TTL_HOURS = 24;
 
@@ -89,11 +90,6 @@ export function mergeAndRankResults(
 export function isAbortError(error: unknown): boolean {
   if (typeof error !== 'object' || error == null) return false;
   return (error as { name?: string }).name === 'AbortError';
-}
-
-/** RN fetch rejects with this TypeError when offline or on DNS/TLS failure: expected, not a bug. */
-export function isNetworkError(error: unknown): boolean {
-  return error instanceof TypeError && error.message === 'Network request failed';
 }
 
 export async function searchRxTerms(query: string, signal?: AbortSignal): Promise<CatalogResult[]> {

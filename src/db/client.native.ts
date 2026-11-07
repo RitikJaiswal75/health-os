@@ -4,6 +4,7 @@ import { MIGRATION_SQL as MIGRATION_002 } from './migrations/002_pill_color2';
 import { MIGRATION_SQL as MIGRATION_003 } from './migrations/003_dose_unit';
 import { runAddColumnMigration } from './migrations/runAddColumnMigration';
 import {
+  adoptLegacyPublicData,
   resolveHealthOsDirectory,
   DB_FILENAME,
 } from '../core/storage/durableStorage';
@@ -31,6 +32,7 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
 
   try {
     const directory = await resolveHealthOsDirectory();
+    const legacyDirectory = await adoptLegacyPublicData(directory);
 
     const db = SQLite.openDatabaseSync(
       DB_FILENAME,
@@ -43,6 +45,14 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
 
     runAddColumnMigration(db, MIGRATION_002);
     runAddColumnMigration(db, MIGRATION_003);
+
+    if (legacyDirectory) {
+      // Photos moved with the database; point saved photo paths at the new folder.
+      db.runSync(
+        `UPDATE medications SET photo_uri = ? || substr(photo_uri, ?) WHERE photo_uri LIKE ?`,
+        [directory, legacyDirectory.length + 1, `${legacyDirectory}%`],
+      );
+    }
 
     db.runSync(
       `INSERT OR IGNORE INTO reminder_health (id, updated_at) VALUES ('singleton', ?)`,

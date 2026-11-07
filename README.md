@@ -73,8 +73,9 @@ Daily, every N days, specific weekdays, monthly, or as-needed — with multiple 
 ## Privacy & data
 
 - **No accounts, no cloud sync** — everything stays on your device
-- Database and pill photos live in durable **`Documents/HealthOS/`** storage
-- Data survives Android **Clear cache**; removed only on **Clear data** / uninstall
+- Database and pill photos live in the app's **private storage**; other apps can't read them
+- Data survives Android **Clear cache**. It's removed on **Clear data** / uninstall, unless your phone's own Google backup restores it
+- Versions up to 2.1.0 kept data in `Documents/HealthOS/`; 2.1.1 copies it into private storage on first launch
 - Catalog API queries (RxTerms, DSLD) are cached locally for 24 hours
 - Crash reports (if enabled) send only an anonymous install ID, app/OS version, device model, route name, and stack — never medication names, notes, or photos
 

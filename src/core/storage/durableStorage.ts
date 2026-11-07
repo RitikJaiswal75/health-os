@@ -5,33 +5,50 @@ export const HEALTH_OS_FOLDER = 'HealthOS';
 export const DB_FILENAME = 'health-os.db';
 export const PHOTOS_FOLDER = 'photos';
 
-/** Resolves the durable HealthOS storage directory (not cache). */
-export async function resolveHealthOsDirectory(): Promise<string> {
-  if (Platform.OS === 'android') {
-    const publicPath = `/storage/emulated/0/Documents/${HEALTH_OS_FOLDER}/`;
-    const info = await FileSystem.getInfoAsync(publicPath);
-    if (info.exists) {
-      return publicPath;
-    }
-    try {
-      await FileSystem.makeDirectoryAsync(publicPath, { intermediates: true });
-      return publicPath;
-    } catch {
-      // Fall through to app documents if public path unavailable (emulator/dev)
-    }
-  }
+/** Where releases up to 2.1.0 kept data on Android. */
+const LEGACY_PUBLIC_DIR = `/storage/emulated/0/Documents/${HEALTH_OS_FOLDER}/`;
+const DB_FILES = [`${DB_FILENAME}-wal`, `${DB_FILENAME}-shm`, DB_FILENAME];
 
-  const fallback = `${FileSystem.documentDirectory}${HEALTH_OS_FOLDER}/`;
-  const fallbackInfo = await FileSystem.getInfoAsync(fallback);
-  if (!fallbackInfo.exists) {
-    await FileSystem.makeDirectoryAsync(fallback, { intermediates: true });
+/**
+ * App-private HealthOS directory. Other apps can't read it, Android Auto Backup covers it, and a
+ * reinstalled app can always open it (public Documents files belong to the install that made them).
+ */
+export async function resolveHealthOsDirectory(): Promise<string> {
+  const dir = `${FileSystem.documentDirectory}${HEALTH_OS_FOLDER}/`;
+  const info = await FileSystem.getInfoAsync(dir);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   }
-  return fallback;
+  return dir;
 }
 
-export async function resolveDatabasePath(): Promise<string> {
-  const dir = await resolveHealthOsDirectory();
-  return `${dir}${DB_FILENAME}`;
+/**
+ * Copies data from the old public folder into `privateDir` once, before the database is opened.
+ * Returns the old folder when copied (so photo paths can be rewritten), else null. Files left by
+ * an earlier install are unreadable: then this cleans up and the app starts with a fresh database.
+ * shortcut: a failed copy is not retried, because the fresh database then exists; the old files stay
+ * in Documents for a manual restore.
+ */
+export async function adoptLegacyPublicData(privateDir: string): Promise<string | null> {
+  if (Platform.OS !== 'android') return null;
+  if ((await FileSystem.getInfoAsync(`${privateDir}${DB_FILENAME}`)).exists) return null;
+  if (!(await FileSystem.getInfoAsync(`${LEGACY_PUBLIC_DIR}${DB_FILENAME}`)).exists) return null;
+
+  // Photos and WAL first, the database last: its presence marks the move as done.
+  const toCopy = [PHOTOS_FOLDER, ...DB_FILES];
+  try {
+    for (const name of toCopy) {
+      const from = `${LEGACY_PUBLIC_DIR}${name}`;
+      if (!(await FileSystem.getInfoAsync(from)).exists) continue;
+      await FileSystem.copyAsync({ from, to: `${privateDir}${name}` });
+    }
+    return LEGACY_PUBLIC_DIR;
+  } catch {
+    for (const name of toCopy) {
+      await FileSystem.deleteAsync(`${privateDir}${name}`, { idempotent: true }).catch(() => undefined);
+    }
+    return null;
+  }
 }
 
 export async function resolvePhotosDirectory(): Promise<string> {

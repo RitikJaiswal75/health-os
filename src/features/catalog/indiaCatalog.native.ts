@@ -1,6 +1,7 @@
 import { getIndiaCatalogApiUrl } from './indiaCatalogConfig';
 import { searchIndiaCatalogRemote } from './indiaCatalogApi';
-import { isAbortError, isNetworkError, type CatalogResult } from './catalogService';
+import { isAbortError, type CatalogResult } from './catalogService';
+import { isNetworkError } from '@/src/core/observability/networkError';
 import { reportError } from '@/src/core/observability/crashReporter';
 
 export async function searchIndiaCatalogAsync(

@@ -64,7 +64,7 @@ export const VALUE_PROPS = [
   },
   {
     title: 'Private by design',
-    description: 'Your database and pill photos live in durable Documents/HealthOS/ storage on your phone.',
+    description: "Your database and pill photos live in the app's private storage on your phone, where other apps can't read them.",
   },
   {
     title: 'Reliable reminders',
