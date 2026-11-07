@@ -1,7 +1,7 @@
 import { addDays, format } from 'date-fns';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { parseScheduledAt, formatLocalDateTime } from '../../core/dates/dateUtils';
+import { parseScheduledAt } from '../../core/dates/dateUtils';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from './notificationSetup';
 import { dedupeAlarms, groupToSlotAlarms, type AlarmScheduleInput } from './alarmGrouping';
 import type { SQLiteDatabase } from 'expo-sqlite';
@@ -143,19 +143,6 @@ export function rescheduleReminders(db: SQLiteDatabase): Promise<void> {
   return run;
 }
 
-export async function cancelAlarm(alarmId: string): Promise<void> {
-  if (Platform.OS === 'android') {
-    try {
-      const MedicationAlarm = require('../../../modules/medication-alarm');
-      if (MedicationAlarm?.cancelAlarm) {
-        await MedicationAlarm.cancelAlarm(alarmId);
-      }
-    } catch {
-      // stub
-    }
-  }
-}
-
 export async function dismissReminderNotification(
   alarmId: string,
 ): Promise<void> {
@@ -169,39 +156,4 @@ export async function dismissReminderNotification(
   } catch {
     // stub
   }
-}
-
-export async function scheduleSnoozeAt(
-  medicationId: string,
-  medicationName: string,
-  scheduledAt: string,
-  doseEventId?: string,
-  db?: SQLiteDatabase,
-): Promise<void> {
-  if (db) {
-    await rescheduleReminders(db);
-    return;
-  }
-
-  await scheduleAlarms([
-    {
-      id: `snooze:${medicationId}:${doseEventId ?? Date.now()}`,
-      medicationId,
-      medicationName,
-      scheduledAt,
-      doseAmount: 1,
-      doseEventId,
-    },
-  ]);
-}
-
-export async function scheduleSnooze(
-  medicationId: string,
-  medicationName: string,
-  minutes: number,
-  doseEventId?: string,
-): Promise<string> {
-  const scheduledAt = formatLocalDateTime(new Date(Date.now() + minutes * 60000));
-  await scheduleSnoozeAt(medicationId, medicationName, scheduledAt, doseEventId);
-  return scheduledAt;
 }

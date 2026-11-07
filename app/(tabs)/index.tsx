@@ -14,13 +14,11 @@ import {
   cleanupSnoozeConflicts,
   deletePendingAtSlot,
 } from '@/src/features/medications/snoozeCleanupService';
-import { InventoryService } from '@/src/features/inventory/inventoryService';
-import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
+import { deleteDose, markDoseAsTaken, saveDoseEdit } from '@/src/features/inventory/doseTakenService';
 import type { DoseEvent } from '@/src/db/schema';
 import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
 import {
   rescheduleReminders,
-  scheduleSnoozeAt,
 } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
@@ -125,42 +123,21 @@ export default function HomeScreen() {
     deletePendingAtSlot(doseRepo, snoozeDose.scheduleId, originalSlot);
     cleanupSnoozeConflicts(dbState.db);
 
-    await scheduleSnoozeAt(
-      med.id,
-      med.nickname ?? med.name,
-      snoozedUntil,
-      snoozeDose.id,
-      dbState.db,
-    );
+    await rescheduleReminders(dbState.db);
     setSnoozeDose(null);
     refresh();
   };
 
   const handleSaveEdit = () => {
-    if (!editDose || dbState.status !== 'ready' || !medRepo) return;
-    if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
-    if (editStatus === 'taken' && editDose.status !== 'taken') {
-      markDoseAsTaken(dbState.db, editDose.id);
-    } else {
-      const doseRepo = new DoseEventRepository(dbState.db);
-      const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-      inventory.applyStatusChange(editDose.id, editDose.status, editStatus);
-      doseRepo.updateStatus(editDose.id, editStatus, {
-        takenAt: editStatus === 'taken' ? new Date().toISOString() : undefined,
-      });
-      void rescheduleReminders(dbState.db);
-    }
+    if (!editDose || dbState.status !== 'ready') return;
+    if (!saveDoseEdit(dbState.db, editDose, editStatus)) return;
     setEditDose(null);
     refresh();
   };
 
   const handleDeleteDose = () => {
-    if (!editDose || dbState.status !== 'ready' || !medRepo) return;
-    const doseRepo = new DoseEventRepository(dbState.db);
-    const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.compensateOnDelete(editDose.id, editDose.status);
-    doseRepo.delete(editDose.id);
-    void rescheduleReminders(dbState.db);
+    if (!editDose || dbState.status !== 'ready') return;
+    deleteDose(dbState.db, editDose);
     setEditDose(null);
     refresh();
   };

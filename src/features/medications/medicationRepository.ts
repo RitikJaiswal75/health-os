@@ -68,7 +68,24 @@ export interface CreateMedicationInput {
 export class MedicationRepository {
   constructor(private readonly db: SQLiteDatabase) {}
 
+  /** All rows or none: a half-saved medication would block the retry via the duplicate check. */
   create(input: CreateMedicationInput): { medication: Medication; variant: MedicationVariant; schedule: Schedule } {
+    let created!: ReturnType<MedicationRepository['insertMedication']>;
+    this.db.withTransactionSync(() => {
+      created = this.insertMedication(input);
+    });
+    return created;
+  }
+
+  update(medicationId: string, input: CreateMedicationInput): boolean {
+    let updated = false;
+    this.db.withTransactionSync(() => {
+      updated = this.writeUpdate(medicationId, input);
+    });
+    return updated;
+  }
+
+  private insertMedication(input: CreateMedicationInput): { medication: Medication; variant: MedicationVariant; schedule: Schedule } {
     const now = new Date().toISOString();
     const medicationId = uuidv4();
     const variantId = uuidv4();
@@ -150,7 +167,7 @@ export class MedicationRepository {
     };
   }
 
-  update(medicationId: string, input: CreateMedicationInput): boolean {
+  private writeUpdate(medicationId: string, input: CreateMedicationInput): boolean {
     const med = this.getById(medicationId);
     if (!med) return false;
 
@@ -277,11 +294,13 @@ export class MedicationRepository {
     const med = this.getById(medicationId);
     if (!med) return false;
 
-    this.db.runSync(`DELETE FROM inventory_transactions WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM dose_events WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM schedules WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM medication_variants WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM medications WHERE id = ?`, [medicationId]);
+    this.db.withTransactionSync(() => {
+      this.db.runSync(`DELETE FROM inventory_transactions WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM dose_events WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM schedules WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM medication_variants WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM medications WHERE id = ?`, [medicationId]);
+    });
     return true;
   }
 

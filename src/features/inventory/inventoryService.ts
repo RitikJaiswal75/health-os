@@ -35,6 +35,15 @@ export class InventoryService {
     return row != null;
   }
 
+  /** Stock the dose actually removed; it can be less than the dose when stock hit zero. */
+  private recordedTakenAmount(doseEventId: string): number | null {
+    const row = this.db.getFirstSync<{ quantity_delta: number }>(
+      `SELECT quantity_delta FROM inventory_transactions WHERE dose_event_id = ? AND type = 'dose_taken' LIMIT 1`,
+      [doseEventId],
+    );
+    return row ? -row.quantity_delta : null;
+  }
+
   private clearTakenTransaction(doseEventId: string): void {
     this.db.runSync(
       `DELETE FROM inventory_transactions WHERE dose_event_id = ? AND type = 'dose_taken'`,
@@ -94,6 +103,7 @@ export class InventoryService {
     const amount = takenDeductAmount(dose, med.medicationType);
     const previousQty = asQuantity(med.currentQuantity);
     const newQty = Math.max(0, previousQty - amount);
+    const removed = previousQty - newQty;
     const now = new Date().toISOString();
     const resolvedVariantId = this.resolveVariantId(med.id, variantId);
 
@@ -119,7 +129,7 @@ export class InventoryService {
       medicationId: med.id,
       variantId: resolvedVariantId,
       type: 'dose_taken',
-      quantityDelta: -amount,
+      quantityDelta: -removed,
       balanceAfter: newQty,
       doseEventId,
     });
@@ -138,7 +148,9 @@ export class InventoryService {
     const med = this.medications.getById(dose.medicationId);
     if (!med) return { previousQty: 0, newQty: 0, changed: false };
 
-    const amount = takenDeductAmount(dose, med.medicationType);
+    // Rows from before the ledger stored the real amount fall back to the full dose.
+    const amount =
+      this.recordedTakenAmount(doseEventId) ?? takenDeductAmount(dose, med.medicationType);
     const previousQty = asQuantity(med.currentQuantity);
     const newQty = previousQty + amount;
     const now = new Date().toISOString();
@@ -168,6 +180,7 @@ export class InventoryService {
       quantityDelta: amount,
       balanceAfter: newQty,
     });
+    this.clearTakenTransaction(doseEventId);
 
     return { previousQty, newQty, changed: true };
   }

@@ -11,8 +11,8 @@ import { mapDoseEventRow } from '../../db/rowMappers';
 import {
   doseBelongsToDateKey,
   doseDedupeKey,
-  dosesShareMedicationSlot,
   normalizeScheduledAtStorage,
+  pendingDuplicatingResolved,
   pickCanonicalDose,
 } from './doseSlotUtils';
 import { formatDateKey, parseDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
@@ -54,11 +54,6 @@ export function removeDuplicateDoseEvents(db: SQLiteDatabase): number {
   return removed;
 }
 
-/** Drop pending doses whose schedule slot was deferred by a snooze. */
-export function removePendingSupersededBySnooze(db: SQLiteDatabase): number {
-  return cleanupSnoozeConflicts(db);
-}
-
 /** Drop pending doses that duplicate a taken/skipped/missed dose for the same medication slot. */
 export function removePendingDuplicatingResolvedDoses(db: SQLiteDatabase): number {
   const doseRepo = new DoseEventRepository(db);
@@ -66,18 +61,9 @@ export function removePendingDuplicatingResolvedDoses(db: SQLiteDatabase): numbe
     .getAllSync(`SELECT * FROM dose_events ORDER BY created_at ASC`)
     .map(mapDoseEventRow);
 
-  const resolved = allDoses.filter((d) => ['taken', 'skipped', 'missed'].includes(d.status));
-
-  let removed = 0;
-  for (const dose of allDoses) {
-    if (dose.status !== 'pending') continue;
-    const duplicateResolved = resolved.some((other) => dosesShareMedicationSlot(other, dose));
-    if (!duplicateResolved) continue;
-    doseRepo.delete(dose.id);
-    removed += 1;
-  }
-
-  return removed;
+  const duplicates = pendingDuplicatingResolved(allDoses);
+  for (const dose of duplicates) doseRepo.delete(dose.id);
+  return duplicates.size;
 }
 
 export function pruneStalePendingDoses(
@@ -308,9 +294,18 @@ export function generateUpcomingDoseEvents(
   db: SQLiteDatabase,
   horizonDays = DEFAULT_HORIZON_DAYS,
 ): number {
+  let created = 0;
+  // One transaction: one disk commit instead of one per insert/delete, and no half-applied cleanup.
+  db.withTransactionSync(() => {
+    created = generateInsideTransaction(db, horizonDays);
+  });
+  return created;
+}
+
+function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): number {
   purgeOrphanDoseEvents(db);
   removeDuplicateDoseEvents(db);
-  removePendingSupersededBySnooze(db);
+  cleanupSnoozeConflicts(db);
   removePendingDuplicatingResolvedDoses(db);
   removeDosesOutsideScheduleWindow(db);
 

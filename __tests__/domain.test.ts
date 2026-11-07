@@ -1,5 +1,6 @@
 import { computeDateCompletion, computeDonutRatio, formatTime24, formatDateKey, formatScheduledTime, parseScheduledAt, parseDateKey, scheduledAtToDateKey } from '../src/core/dates/dateUtils';
-import { mergeAndRankResults, CACHE_TTL_HOURS, sanitizeFtsQuery, parseCachedResults } from '../src/features/catalog/catalogService';
+import { mergeAndRankResults, CACHE_TTL_HOURS, parseCachedResults } from '../src/features/catalog/catalogService';
+import { sanitizeFtsQuery } from '../workers/india-catalog/src/fts';
 import { mapIndianMedicineRow, parseIndianMedicineJson } from '../src/features/catalog/indiaMedicineParser';
 import { mapIndiaApiResults } from '../src/features/catalog/indiaCatalogApi';
 import {
@@ -1461,6 +1462,7 @@ describe('doseGenerationService', () => {
   it('does not duplicate dose events for same schedule slot', () => {
     const runs: unknown[][] = [];
     const mockDb = {
+      withTransactionSync: (task: () => void) => task(),
       runSync: jest.fn((sql: string, params?: unknown[]) => {
         runs.push(params ?? []);
       }),
@@ -1693,6 +1695,7 @@ describe('doseGenerationService', () => {
     ];
 
     const mockDb = {
+      withTransactionSync: (task: () => void) => task(),
       runSync: jest.fn(),
       getFirstSync: jest.fn(() => null),
       getAllSync: jest.fn((sql: string) => {
@@ -1793,6 +1796,7 @@ describe('doseGenerationService', () => {
     ];
 
     const mockDb = {
+      withTransactionSync: (task: () => void) => task(),
       runSync: jest.fn(),
       getFirstSync: jest.fn(() => null),
       getAllSync: jest.fn((sql: string) => {
@@ -1883,6 +1887,7 @@ describe('doseGenerationService', () => {
     ];
 
     const mockDb = {
+      withTransactionSync: (task: () => void) => task(),
       runSync: jest.fn(),
       getFirstSync: jest.fn(() => null),
       getAllSync: jest.fn((sql: string) => {
@@ -1995,6 +2000,7 @@ describe('default variant invariant', () => {
           created_at: '2026-09-08',
         }),
       getAllSync: jest.fn(() => []),
+      withTransactionSync: (task: () => void) => task(),
     };
 
     const { MedicationRepository } = require('../src/features/medications/medicationRepository');
@@ -2020,6 +2026,7 @@ describe('default variant invariant', () => {
   it('deletes dose events and related rows when medication is removed', () => {
     const mockDb = {
       runSync: jest.fn(),
+      withTransactionSync: (task: () => void) => task(),
       getFirstSync: jest.fn().mockReturnValue({
         id: 'med-1',
         name: 'Test Med',

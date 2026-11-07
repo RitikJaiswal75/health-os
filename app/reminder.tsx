@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository, DoseEventRepository } from '@/src/features/medications/medicationRepository';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
-import { scheduleSnoozeAt, dismissReminderNotification } from '@/src/features/reminders/reminderService';
+import { dismissReminderNotification, rescheduleReminders } from '@/src/features/reminders/reminderService';
 import { exitReminderScreen } from '@/src/features/reminders/reminderDeepLink';
 import { ReminderMedicationRow } from '@/src/features/reminders/ReminderMedicationRow';
 import { ReminderSingleMedicationCard } from '@/src/features/reminders/ReminderSingleMedicationCard';
@@ -92,14 +92,8 @@ export default function ReminderScreen() {
   const completeTaken = (item: ReminderItem, variantId?: string) => {
     if (dbState.status !== 'ready' || !medRepo) return;
     const doseRepo = new DoseEventRepository(dbState.db);
-    let dose = item.dose;
-    if (!dose) {
-      dose = doseRepo.createPending({
-        medicationId: item.medication.id,
-        scheduledAt: scheduledAt ?? new Date().toISOString(),
-      });
-    }
-    markDoseAsTaken(dbState.db, dose.id, variantId);
+    // Save failed (already reported): keep the alarm open so the dose isn't silently lost.
+    if (!markDoseAsTaken(dbState.db, item.dose.id, variantId)) return;
 
     if (scheduledAt) {
       const remaining = doseRepo.findPendingDosesAtMinute(scheduledAt);
@@ -132,9 +126,14 @@ export default function ReminderScreen() {
     }
 
     if (dbState.status !== 'ready') return;
-    for (const item of items) {
+    const failed = items.filter((item) => {
       const variants = medRepo?.getVariants(item.medication.id) ?? [];
-      markDoseAsTaken(dbState.db, item.dose.id, variants[0]?.id);
+      return !markDoseAsTaken(dbState.db, item.dose.id, variants[0]?.id);
+    });
+    if (failed.length > 0) {
+      // Keep the alarm open with the doses that are still pending.
+      setRefreshKey((key) => key + 1);
+      return;
     }
     void dismiss();
   };
@@ -161,15 +160,7 @@ export default function ReminderScreen() {
     }
 
     cleanupSnoozeConflicts(dbState.db);
-    if (items[0]) {
-      await scheduleSnoozeAt(
-        items[0].medication.id,
-        items[0].medication.nickname ?? items[0].medication.name,
-        snoozedUntil,
-        items[0].dose.id,
-        dbState.db,
-      );
-    }
+    await rescheduleReminders(dbState.db);
     setSnoozeDialog(false);
     void dismiss();
   };

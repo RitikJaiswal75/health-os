@@ -90,5 +90,3 @@ CREATE INDEX IF NOT EXISTS idx_dose_events_medication ON dose_events(medication_
 CREATE INDEX IF NOT EXISTS idx_catalog_cache_query ON catalog_cache(source, query_key);
 CREATE INDEX IF NOT EXISTS idx_catalog_cache_expires ON catalog_cache(expires_at);
 `;
-
-export const SCHEMA_VERSION = 1;
