@@ -9,7 +9,10 @@ const mockLocaleWrites: string[] = [];
 jest.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   StyleSheet: { create: <T,>(styles: T) => styles },
+  // Phone in landscape: shorter than the month grid.
+  useWindowDimensions: () => ({ width: 800, height: 360 }),
 }));
 jest.mock('react-native-paper', () => {
   const { createElement } = jest.requireActual('react');
@@ -134,6 +137,15 @@ describe('HistoryCalendarDialog', () => {
 
     expect(onSelectDate).toHaveBeenCalledWith(new Date(2026, 9, 3));
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('scrolls the calendar when the window is too short to fit it', () => {
+    const renderer = createRoot();
+    renderDialog(renderer);
+
+    const [scroll] = renderer.container.queryAll((node) => node.type === 'ScrollView');
+    expect(scroll?.props.style.maxHeight).toBeLessThan(360);
+    expect(scroll?.queryAll((node) => node.type === 'Calendar')).toHaveLength(1);
   });
 
   it('marks only the selected date as selected', () => {

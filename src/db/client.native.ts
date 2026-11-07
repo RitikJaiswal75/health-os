@@ -2,8 +2,11 @@ import * as SQLite from 'expo-sqlite';
 import { MIGRATION_SQL } from './migrations/001_initial';
 import { MIGRATION_SQL as MIGRATION_002 } from './migrations/002_pill_color2';
 import { MIGRATION_SQL as MIGRATION_003 } from './migrations/003_dose_unit';
+import { runAddColumnMigration } from './migrations/runAddColumnMigration';
 import {
+  adoptLegacyPublicData,
   resolveHealthOsDirectory,
+  rewriteLegacyPhotoPaths,
   DB_FILENAME,
 } from '../core/storage/durableStorage';
 import type { DbBootstrapResult } from './clientTypes';
@@ -13,6 +16,7 @@ import {
   repairMissingPastDosesOnce,
 } from '../features/medications/doseGenerationService';
 import { ReminderReconciler, scheduleAlarms } from '../features/reminders/reminderService';
+import { reportError } from '../core/observability/crashReporter';
 
 export type { DbBootstrapResult, SQLiteDatabase } from './clientTypes';
 
@@ -29,6 +33,7 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
 
   try {
     const directory = await resolveHealthOsDirectory();
+    await adoptLegacyPublicData(directory);
 
     const db = SQLite.openDatabaseSync(
       DB_FILENAME,
@@ -39,33 +44,31 @@ export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
     db.execSync('PRAGMA foreign_keys = ON;');
     db.execSync(MIGRATION_SQL);
 
-    try {
-      db.execSync(MIGRATION_002);
-    } catch {
-      // Column may already exist on upgraded databases.
-    }
+    runAddColumnMigration(db, MIGRATION_002);
+    runAddColumnMigration(db, MIGRATION_003);
 
-    try {
-      db.execSync(MIGRATION_003);
-    } catch {
-      // Columns may already exist on upgraded databases.
-    }
-
-    db.runSync(
-      `INSERT OR IGNORE INTO reminder_health (id, updated_at) VALUES ('singleton', ?)`,
-      [new Date().toISOString()],
-    );
+    // Photos moved with the database. Every launch, not only the one that copied: a launch killed
+    // after the copy would otherwise leave the paths pointing at the public originals.
+    rewriteLegacyPhotoPaths(db, directory);
 
     new CatalogCacheRepository(db).sweepExpired();
-    generateUpcomingDoseEvents(db, 14);
+    // Dose generation and alarms are best effort: if they fail the user must still see their data.
+    try {
+      generateUpcomingDoseEvents(db, 14);
+    } catch (error) {
+      reportError('DB_BOOTSTRAP_FAILED', error);
+    }
     try {
       repairMissingPastDosesOnce(db);
     } catch {
       // Best effort: a failed repair must never block startup. The flag stays unset, so it retries.
     }
 
-    const reconciler = new ReminderReconciler(db);
-    await scheduleAlarms(reconciler.reconcile(7));
+    try {
+      await scheduleAlarms(new ReminderReconciler(db).reconcile(7));
+    } catch (error) {
+      reportError('ALARM_SCHEDULE_FAILED', error);
+    }
 
     dbInstance = db;
     return { status: 'ready', db };

@@ -22,9 +22,6 @@ const MedicationAlarmModule = NativeModules.MedicationAlarm ?? {
   scheduleAlarms: async (_occurrences: AlarmOccurrence[]) => {
     if (__DEV__) console.warn(LINKING_ERROR);
   },
-  cancelAlarm: async (_id: string) => {
-    if (__DEV__) console.warn(LINKING_ERROR);
-  },
   dismissReminderNotification: async (_id: string) => {
     if (__DEV__) console.warn(LINKING_ERROR);
   },
@@ -58,10 +55,6 @@ const MedicationAlarmModule = NativeModules.MedicationAlarm ?? {
 
 export async function scheduleAlarms(occurrences: AlarmOccurrence[]): Promise<void> {
   return MedicationAlarmModule.scheduleAlarms(occurrences);
-}
-
-export async function cancelAlarm(id: string): Promise<void> {
-  return MedicationAlarmModule.cancelAlarm(id);
 }
 
 export async function dismissReminderNotification(

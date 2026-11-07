@@ -30,4 +30,4 @@ Installed by `npm install` (`prepare` script). `.husky/pre-commit` runs, in orde
 
 Bypass only when intentional: `git commit --no-verify`.
 
-Stack: Expo SDK 57, TypeScript, React Native Paper, Drizzle + expo-sqlite, durable Documents/HealthOS storage.
+Stack: Expo SDK 57, TypeScript, React Native Paper, expo-sqlite (raw SQL, row types in `src/db/types.ts`), app-private HealthOS storage (`documentDirectory/HealthOS`).

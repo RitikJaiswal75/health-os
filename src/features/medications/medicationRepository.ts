@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { Medication, MedicationVariant, Schedule, DoseEvent } from '../../db/schema';
+import type { Medication, MedicationVariant, Schedule, DoseEvent } from '../../db/types';
 import type { ScheduleType, TimeOfDay, DoseStatus, InventoryTransactionType } from '../../core/types/domain';
 import { formatDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
 import { scheduleIncludesDateKey } from '../reminders/occurrenceExpander';
@@ -10,9 +10,9 @@ import {
   filterPendingDuplicatingResolved,
   filterPendingReplacedBySnooze,
   parseSnoozedFromNotes,
-  readScheduledAtFromRow,
   slotKeysEqual,
   buildSnoozedFromNotes,
+  normalizedSlotKey,
   sortDosesForDisplay,
 } from './doseSlotUtils';
 import {
@@ -68,7 +68,24 @@ export interface CreateMedicationInput {
 export class MedicationRepository {
   constructor(private readonly db: SQLiteDatabase) {}
 
+  /** All rows or none: a half-saved medication would block the retry via the duplicate check. */
   create(input: CreateMedicationInput): { medication: Medication; variant: MedicationVariant; schedule: Schedule } {
+    let created!: ReturnType<MedicationRepository['insertMedication']>;
+    this.db.withTransactionSync(() => {
+      created = this.insertMedication(input);
+    });
+    return created;
+  }
+
+  update(medicationId: string, input: CreateMedicationInput): boolean {
+    let updated = false;
+    this.db.withTransactionSync(() => {
+      updated = this.writeUpdate(medicationId, input);
+    });
+    return updated;
+  }
+
+  private insertMedication(input: CreateMedicationInput): { medication: Medication; variant: MedicationVariant; schedule: Schedule } {
     const now = new Date().toISOString();
     const medicationId = uuidv4();
     const variantId = uuidv4();
@@ -150,7 +167,7 @@ export class MedicationRepository {
     };
   }
 
-  update(medicationId: string, input: CreateMedicationInput): boolean {
+  private writeUpdate(medicationId: string, input: CreateMedicationInput): boolean {
     const med = this.getById(medicationId);
     if (!med) return false;
 
@@ -277,62 +294,14 @@ export class MedicationRepository {
     const med = this.getById(medicationId);
     if (!med) return false;
 
-    this.db.runSync(`DELETE FROM inventory_transactions WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM dose_events WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM schedules WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM medication_variants WHERE medication_id = ?`, [medicationId]);
-    this.db.runSync(`DELETE FROM medications WHERE id = ?`, [medicationId]);
-    return true;
-  }
-
-  setAbsoluteQuantity(medicationId: string, quantity: number): void {
-    const med = this.getById(medicationId);
-    if (!med) return;
-    const previousQty = med.currentQuantity;
-    const now = new Date().toISOString();
-    this.db.runSync(
-      `UPDATE medications SET current_quantity = ?, updated_at = ? WHERE id = ?`,
-      [quantity, now, medicationId],
-    );
-    const variant = this.getDefaultVariant(medicationId);
-    if (variant) {
-      this.db.runSync(`UPDATE medication_variants SET current_quantity = ? WHERE id = ?`, [
-        quantity,
-        variant.id,
-      ]);
-    }
-    this.recordInventoryTransaction({
-      medicationId,
-      variantId: variant?.id,
-      type: 'adjustment',
-      quantityDelta: quantity - previousQty,
-      balanceAfter: quantity,
+    this.db.withTransactionSync(() => {
+      this.db.runSync(`DELETE FROM inventory_transactions WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM dose_events WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM schedules WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM medication_variants WHERE medication_id = ?`, [medicationId]);
+      this.db.runSync(`DELETE FROM medications WHERE id = ?`, [medicationId]);
     });
-  }
-
-  addVariant(input: {
-    medicationId: string;
-    label: string;
-    strengthValue?: number;
-    strengthUnit?: string;
-    currentQuantity?: number;
-  }): MedicationVariant {
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    this.db.runSync(
-      `INSERT INTO medication_variants (id, medication_id, label, strength_value, strength_unit, current_quantity, is_default, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-      [
-        id,
-        input.medicationId,
-        input.label,
-        input.strengthValue ?? null,
-        input.strengthUnit ?? null,
-        input.currentQuantity ?? 0,
-        now,
-      ],
-    );
-    return this.db.getFirstSync<MedicationVariant>(`SELECT * FROM medication_variants WHERE id = ?`, [id])!;
+    return true;
   }
 
   recordInventoryTransaction(input: {
@@ -479,34 +448,22 @@ export class DoseEventRepository {
     return rows.map((row) => scheduledAtToDateKey(row.scheduled_at)).sort()[0];
   }
 
-  /** True when any dose row already occupies this schedule slot (including skipped/missed). */
-  existsForScheduleAt(scheduleId: string, scheduledAt: string): boolean {
-    const rows = this.db.getAllSync(
-      `SELECT scheduled_at, status, notes FROM dose_events WHERE schedule_id = ?`,
-      [scheduleId],
-    );
-    return this.rowOccupiesSlot(rows, scheduledAt);
-  }
-
-  /** True when any dose row for this medication occupies the slot (covers legacy rows without schedule_id). */
-  existsForMedicationAt(medicationId: string, scheduledAt: string): boolean {
-    const rows = this.db.getAllSync(
-      `SELECT scheduled_at, status, notes FROM dose_events WHERE medication_id = ?`,
+  /**
+   * Slot keys (local minute) already used by any of the medication's dose rows, whatever the status,
+   * including the slot a snoozed dose came from. Covers legacy rows without schedule_id.
+   */
+  occupiedSlotKeys(medicationId: string): Set<string> {
+    const keys = new Set<string>();
+    const rows = this.db.getAllSync<{ scheduled_at: string; notes: string | null }>(
+      `SELECT scheduled_at, notes FROM dose_events WHERE medication_id = ?`,
       [medicationId],
     );
-    return this.rowOccupiesSlot(rows, scheduledAt);
-  }
-
-  private rowOccupiesSlot(rows: unknown[], scheduledAt: string): boolean {
-    return rows.some((row) => {
-      const record = row as Record<string, string | null | undefined>;
-      const storedAt = readScheduledAtFromRow(row);
-      if (storedAt && slotKeysEqual(storedAt, scheduledAt)) {
-        return true;
-      }
-      const snoozedFrom = parseSnoozedFromNotes(record.notes ?? null);
-      return snoozedFrom != null && slotKeysEqual(snoozedFrom, scheduledAt);
-    });
+    for (const row of rows) {
+      keys.add(normalizedSlotKey(row.scheduled_at));
+      const snoozedFrom = parseSnoozedFromNotes(row.notes);
+      if (snoozedFrom) keys.add(normalizedSlotKey(snoozedFrom));
+    }
+    return keys;
   }
 
   backfillSnoozeNotes(id: string, originalScheduledAt: string): void {
@@ -614,15 +571,4 @@ export class DoseEventRepository {
     this.db.runSync(`DELETE FROM inventory_transactions WHERE dose_event_id = ?`, [id]);
     this.db.runSync(`DELETE FROM dose_events WHERE id = ?`, [id]);
   }
-}
-
-export function createDefaultVariantOnInsert(db: SQLiteDatabase, medicationId: string, label: string): MedicationVariant {
-  const id = uuidv4();
-  const now = new Date().toISOString();
-  db.runSync(
-    `INSERT INTO medication_variants (id, medication_id, label, current_quantity, is_default, created_at)
-     VALUES (?, ?, ?, 0, 1, ?)`,
-    [id, medicationId, label, now],
-  );
-  return mapVariantRow(db.getFirstSync(`SELECT * FROM medication_variants WHERE id = ?`, [id])!);
 }

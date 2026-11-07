@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import type { Medication } from '@/src/db/schema';
+import type { Medication } from '@/src/db/types';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from '@/src/features/reminders/notificationSetup';
 import { t } from '@/src/i18n/translate';
 import { REFILL_NOTIFICATION_TYPE } from './constants';

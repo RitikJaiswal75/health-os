@@ -1,7 +1,7 @@
 import { addDays, format } from 'date-fns';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { parseScheduledAt, formatLocalDateTime } from '../../core/dates/dateUtils';
+import { parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
 import { ensureNotificationSetup, MEDICATION_REMINDER_CHANNEL } from './notificationSetup';
 import { dedupeAlarms, groupToSlotAlarms, type AlarmScheduleInput } from './alarmGrouping';
 import type { SQLiteDatabase } from 'expo-sqlite';
@@ -14,7 +14,11 @@ export type { AlarmScheduleInput } from './alarmGrouping';
 export class ReminderReconciler {
   constructor(private readonly db: SQLiteDatabase) {}
 
-  /** Build alarms from actionable dose rows (pending + snoozed), not raw schedule only. */
+  /**
+   * Build alarms from actionable dose rows (pending + snoozed), not raw schedule only: every dose in
+   * the next `daysAhead` days, plus all doses on each schedule's next day when that is further away
+   * (monthly), so they still ring if the app is not opened before then.
+   */
   reconcile(daysAhead = 7): AlarmScheduleInput[] {
     const medRepo = new MedicationRepository(this.db);
     const doseRepo = new DoseEventRepository(this.db);
@@ -23,8 +27,18 @@ export class ReminderReconciler {
     const medsById = new Map(medRepo.getAll().map((med) => [med.id, med]));
 
     const alarms: AlarmScheduleInput[] = [];
+    const upcoming = doseRepo
+      .getUpcomingForReminders(now, Number.POSITIVE_INFINITY)
+      .map((dose) => ({ dose, trigger: parseScheduledAt(dose.scheduledAt).getTime() }))
+      .sort((a, b) => a.trigger - b.trigger);
+    const nextDayBySchedule = new Map<string, string>();
 
-    for (const dose of doseRepo.getUpcomingForReminders(now, toMillis)) {
+    for (const { dose, trigger } of upcoming) {
+      const scheduleKey = dose.scheduleId ?? dose.id;
+      const dayKey = scheduledAtToDateKey(dose.scheduledAt);
+      if (!nextDayBySchedule.has(scheduleKey)) nextDayBySchedule.set(scheduleKey, dayKey);
+      if (trigger > toMillis && nextDayBySchedule.get(scheduleKey) !== dayKey) continue;
+
       const med = medsById.get(dose.medicationId);
       if (!med) continue;
 
@@ -143,19 +157,6 @@ export function rescheduleReminders(db: SQLiteDatabase): Promise<void> {
   return run;
 }
 
-export async function cancelAlarm(alarmId: string): Promise<void> {
-  if (Platform.OS === 'android') {
-    try {
-      const MedicationAlarm = require('../../../modules/medication-alarm');
-      if (MedicationAlarm?.cancelAlarm) {
-        await MedicationAlarm.cancelAlarm(alarmId);
-      }
-    } catch {
-      // stub
-    }
-  }
-}
-
 export async function dismissReminderNotification(
   alarmId: string,
 ): Promise<void> {
@@ -169,39 +170,4 @@ export async function dismissReminderNotification(
   } catch {
     // stub
   }
-}
-
-export async function scheduleSnoozeAt(
-  medicationId: string,
-  medicationName: string,
-  scheduledAt: string,
-  doseEventId?: string,
-  db?: SQLiteDatabase,
-): Promise<void> {
-  if (db) {
-    await rescheduleReminders(db);
-    return;
-  }
-
-  await scheduleAlarms([
-    {
-      id: `snooze:${medicationId}:${doseEventId ?? Date.now()}`,
-      medicationId,
-      medicationName,
-      scheduledAt,
-      doseAmount: 1,
-      doseEventId,
-    },
-  ]);
-}
-
-export async function scheduleSnooze(
-  medicationId: string,
-  medicationName: string,
-  minutes: number,
-  doseEventId?: string,
-): Promise<string> {
-  const scheduledAt = formatLocalDateTime(new Date(Date.now() + minutes * 60000));
-  await scheduleSnoozeAt(medicationId, medicationName, scheduledAt, doseEventId);
-  return scheduledAt;
 }

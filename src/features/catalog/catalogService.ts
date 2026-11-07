@@ -1,6 +1,7 @@
 import { addHours, isAfter, parseISO } from 'date-fns';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { reportError } from '@/src/core/observability/crashReporter';
+import { isNetworkError } from '@/src/core/observability/networkError';
 
 export const CACHE_TTL_HOURS = 24;
 
@@ -106,7 +107,7 @@ export async function searchRxTerms(query: string, signal?: AbortSignal): Promis
     }));
   } catch (error) {
     if (isAbortError(error)) throw error;
-    reportError('CATALOG_FETCH_FAILED', error);
+    if (!isNetworkError(error)) reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
 }
@@ -127,7 +128,7 @@ export async function searchDsld(query: string, signal?: AbortSignal): Promise<C
     }));
   } catch (error) {
     if (isAbortError(error)) throw error;
-    reportError('CATALOG_FETCH_FAILED', error);
+    if (!isNetworkError(error)) reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
 }
@@ -152,13 +153,14 @@ export async function loadCachedOrFetch(
     const cached = cache.get(source, query);
     if (cached) {
       const parsed = parseCachedResults(cached);
-      if (parsed.length > 0 || cached === '[]') return parsed;
+      if (parsed.length > 0) return parsed;
       cache.delete(source, query);
     }
   }
 
   const results = await fetcher(query, signal);
-  if (!signal?.aborted) {
+  // Fetchers return [] when offline or on a server error, so only real results are cached.
+  if (!signal?.aborted && results.length > 0) {
     cache?.set(source, query, JSON.stringify(results));
   }
   return results;
@@ -182,16 +184,6 @@ export async function searchAllCatalogs(
   ]);
 
   return mergeAndRankResults([india, rx, dsld], query);
-}
-
-export function sanitizeFtsQuery(query: string): string {
-  const tokens = query
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-  if (tokens.length === 0) return '';
-  return `${tokens.map((token) => `"${token.replace(/"/g, '""')}"`).join(' ')}*`;
 }
 
 export function parseCachedResults(payload: string): CatalogResult[] {

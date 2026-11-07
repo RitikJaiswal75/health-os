@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { MedicationRepository, DoseEventRepository } from '@/src/features/medications/medicationRepository';
 import { markDoseAsTaken } from '@/src/features/inventory/doseTakenService';
-import { scheduleSnoozeAt, dismissReminderNotification } from '@/src/features/reminders/reminderService';
+import { dismissReminderNotification, rescheduleReminders } from '@/src/features/reminders/reminderService';
 import { exitReminderScreen } from '@/src/features/reminders/reminderDeepLink';
 import { ReminderMedicationRow } from '@/src/features/reminders/ReminderMedicationRow';
 import { ReminderSingleMedicationCard } from '@/src/features/reminders/ReminderSingleMedicationCard';
@@ -17,8 +17,7 @@ import {
   cleanupSnoozeConflicts,
   deletePendingAtSlot,
 } from '@/src/features/medications/snoozeCleanupService';
-import { useVariantTakenFlow } from '@/src/features/variants/VariantPickerSheet';
-import type { DoseEvent, Medication } from '@/src/db/schema';
+import type { DoseEvent, Medication } from '@/src/db/types';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 
@@ -89,17 +88,11 @@ export default function ReminderScreen() {
     await exitReminderScreen(handled);
   };
 
-  const completeTaken = (item: ReminderItem, variantId?: string) => {
+  const completeTaken = (item: ReminderItem) => {
     if (dbState.status !== 'ready' || !medRepo) return;
     const doseRepo = new DoseEventRepository(dbState.db);
-    let dose = item.dose;
-    if (!dose) {
-      dose = doseRepo.createPending({
-        medicationId: item.medication.id,
-        scheduledAt: scheduledAt ?? new Date().toISOString(),
-      });
-    }
-    markDoseAsTaken(dbState.db, dose.id, variantId);
+    // Save failed (already reported): keep the alarm open so the dose isn't silently lost.
+    if (!markDoseAsTaken(dbState.db, item.dose.id)) return;
 
     if (scheduledAt) {
       const remaining = doseRepo.findPendingDosesAtMinute(scheduledAt);
@@ -115,26 +108,13 @@ export default function ReminderScreen() {
     void dismiss();
   };
 
-  const { requestTaken, sheet: variantSheet } = useVariantTakenFlow<ReminderItem>(
-    (id) => medRepo?.getVariants(id) ?? [],
-    (variantId, context) => {
-      if (context) completeTaken(context, variantId || undefined);
-    },
-  );
-
   const handleTakeAll = () => {
-    const multiVariant = items.find(
-      (item) => (medRepo?.getVariants(item.medication.id) ?? []).length > 1,
-    );
-    if (multiVariant) {
-      requestTaken(multiVariant.medication.id, multiVariant);
-      return;
-    }
-
     if (dbState.status !== 'ready') return;
-    for (const item of items) {
-      const variants = medRepo?.getVariants(item.medication.id) ?? [];
-      markDoseAsTaken(dbState.db, item.dose.id, variants[0]?.id);
+    const failed = items.filter((item) => !markDoseAsTaken(dbState.db, item.dose.id));
+    if (failed.length > 0) {
+      // Keep the alarm open with the doses that are still pending.
+      setRefreshKey((key) => key + 1);
+      return;
     }
     void dismiss();
   };
@@ -161,15 +141,7 @@ export default function ReminderScreen() {
     }
 
     cleanupSnoozeConflicts(dbState.db);
-    if (items[0]) {
-      await scheduleSnoozeAt(
-        items[0].medication.id,
-        items[0].medication.nickname ?? items[0].medication.name,
-        snoozedUntil,
-        items[0].dose.id,
-        dbState.db,
-      );
-    }
+    await rescheduleReminders(dbState.db);
     setSnoozeDialog(false);
     void dismiss();
   };
@@ -233,7 +205,7 @@ export default function ReminderScreen() {
               key={item.dose.id}
               medication={item.medication}
               doseAmount={item.dose.doseAmount}
-              onTaken={() => requestTaken(item.medication.id, item)}
+              onTaken={() => completeTaken(item)}
             />
           ))
         ) : (
@@ -257,7 +229,7 @@ export default function ReminderScreen() {
         ) : (
           <Button
             mode="contained"
-            onPress={() => requestTaken(items[0]!.medication.id, items[0])}
+            onPress={() => completeTaken(items[0]!)}
             contentStyle={styles.primaryButtonContent}
             accessibilityLabel={t('home.markTaken')}
           >
@@ -275,7 +247,6 @@ export default function ReminderScreen() {
         </Button>
       </View>
 
-      {variantSheet}
 
       <SnoozeTimeDialog
         visible={snoozeDialog}

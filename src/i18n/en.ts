@@ -280,9 +280,6 @@ export const en = {
   'refill.notifyTitle': 'Refill reminder',
   'refill.notifyBody': '{{name}} has {{count}} left. Consider refilling soon.',
 
-  'variant.title': 'Which strength?',
-  'variant.left': '{{label}} ({{count}} left)',
-  'variant.confirm': 'Confirm variant',
 
   'snooze.title': 'Snooze until',
   'snooze.hint': 'Choose when you want to be reminded again.',

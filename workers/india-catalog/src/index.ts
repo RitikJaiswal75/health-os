@@ -1,8 +1,13 @@
 import { sanitizeFtsQuery } from './fts';
 
-export interface Env {
-  DB: D1Database;
-}
+// Only the D1 calls this worker makes, so the app's tsconfig can type-check it (as app-config does).
+export type Env = {
+  DB: {
+    prepare(query: string): {
+      bind(...values: unknown[]): { all<T>(): Promise<{ results: T[] }> };
+    };
+  };
+};
 
 interface DrugRow {
   id: number;
@@ -53,7 +58,7 @@ export default {
       return json({ results: [] });
     }
 
-    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 20), 1), 50);
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
 
     try {
       const { results } = await env.DB.prepare(
@@ -66,8 +71,10 @@ export default {
         .all<DrugRow>();
 
       return json({ results });
-    } catch {
-      return json({ results: [] });
+    } catch (error) {
+      // Show in Cloudflare logs and analytics; the app treats any non-OK response as no results.
+      console.error('drug_search query failed', error);
+      return json({ results: [] }, 503);
     }
   },
 };

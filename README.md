@@ -73,8 +73,9 @@ Daily, every N days, specific weekdays, monthly, or as-needed — with multiple 
 ## Privacy & data
 
 - **No accounts, no cloud sync** — everything stays on your device
-- Database and pill photos live in durable **`Documents/HealthOS/`** storage
-- Data survives Android **Clear cache**; removed only on **Clear data** / uninstall
+- Database and pill photos live in the app's **private storage**; other apps can't read them
+- Data survives Android **Clear cache**. It's removed on **Clear data** / uninstall, unless your phone's own Google backup restores it
+- Versions up to 2.1.0 kept data in `Documents/HealthOS/`; 2.1.1 copies it into private storage on first launch
 - Catalog API queries (RxTerms, DSLD) are cached locally for 24 hours
 - Crash reports (if enabled) send only an anonymous install ID, app/OS version, device model, route name, and stack — never medication names, notes, or photos
 
@@ -186,7 +187,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 | Language | TypeScript (strict) |
 | Navigation | Expo Router |
 | UI | React Native Paper (MD3 dark) + Reanimated |
-| Database | expo-sqlite + Drizzle ORM |
+| Database | expo-sqlite (raw SQL) |
 | State | Zustand (wizard draft) |
 | Alarms | Custom `medication-alarm` native module (Android) |
 | Catalog | Cloudflare Worker (India, per-query) + RxTerms + NIH DSLD |
@@ -200,7 +201,7 @@ See [`eas.json`](eas.json) for optional local EAS / Play Store builds.
 app/                  Expo Router screens (tabs, medicine wizard, reminder)
 src/core/             Theme, UI primitives, dates, domain types
 src/features/         Medications, reminders, inventory, catalog, reliability
-src/db/               Drizzle schema, migrations, repositories
+src/db/               Row types, migrations, bootstrap
 modules/medication-alarm/   Android alarm native module
 data/                 Local-only catalog source for worker seeding (gitignored)
 workers/india-catalog/  Cloudflare Worker for per-query India medicine search

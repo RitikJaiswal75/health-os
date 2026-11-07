@@ -42,6 +42,7 @@ import {
 import { DuplicateMedicationDialog } from '@/src/core/components/DuplicateMedicationDialog';
 import { t, tCount } from '@/src/i18n/translate';
 import { useT } from '@/src/i18n/useT';
+import { reportError } from '@/src/core/observability/crashReporter';
 
 function getFrequencyLabel(type?: ScheduleType, intervalDays?: number): string {
   if (type === 'interval_days' && intervalDays) {
@@ -233,7 +234,8 @@ export function MedicationReviewView() {
 
       reset();
       router.replace('/');
-    } catch {
+    } catch (error) {
+      reportError('MEDICATION_SAVE_FAILED', error);
       setSaveError(t('review.saveFailed'));
     } finally {
       setSaving(false);

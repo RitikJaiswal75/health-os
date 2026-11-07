@@ -1,6 +1,7 @@
 import { getIndiaCatalogApiUrl } from './indiaCatalogConfig';
 import { searchIndiaCatalogRemote } from './indiaCatalogApi';
 import { isAbortError, type CatalogResult } from './catalogService';
+import { isNetworkError } from '@/src/core/observability/networkError';
 import { reportError } from '@/src/core/observability/crashReporter';
 
 export async function searchIndiaCatalogAsync(
@@ -13,12 +14,7 @@ export async function searchIndiaCatalogAsync(
     return await searchIndiaCatalogRemote(query, apiUrl, signal);
   } catch (error) {
     if (isAbortError(error)) throw error;
-    reportError('CATALOG_FETCH_FAILED', error);
+    if (!isNetworkError(error)) reportError('CATALOG_FETCH_FAILED', error);
     return [];
   }
-}
-
-/** Sync wrapper — India catalog is remote-only; always returns empty. */
-export function searchIndiaCatalog(_query: string): CatalogResult[] {
-  return [];
 }

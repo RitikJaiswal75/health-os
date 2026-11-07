@@ -8,12 +8,11 @@ import { HistoryDateNavigator } from '@/src/core/components/HistoryDateNavigator
 import type { DateCompletion } from '@/src/core/components/DateStrip';
 import { useDatabaseBootstrap } from '@/src/db/DbProvider';
 import { DoseEventRepository, MedicationRepository } from '@/src/features/medications/medicationRepository';
-import { InventoryService } from '@/src/features/inventory/inventoryService';
-import type { DoseEvent } from '@/src/db/schema';
+import { deleteDose, saveDoseEdit } from '@/src/features/inventory/doseTakenService';
+import type { DoseEvent } from '@/src/db/types';
 import { DOSE_STATUS_OPTIONS, getDoseStatusLabel, type DoseStatus } from '@/src/core/types/domain';
 import { canLogDoseForTodayOrPast, originalScheduledAt } from '@/src/features/medications/doseSlotUtils';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
-import { rescheduleReminders } from '@/src/features/reminders/reminderService';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
 
@@ -72,24 +71,15 @@ export default function HistoryScreen() {
   const refresh = () => setRefreshKey((key) => key + 1);
 
   const handleSaveEdit = () => {
-    if (!editDose || dbState.status !== 'ready' || !medRepo) return;
-    if (editStatus === 'taken' && !canLogDoseForTodayOrPast(editDose)) return;
-    const doseRepo = new DoseEventRepository(dbState.db);
-    const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.applyStatusChange(editDose.id, editDose.status, editStatus);
-    doseRepo.updateStatus(editDose.id, editStatus);
-    void rescheduleReminders(dbState.db);
+    if (!editDose || dbState.status !== 'ready') return;
+    if (!saveDoseEdit(dbState.db, editDose, editStatus)) return;
     setEditDose(null);
     refresh();
   };
 
   const handleDelete = () => {
-    if (!editDose || dbState.status !== 'ready' || !medRepo) return;
-    const doseRepo = new DoseEventRepository(dbState.db);
-    const inventory = new InventoryService(dbState.db, medRepo, doseRepo);
-    inventory.compensateOnDelete(editDose.id, editDose.status);
-    doseRepo.delete(editDose.id);
-    void rescheduleReminders(dbState.db);
+    if (!editDose || dbState.status !== 'ready') return;
+    if (!deleteDose(dbState.db, editDose)) return;
     setEditDose(null);
     refresh();
   };

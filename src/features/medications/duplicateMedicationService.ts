@@ -1,5 +1,5 @@
 import { isBefore, startOfDay } from 'date-fns';
-import type { Medication, Schedule } from '../../db/schema';
+import type { Medication, Schedule } from '../../db/types';
 import { formatDateKey, formatDisplayDate, hasScheduleEndDate, parseDateKey } from '../../core/dates/dateUtils';
 import type { MedicationRepository } from './medicationRepository';
 import { t } from '@/src/i18n/translate';

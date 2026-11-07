@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import { Calendar, LocaleConfig, type DateData } from 'react-native-calendars';
 import { addDays, format, startOfWeek, type Locale } from 'date-fns';
@@ -16,6 +16,8 @@ const CALENDAR_LOCALE = 'healthos';
 const SELECTED_MARKER_INSET = 5;
 // Primary at ~35% opacity: clearly lighter than the ring track, day text stays readable.
 const SELECTED_MARKER_COLOR = 'rgba(187, 134, 252, 0.35)';
+// Share of window height the month grid may use before it scrolls (landscape phones); portrait fits whole.
+const CALENDAR_MAX_HEIGHT_RATIO = 0.65;
 
 type HistoryCalendarDialogProps = {
   visible: boolean;
@@ -110,6 +112,7 @@ export function HistoryCalendarDialog({
   onDismiss,
 }: HistoryCalendarDialogProps) {
   const { t } = useT();
+  const { height: windowHeight } = useWindowDimensions();
   const locale = getDateFnsLocale();
   if (visible) syncCalendarLocale(locale);
 
@@ -119,31 +122,33 @@ export function HistoryCalendarDialog({
     <Portal>
       <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
         <Dialog.Content style={styles.content}>
-          <CompletionContext.Provider value={completionByDate}>
-            <Calendar
-              current={selectedKey}
-              minDate={formatDateKey(minDate)}
-              maxDate={formatDateKey(maxDate)}
-              markedDates={{ [selectedKey]: { selected: true } }}
-              firstDay={locale.options?.weekStartsOn ?? 0}
-              dayComponent={DayCell}
-              disableAllTouchEventsForDisabledDays
-              hideExtraDays
-              enableSwipeMonths
-              onDayPress={(day: DateData) => {
-                onSelectDate(parseDateKey(day.dateString));
-                onDismiss();
-              }}
-              theme={{
-                calendarBackground: 'transparent',
-                monthTextColor: healthOsTheme.colors.onSurface,
-                textSectionTitleColor: healthOsTheme.colors.onSurfaceVariant,
-                arrowColor: healthOsTheme.colors.primary,
-                disabledArrowColor: healthOsTheme.colors.outline,
-                textMonthFontWeight: '600',
-              }}
-            />
-          </CompletionContext.Provider>
+          <ScrollView style={{ maxHeight: windowHeight * CALENDAR_MAX_HEIGHT_RATIO }} bounces={false}>
+            <CompletionContext.Provider value={completionByDate}>
+              <Calendar
+                current={selectedKey}
+                minDate={formatDateKey(minDate)}
+                maxDate={formatDateKey(maxDate)}
+                markedDates={{ [selectedKey]: { selected: true } }}
+                firstDay={locale.options?.weekStartsOn ?? 0}
+                dayComponent={DayCell}
+                disableAllTouchEventsForDisabledDays
+                hideExtraDays
+                enableSwipeMonths
+                onDayPress={(day: DateData) => {
+                  onSelectDate(parseDateKey(day.dateString));
+                  onDismiss();
+                }}
+                theme={{
+                  calendarBackground: 'transparent',
+                  monthTextColor: healthOsTheme.colors.onSurface,
+                  textSectionTitleColor: healthOsTheme.colors.onSurfaceVariant,
+                  arrowColor: healthOsTheme.colors.primary,
+                  disabledArrowColor: healthOsTheme.colors.outline,
+                  textMonthFontWeight: '600',
+                }}
+              />
+            </CompletionContext.Provider>
+          </ScrollView>
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={onDismiss}>{t('common.cancel')}</Button>

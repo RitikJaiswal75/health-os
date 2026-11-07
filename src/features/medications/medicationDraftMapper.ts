@@ -1,4 +1,4 @@
-import type { Medication, Schedule } from '../../db/schema';
+import type { Medication, Schedule } from '../../db/types';
 import type {
   MedicationType,
   PillShape,

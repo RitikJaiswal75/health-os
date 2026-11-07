@@ -4,6 +4,7 @@ import type { MessageCatalog } from './en';
 import { getI18nBaseUrl } from './catalogConfig';
 import { hasCatalog, registerCatalog } from './translate';
 import { reportError } from '@/src/core/observability/crashReporter';
+import { isNetworkError } from '@/src/core/observability/networkError';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const pending = new Map<AppLocale, Promise<boolean>>();
@@ -71,7 +72,7 @@ async function fetchRemoteCatalog(locale: AppLocale): Promise<MessageCatalog | n
     return asMessageCatalog(await response.json());
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') return null;
-    reportError('I18N_CATALOG_FAILED', error);
+    if (!isNetworkError(error)) reportError('I18N_CATALOG_FAILED', error);
     return null;
   } finally {
     clearTimeout(timer);

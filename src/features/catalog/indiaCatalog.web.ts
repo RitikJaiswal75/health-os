@@ -1,1 +1,1 @@
-export { searchIndiaCatalogAsync, searchIndiaCatalog } from './indiaCatalog.native';
+export { searchIndiaCatalogAsync } from './indiaCatalog.native';

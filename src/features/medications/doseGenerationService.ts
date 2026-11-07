@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { addDays, format, isBefore, max, startOfDay } from 'date-fns';
-import type { Schedule } from '../../db/schema';
+import { addDays, format, isAfter, isBefore, max, startOfDay } from 'date-fns';
+import type { Schedule } from '../../db/types';
 import {
   MedicationRepository,
   DoseEventRepository,
@@ -11,8 +11,9 @@ import { mapDoseEventRow } from '../../db/rowMappers';
 import {
   doseBelongsToDateKey,
   doseDedupeKey,
-  dosesShareMedicationSlot,
   normalizeScheduledAtStorage,
+  normalizedSlotKey,
+  pendingDuplicatingResolved,
   pickCanonicalDose,
 } from './doseSlotUtils';
 import { formatDateKey, parseDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
@@ -54,11 +55,6 @@ export function removeDuplicateDoseEvents(db: SQLiteDatabase): number {
   return removed;
 }
 
-/** Drop pending doses whose schedule slot was deferred by a snooze. */
-export function removePendingSupersededBySnooze(db: SQLiteDatabase): number {
-  return cleanupSnoozeConflicts(db);
-}
-
 /** Drop pending doses that duplicate a taken/skipped/missed dose for the same medication slot. */
 export function removePendingDuplicatingResolvedDoses(db: SQLiteDatabase): number {
   const doseRepo = new DoseEventRepository(db);
@@ -66,18 +62,9 @@ export function removePendingDuplicatingResolvedDoses(db: SQLiteDatabase): numbe
     .getAllSync(`SELECT * FROM dose_events ORDER BY created_at ASC`)
     .map(mapDoseEventRow);
 
-  const resolved = allDoses.filter((d) => ['taken', 'skipped', 'missed'].includes(d.status));
-
-  let removed = 0;
-  for (const dose of allDoses) {
-    if (dose.status !== 'pending') continue;
-    const duplicateResolved = resolved.some((other) => dosesShareMedicationSlot(other, dose));
-    if (!duplicateResolved) continue;
-    doseRepo.delete(dose.id);
-    removed += 1;
-  }
-
-  return removed;
+  const duplicates = pendingDuplicatingResolved(allDoses);
+  for (const dose of duplicates) doseRepo.delete(dose.id);
+  return duplicates.size;
 }
 
 export function pruneStalePendingDoses(
@@ -303,14 +290,37 @@ export function repairMissingPastDosesOnce(db: SQLiteDatabase): number {
   return created;
 }
 
+/**
+ * Day by which the next dose of this schedule has certainly happened, counted from today or from the
+ * start date when that is later. Monthly, long-interval and future-start schedules can be further
+ * away than the horizon, and without a row they would get no alarm.
+ */
+function nextDoseDeadline(schedule: Schedule, from: Date): Date {
+  const start = parseDateKey(schedule.startDate);
+  const base = isAfter(start, from) ? start : from;
+  if (schedule.type === 'monthly') return addDays(base, 32);
+  if (schedule.type === 'interval_days') return addDays(base, (schedule.intervalDays ?? 1) + 1);
+  if (schedule.type === 'weekdays') return addDays(base, 8);
+  return addDays(base, 1);
+}
+
 /** Generate pending dose_events for all active schedules within the horizon. Idempotent. */
 export function generateUpcomingDoseEvents(
   db: SQLiteDatabase,
   horizonDays = DEFAULT_HORIZON_DAYS,
 ): number {
+  let created = 0;
+  // One transaction: one disk commit instead of one per insert/delete, and no half-applied cleanup.
+  db.withTransactionSync(() => {
+    created = generateInsideTransaction(db, horizonDays);
+  });
+  return created;
+}
+
+function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): number {
   purgeOrphanDoseEvents(db);
   removeDuplicateDoseEvents(db);
-  removePendingSupersededBySnooze(db);
+  cleanupSnoozeConflicts(db);
   removePendingDuplicatingResolvedDoses(db);
   removeDosesOutsideScheduleWindow(db);
 
@@ -323,7 +333,7 @@ export function generateUpcomingDoseEvents(
 
   for (const med of medRepo.getAll()) {
     for (const schedule of medRepo.getActiveSchedules(med.id)) {
-      const occurrences = expandOccurrences(schedule, from, to);
+      const occurrences = expandOccurrences(schedule, from, max([to, nextDoseDeadline(schedule, from)]));
       const times = parseTimesOfDay(schedule.timesOfDay);
       pruneStalePendingDoses(doseRepo, schedule.id, occurrences);
       const remainingToday = trimExtraPendingDosesForDate(
@@ -332,12 +342,15 @@ export function generateUpcomingDoseEvents(
         times.length,
       );
       const neededToday = pendingDosesNeededAfterCompleted(times.length, remainingToday.length);
+      // Read once, after the prune and trim above: one query per schedule, not one per planned dose.
+      const occupied = doseRepo.occupiedSlotKeys(med.id);
       let createdToday = 0;
       for (const occ of occurrences) {
         const occDateKey = formatDateKey(parseScheduledAt(occ.scheduledAt));
-        if (doseRepo.existsForScheduleAt(schedule.id, occ.scheduledAt)) continue;
-        if (doseRepo.existsForMedicationAt(occ.medicationId, occ.scheduledAt)) continue;
+        const slotKey = normalizedSlotKey(occ.scheduledAt);
+        if (occupied.has(slotKey)) continue;
         if (occDateKey === todayKey && createdToday >= neededToday) continue;
+        occupied.add(slotKey);
         doseRepo.createPending({
           medicationId: occ.medicationId,
           scheduleId: occ.scheduleId,

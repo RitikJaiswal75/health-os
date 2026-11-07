@@ -1,7 +1,15 @@
-import { addDays, addMinutes, format, startOfDay, isBefore, isAfter } from 'date-fns';
-import type { Schedule } from '../../db/schema';
+import {
+  addDays,
+  addMinutes,
+  differenceInCalendarDays,
+  getDaysInMonth,
+  startOfDay,
+  isBefore,
+  isAfter,
+} from 'date-fns';
+import type { Schedule } from '../../db/types';
 import type { TimeOfDay } from '../../core/types/domain';
-import { formatLocalDateTime, formatDateKey, parseDateKey, parseScheduledAt } from '../../core/dates/dateUtils';
+import { formatLocalDateTime, formatDateKey, parseDateKey } from '../../core/dates/dateUtils';
 
 export interface DoseOccurrence {
   medicationId: string;
@@ -77,17 +85,19 @@ function shouldFireOnDate(schedule: Schedule, date: Date): boolean {
       return true;
     case 'interval_days': {
       const interval = schedule.intervalDays ?? 1;
-      const start = startOfDay(parseDateKey(schedule.startDate));
-      const diff = Math.floor((startOfDay(date).getTime() - start.getTime()) / 86400000);
-      return diff % interval === 0;
+      // Calendar days, not ms / 24h: a DST day is 23h and would shift the rhythm.
+      return differenceInCalendarDays(date, parseDateKey(schedule.startDate)) % interval === 0;
     }
     case 'weekdays': {
       const mask = schedule.weekdayMask ?? 0;
       const dayBit = 1 << date.getDay();
       return (mask & dayBit) !== 0;
     }
-    case 'monthly':
-      return date.getDate() === (schedule.dayOfMonth ?? parseDateKey(schedule.startDate).getDate());
+    case 'monthly': {
+      const day = schedule.dayOfMonth ?? parseDateKey(schedule.startDate).getDate();
+      // A 31st schedule fires on the last day of shorter months.
+      return date.getDate() === Math.min(day, getDaysInMonth(date));
+    }
     default:
       return false;
   }
@@ -95,8 +105,4 @@ function shouldFireOnDate(schedule: Schedule, date: Date): boolean {
 
 export function computeSnoozeTime(minutes: number, from: Date = new Date()): string {
   return formatLocalDateTime(addMinutes(from, minutes));
-}
-
-export function formatOccurrenceKey(occurrence: DoseOccurrence): string {
-  return `${occurrence.scheduleId}:${format(parseScheduledAt(occurrence.scheduledAt), 'yyyy-MM-dd-HH-mm')}`;
 }
