@@ -47,6 +47,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Caches the Gradle distribution and dependencies, so a Maven Central / services.gradle.org
+      # outage doesn't fail the build. setup-java's `cache: gradle` can't key on android/, which
+      # prebuild only generates later in the job.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
