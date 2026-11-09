@@ -42,7 +42,8 @@ export default {
 
     // Cloudflare does not cache a Worker's own responses from Cache-Control; only the Cache API does.
     const cache = request.method === 'GET' ? edgeCache() : undefined;
-    const hit = await cache?.match(request);
+    // The cache only speeds search up: a failed read is a miss, never an outage.
+    const hit = await cache?.match(request).catch(() => undefined);
     if (hit) return hit;
 
     const response = await search(url, env);

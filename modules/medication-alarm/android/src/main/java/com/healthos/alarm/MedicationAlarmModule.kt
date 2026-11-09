@@ -76,16 +76,19 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
                 val scheduledAt = item.getString("scheduledAt") ?: continue
                 val doseEventId = if (item.hasKey("doseEventId")) item.getString("doseEventId") else null
                 // One bad row (unparseable time) must not stop the rest, or the saved list goes stale.
-                try {
-                    val triggerAt = ScheduledAlarmStore.parseScheduledAtMillis(scheduledAt)
-                    MedicationAlarmReceiver.schedule(
-                        reactContext, id, medicationId, triggerAt, scheduledAt, doseEventId,
-                    )
-                    next.add(id)
-                    saved.add(ScheduledAlarm(id, medicationId, scheduledAt, doseEventId))
-                } catch (e: Exception) {
-                    Log.e("MedicationAlarm", "Skipping alarm $id", e)
+                val triggerAt = try {
+                    ScheduledAlarmStore.parseScheduledAtMillis(scheduledAt)
+                } catch (e: java.time.format.DateTimeParseException) {
+                    Log.e("MedicationAlarm", "Skipping alarm $id with bad time $scheduledAt", e)
+                    continue
                 }
+                // Scheduling itself failing (e.g. exact alarms denied) rejects below and keeps the
+                // saved lists, so reboot restore still works and JS reports ALARM_SCHEDULE_FAILED.
+                MedicationAlarmReceiver.schedule(
+                    reactContext, id, medicationId, triggerAt, scheduledAt, doseEventId,
+                )
+                next.add(id)
+                saved.add(ScheduledAlarm(id, medicationId, scheduledAt, doseEventId))
             }
 
             val ringingAlarmIds = PendingReminderStore.snapshot(reactContext)

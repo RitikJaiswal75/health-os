@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { addDays, format, isAfter, isBefore, max, min, startOfDay, subHours } from 'date-fns';
+import { addDays, format, isAfter, isBefore, max, startOfDay, subHours } from 'date-fns';
 import type { Schedule } from '../../db/types';
 import {
   MedicationRepository,
@@ -14,6 +14,7 @@ import {
   normalizeScheduledAtStorage,
   normalizedSlotKey,
   pendingDuplicatingResolved,
+  parseSnoozedFromNotes,
   pickCanonicalDose,
 } from './doseSlotUtils';
 import { formatDateKey, parseDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
@@ -68,26 +69,29 @@ export function removePendingDuplicatingResolvedDoses(db: SQLiteDatabase): numbe
 }
 
 /**
- * Any dose from a day before `today` that was never taken (pending, snoozed or missed) becomes skipped,
- * for every medication, once it is SKIP_UNLOGGED_AFTER_HOURS old.
+ * Any dose due on a day before `today` that was never taken (pending, snoozed or missed) becomes
+ * skipped once its alarm time is SKIP_UNLOGGED_AFTER_HOURS old. A snoozed dose is judged by, and moved
+ * back to, the time it was originally due, so History keeps it on that day.
  */
 export function skipUnloggedPastDoses(db: SQLiteDatabase, today: Date): number {
   const doseRepo = new DoseEventRepository(db);
-  const cutoff = min([today, subHours(new Date(), SKIP_UNLOGGED_AFTER_HOURS)]);
-  const open = db.getAllSync<{ id: string; scheduled_at: string }>(
+  const graceEnd = subHours(new Date(), SKIP_UNLOGGED_AFTER_HOURS);
+  const open = db.getAllSync<{ id: string; scheduled_at: string; status: string; notes: string | null }>(
     // 'missed': what older versions wrote for backfilled days.
-    `SELECT id, scheduled_at FROM dose_events WHERE status IN ('pending', 'snoozed', 'missed')`,
+    `SELECT id, scheduled_at, status, notes FROM dose_events WHERE status IN ('pending', 'snoozed', 'missed')`,
   );
   let skipped = 0;
   for (const row of open) {
-    if (!isBefore(parseScheduledAt(row.scheduled_at), cutoff)) continue;
+    const dueAt = (row.status === 'snoozed' && parseSnoozedFromNotes(row.notes)) || row.scheduled_at;
+    if (!isBefore(parseScheduledAt(dueAt), today)) continue;
+    if (!isBefore(parseScheduledAt(row.scheduled_at), graceEnd)) continue;
+    if (dueAt !== row.scheduled_at) doseRepo.updateScheduledAt(row.id, dueAt);
     doseRepo.updateStatus(row.id, 'skipped');
     skipped += 1;
   }
   return skipped;
 }
 
-/** Drop pending doses from `from` on that the schedule no longer produces; earlier days are history. */
 export function pruneStalePendingDoses(
   doseRepo: DoseEventRepository,
   scheduleId: string,

@@ -59,6 +59,25 @@ describe('india-catalog worker', () => {
     }
   });
 
+  it('still searches D1 when the edge cache read fails', async () => {
+    (globalThis as { caches?: unknown }).caches = {
+      default: {
+        match: async () => {
+          throw new Error('cache unavailable');
+        },
+        put: async () => {},
+      },
+    };
+    const hit = { id: 1, name: 'Dolo 650', strength: null, form: null };
+    try {
+      const response = await search(envWhereQuery(async () => ({ results: [hit] })));
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ results: [hit] });
+    } finally {
+      delete (globalThis as { caches?: unknown }).caches;
+    }
+  });
+
   it('does not cache a failed search', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const response = await search(

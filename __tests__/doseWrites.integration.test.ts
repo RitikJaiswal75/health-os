@@ -176,6 +176,28 @@ describe('dose writes', () => {
     expect(doseRepo.getById(doseId)?.status).toBe('skipped');
   });
 
+  it('a late dose snoozed past midnight stays on the day it was due once skipped', () => {
+    const db = createTestDb();
+    createMedicationAndBackfill(db, {
+      name: 'Melatonin',
+      medicationType: 'tablet',
+      currentQuantity: 10,
+      schedule: { type: 'fixed_daily', timesOfDay: [{ hour: 23, minute: 30 }], startDate: '2026-09-13' },
+    });
+    generateUpcomingDoseEvents(db, 14);
+    const doseRepo = new DoseEventRepository(db);
+    const due = doseRepo.getForDate('2026-09-13')[0];
+    jest.setSystemTime(new Date('2026-09-13T23:31:00'));
+    doseRepo.snooze(due.id, '2026-09-14T00:15:00', due.scheduledAt);
+
+    jest.setSystemTime(new Date('2026-09-14T07:00:00'));
+    generateUpcomingDoseEvents(db, 14);
+
+    const ids = (key: string) => doseRepo.getForDate(key).map((dose) => [dose.id, dose.status]);
+    expect(ids('2026-09-13')).toEqual([[due.id, 'skipped']]);
+    expect(ids('2026-09-14').map(([id]) => id)).not.toContain(due.id);
+  });
+
   it('marks a dose snoozed on an earlier day as skipped too', () => {
     const { db, doseRepo, doseId } = setUp(10);
     doseRepo.snooze(doseId, '2026-09-13T11:00:00', '2026-09-13T08:00:00');
