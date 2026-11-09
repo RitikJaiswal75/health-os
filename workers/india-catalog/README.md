@@ -22,6 +22,8 @@ npm run d1:migrate:remote
 # 5. Seed data (~246k rows — may take several minutes)
 # Re-export seed files from repo root if you changed the catalog: npm run export-india-d1
 npm run d1:seed:remote   # runs seed/*.sql in order (~125 files, several minutes)
+# Rows load into drugs_staging; only the last file (9999-swap.sql) replaces the live data, so search
+# keeps working during the upload. If a file fails, the live data is untouched: just rerun.
 
 # 6. Deploy worker
 npm run deploy
@@ -74,7 +76,8 @@ npm run ingest-cdci
 npm run export-india-d1
 cd workers/india-catalog
 npm run d1:migrate:remote   # if schema changed
-# Re-seed: drop tables or recreate DB, then:
+# Re-seed in place (live search keeps the old data until the final swap):
 npm run d1:seed:remote
+# Edge-cached /search answers can stay old for up to a day after a reseed.
 npm run deploy
 ```

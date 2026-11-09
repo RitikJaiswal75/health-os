@@ -1417,7 +1417,7 @@ describe('doseGenerationService', () => {
       new Date('2026-09-08T23:59:59'),
     );
 
-    pruneStalePendingDoses(doseRepo, 'sched-1', occurrences);
+    pruneStalePendingDoses(doseRepo, 'sched-1', occurrences, new Date('2026-09-08T00:00:00'));
     expect(deletedIds).toEqual(['old-dose']);
   });
 
@@ -1568,7 +1568,7 @@ describe('doseGenerationService', () => {
       const { count, created } = run('2026-09-12');
       expect(count).toBe(1);
       expect(created).toEqual([
-        expect.objectContaining({ scheduledAt: '2026-09-12T08:00:00', status: 'missed' }),
+        expect.objectContaining({ scheduledAt: '2026-09-12T08:00:00', status: 'skipped' }),
       ]);
     });
 

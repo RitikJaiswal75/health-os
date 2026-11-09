@@ -1,5 +1,7 @@
 # Sequential on purpose: one heavy check at a time (see CLAUDE.md "Running checks").
 node scripts/hooks/checkStaged.js
+# Auto-bumps (BUMP=major|minor|patch, default patch) when staged app changes still carry main's version.
+npx tsx scripts/bump-version.ts --if-needed
 npx tsx scripts/check-version-bump.ts --pre-commit
 npm run --silent typecheck
 if git diff --cached --name-only | grep -q '^__tests__/'; then

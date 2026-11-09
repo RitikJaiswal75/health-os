@@ -56,6 +56,20 @@ describe('generateUpcomingDoseEvents', () => {
     expect(rowsAt(db, '2026-09-14T20:00:00').map((row) => row.status)).toEqual(['pending']);
   });
 
+  it('runs the whole-table cleanup only when asked, so a screen focus stays cheap', () => {
+    const db = createTestDb();
+    const { medication, schedule } = createMedication(db, 'Metformin');
+    const slot = '2026-09-14T08:00:00';
+    insertDose(db, medication.id, schedule.id, slot, 'pending');
+    insertDose(db, medication.id, schedule.id, slot, 'pending');
+
+    generateUpcomingDoseEvents(db, 2, false);
+    expect(rowsAt(db, slot)).toHaveLength(2);
+
+    generateUpcomingDoseEvents(db, 2);
+    expect(rowsAt(db, slot)).toHaveLength(1);
+  });
+
   it('stays fast with three years of history for several medicines', () => {
     const db = createTestDb();
     const start = new Date(2023, 8, 13);

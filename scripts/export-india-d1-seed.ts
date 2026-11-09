@@ -3,6 +3,8 @@
  * Export data/india.db into workers/india-catalog/seed/*.sql for D1 import.
  *
  * D1 limits SQL statement size — we use small multi-row INSERTs split across files.
+ * Rows go into drugs_staging first; only the last file swaps them into the live tables, so live
+ * search keeps its old data while the upload runs, and a failed upload leaves it untouched.
  *
  * Run after: npm run ingest-cdci
  * Then: cd workers/india-catalog && npm run d1:seed:remote
@@ -38,7 +40,7 @@ function insertSql(rows: DrugRow[]): string {
         `(${row.id}, ${sqlLiteral(row.name)}, ${sqlLiteral(row.strength)}, ${sqlLiteral(row.form)})`,
     )
     .join(',\n  ');
-  return `INSERT INTO drugs (id, name, strength, form) VALUES\n  ${values};\n`;
+  return `INSERT INTO drugs_staging (id, name, strength, form) VALUES\n  ${values};\n`;
 }
 
 function dataFileName(index: number): string {
@@ -54,8 +56,10 @@ async function exportSeed(): Promise<void> {
   fs.mkdirSync(SEED_DIR, { recursive: true });
 
   fs.writeFileSync(
-    path.join(SEED_DIR, '000-cleanup.sql'),
-    'DELETE FROM drug_search;\nDELETE FROM drugs;\n',
+    path.join(SEED_DIR, '000-staging.sql'),
+    `DROP TABLE IF EXISTS drugs_staging;
+CREATE TABLE drugs_staging (id INTEGER PRIMARY KEY, name TEXT NOT NULL, strength TEXT, form TEXT);
+`,
   );
 
   const db = new Database(DB_PATH, { readonly: true });
@@ -107,10 +111,14 @@ async function exportSeed(): Promise<void> {
   await finished(stream);
   db.close();
 
+  // seed-d1.mjs stops at the first failed file, so this swap runs only after every row is staged.
   fs.writeFileSync(
-    path.join(SEED_DIR, '9999-fts.sql'),
-    `INSERT INTO drug_search(rowid, name, strength, form)
-SELECT id, name, strength, form FROM drugs;
+    path.join(SEED_DIR, '9999-swap.sql'),
+    `INSERT INTO drug_search(drug_search) VALUES('delete-all');
+DELETE FROM drugs;
+INSERT INTO drugs (id, name, strength, form) SELECT id, name, strength, form FROM drugs_staging;
+INSERT INTO drug_search(rowid, name, strength, form) SELECT id, name, strength, form FROM drugs;
+DROP TABLE drugs_staging;
 `,
   );
 

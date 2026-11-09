@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
@@ -74,12 +75,17 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
                 val medicationId = item.getString("medicationId") ?: continue
                 val scheduledAt = item.getString("scheduledAt") ?: continue
                 val doseEventId = if (item.hasKey("doseEventId")) item.getString("doseEventId") else null
-                val triggerAt = ScheduledAlarmStore.parseScheduledAtMillis(scheduledAt)
-                next.add(id)
-                saved.add(ScheduledAlarm(id, medicationId, scheduledAt, doseEventId))
-                MedicationAlarmReceiver.schedule(
-                    reactContext, id, medicationId, triggerAt, scheduledAt, doseEventId,
-                )
+                // One bad row (unparseable time) must not stop the rest, or the saved list goes stale.
+                try {
+                    val triggerAt = ScheduledAlarmStore.parseScheduledAtMillis(scheduledAt)
+                    MedicationAlarmReceiver.schedule(
+                        reactContext, id, medicationId, triggerAt, scheduledAt, doseEventId,
+                    )
+                    next.add(id)
+                    saved.add(ScheduledAlarm(id, medicationId, scheduledAt, doseEventId))
+                } catch (e: Exception) {
+                    Log.e("MedicationAlarm", "Skipping alarm $id", e)
+                }
             }
 
             val ringingAlarmIds = PendingReminderStore.snapshot(reactContext)

@@ -56,6 +56,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Every push here can become a published release, so it must pass the same checks as the hook.
+      - name: Typecheck
+        run: npm run typecheck && npm run typecheck:tests
+
+      - name: Unit tests
+        run: npm test
+
       - name: Read app version
         id: version
         run: echo "version=$(node -p "require('./expo.base.json').expo.version")" >> "$GITHUB_OUTPUT"

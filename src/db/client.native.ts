@@ -22,15 +22,23 @@ export type { DbBootstrapResult, SQLiteDatabase } from './clientTypes';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let bootstrapError: string | null = null;
+let pendingBootstrap: Promise<DbBootstrapResult> | null = null;
 
-export async function bootstrapDatabase(): Promise<DbBootstrapResult> {
+export function bootstrapDatabase(): Promise<DbBootstrapResult> {
   if (dbInstance) {
-    return { status: 'ready', db: dbInstance };
+    return Promise.resolve({ status: 'ready', db: dbInstance });
   }
   if (bootstrapError) {
-    return { status: 'error', message: bootstrapError };
+    return Promise.resolve({ status: 'error', message: bootstrapError });
   }
+  // Callers during setup share one run, or each would copy the data and open the database again.
+  pendingBootstrap ??= runBootstrap().finally(() => {
+    pendingBootstrap = null;
+  });
+  return pendingBootstrap;
+}
 
+async function runBootstrap(): Promise<DbBootstrapResult> {
   try {
     const directory = await resolveHealthOsDirectory();
     await adoptLegacyPublicData(directory);
@@ -96,6 +104,7 @@ export function resetDatabaseForTests(): void {
   }
   dbInstance = null;
   bootstrapError = null;
+  pendingBootstrap = null;
 }
 
 export async function retryBootstrap(): Promise<DbBootstrapResult> {

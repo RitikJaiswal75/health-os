@@ -22,18 +22,19 @@ export async function fetchRemoteConfig<T>({
 }: RemoteConfigRequest<T>): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REMOTE_CONFIG_FETCH_TIMEOUT_MS);
-  try {
-    const etag = cache.readEtag();
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    if (etag) headers['If-None-Match'] = etag;
-
-    const response = await fetch(remoteConfigUrl(path), {
+  const request = (etag: string | null) =>
+    fetch(remoteConfigUrl(path), {
       signal: controller.signal,
-      headers,
+      headers: { Accept: 'application/json', ...(etag ? { 'If-None-Match': etag } : {}) },
     });
+  try {
+    let response = await request(cache.readEtag());
 
     if (response.status === 304) {
-      return cache.readCached();
+      const cached = cache.readCached();
+      if (cached) return cached;
+      // The saved copy is gone or no longer parses: without this the server answers 304 forever.
+      response = await request(null);
     }
     if (!response.ok) return null;
 

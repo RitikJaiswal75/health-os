@@ -17,3 +17,6 @@ export const APP_PATH_PATTERNS: readonly RegExp[] = [
 /** KV is eventually consistent across edges (up to ~60s), so poll for a couple of minutes. */
 export const DEPLOY_VERIFY_ATTEMPTS = 12;
 export const DEPLOY_VERIFY_DELAY_MS = 10_000;
+
+export const PACKAGE_LOCK_JSON = 'package-lock.json';
+export const BUMP_LEVELS = ['major', 'minor', 'patch'] as const;

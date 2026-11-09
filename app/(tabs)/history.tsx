@@ -58,14 +58,12 @@ export default function HistoryScreen() {
     return completion;
   }, [dbState, earliestDoseDate, refreshKey]);
 
-  const doses =
-    dbState.status === 'ready'
-      ? (() => {
-          const medRepo = new MedicationRepository(dbState.db);
-          const activeMedIds = new Set(medRepo.getAll().map((med) => med.id));
-          return new DoseEventRepository(dbState.db).getForDate(dateKey, activeMedIds);
-        })()
-      : [];
+  const doses = useMemo(() => {
+    if (dbState.status !== 'ready') return [];
+    const activeMedIds = new Set(new MedicationRepository(dbState.db).getAll().map((med) => med.id));
+    return new DoseEventRepository(dbState.db).getForDate(dateKey, activeMedIds);
+    // refreshKey: re-read after an edit, delete or tab focus.
+  }, [dbState, dateKey, refreshKey]);
   const medRepo = dbState.status === 'ready' ? new MedicationRepository(dbState.db) : null;
 
   const refresh = () => setRefreshKey((key) => key + 1);

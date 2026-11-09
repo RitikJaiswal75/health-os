@@ -94,7 +94,7 @@ export class InventoryService {
         .getVariants(med.id)
         .find((entry) => entry.id === resolvedVariantId);
       if (variant) {
-        const variantQty = Math.max(0, asQuantity(variant.currentQuantity) - amount);
+        const variantQty = Math.max(0, asQuantity(variant.currentQuantity) - removed);
         this.db.runSync(`UPDATE medication_variants SET current_quantity = ? WHERE id = ?`, [
           variantQty,
           resolvedVariantId,

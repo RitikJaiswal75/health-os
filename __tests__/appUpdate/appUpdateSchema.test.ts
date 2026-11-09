@@ -76,6 +76,15 @@ describe('parseAppUpdateConfig', () => {
     ).toBeNull();
   });
 
+  it('rejects a storeUrl outside the Play Store', () => {
+    expect(
+      parseAppUpdateConfig({
+        version: 1,
+        android: { latestVersion: '2.1.0', storeUrl: 'https://play.google.com.evil.example/x' },
+      }),
+    ).toBeNull();
+  });
+
   it('rejects a wrong version field', () => {
     expect(parseAppUpdateConfig({ android: { latestVersion: '2.1.0' } })).toBeNull();
     expect(parseAppUpdateConfig({ version: 0 })).toBeNull();

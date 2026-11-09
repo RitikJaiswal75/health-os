@@ -85,6 +85,106 @@ describe('dose writes', () => {
     expect(stock(db, medId)).toBe(1);
   });
 
+  it('keeps the variant count in step with what was removed from the medication', () => {
+    const { db, doseRepo, medId, doseId } = setUp(1);
+    // Variant holds more than the medication, so the clamp only applies to the medication.
+    db.runSync(`UPDATE medication_variants SET current_quantity = 2 WHERE medication_id = ?`, [medId]);
+    const variantQty = () =>
+      db.getFirstSync<{ current_quantity: number }>(
+        `SELECT current_quantity FROM medication_variants WHERE medication_id = ?`,
+        [medId],
+      )!.current_quantity;
+
+    markDoseAsTaken(db, doseId);
+    expect(variantQty()).toBe(1);
+
+    saveDoseEdit(db, doseRepo.getById(doseId)!, 'skipped');
+    expect(stock(db, medId)).toBe(1);
+    expect(variantQty()).toBe(2);
+  });
+
+  it('clears taken_at when a taken dose is changed to another status', () => {
+    const { db, doseRepo, doseId } = setUp(10);
+    markDoseAsTaken(db, doseId);
+    expect(doseRepo.getById(doseId)!.takenAt).not.toBeNull();
+
+    saveDoseEdit(db, doseRepo.getById(doseId)!, 'skipped');
+    expect(doseRepo.getById(doseId)!.takenAt).toBeNull();
+  });
+
+  it('marks past doses nobody logged as skipped when the app opens days later', () => {
+    const { db, doseRepo, medId, doseId } = setUp(10);
+    generateUpcomingDoseEvents(db, 14); // what startup does: the next days already have rows
+    // App not opened for two days (or data restored from a backup): generation runs again.
+    jest.setSystemTime(new Date('2026-09-15T09:00:00'));
+    generateUpcomingDoseEvents(db, 14);
+
+    expect(doseRepo.getById(doseId)?.status).toBe('skipped');
+    const day = (key: string) =>
+      db.getAllSync<{ status: string }>(`SELECT status FROM dose_events WHERE scheduled_at LIKE ?`, [`${key}%`]);
+    expect(day('2026-09-14')).toEqual([{ status: 'skipped' }]);
+    // Today's 08:00 is already past but stays pending: it can still be logged.
+    expect(day('2026-09-15')).toEqual([{ status: 'pending' }]);
+    expect(stock(db, medId)).toBe(10);
+  });
+
+  it('leaves a late-night dose pending for a few hours after midnight, so the alarm can still log it', () => {
+    const db = createTestDb();
+    const { medication } = createMedicationAndBackfill(db, {
+      name: 'Melatonin',
+      medicationType: 'tablet',
+      currentQuantity: 10,
+      schedule: { type: 'fixed_daily', timesOfDay: [{ hour: 23, minute: 30 }], startDate: '2026-09-13' },
+    });
+    generateUpcomingDoseEvents(db, 14);
+    const status = () =>
+      db.getFirstSync<{ status: string }>(
+        `SELECT status FROM dose_events WHERE medication_id = ? AND scheduled_at LIKE '2026-09-13T23:30%'`,
+        [medication.id],
+      )?.status;
+
+    jest.setSystemTime(new Date('2026-09-14T00:10:00'));
+    generateUpcomingDoseEvents(db, 14);
+    expect(status()).toBe('pending');
+
+    jest.setSystemTime(new Date('2026-09-14T06:00:00'));
+    generateUpcomingDoseEvents(db, 14, false);
+    expect(status()).toBe('skipped');
+  });
+
+  it('the alarm screen offers its own dose only while it is still open', () => {
+    const { doseRepo, medId, doseId } = setUp(10);
+    const slot = doseRepo.getById(doseId)!.scheduledAt;
+    expect(doseRepo.findAlarmDose(medId, doseId, slot)?.id).toBe(doseId);
+
+    doseRepo.updateStatus(doseId, 'skipped');
+    expect(doseRepo.findAlarmDose(medId, doseId, slot)).toBeNull();
+  });
+
+  it('the alarm screen falls back to the pending dose at the same time when its id is gone', () => {
+    const { doseRepo, medId, doseId } = setUp(10);
+    const slot = doseRepo.getById(doseId)!.scheduledAt;
+    expect(doseRepo.findAlarmDose(medId, 'deleted-id', slot)?.id).toBe(doseId);
+  });
+
+  it('turns doses saved as missed by older versions into skipped', () => {
+    const { db, doseRepo, doseId } = setUp(10);
+    db.runSync(`UPDATE dose_events SET status = 'missed' WHERE id = ?`, [doseId]);
+    jest.setSystemTime(new Date('2026-09-14T09:00:00'));
+    generateUpcomingDoseEvents(db, 14, false);
+
+    expect(doseRepo.getById(doseId)?.status).toBe('skipped');
+  });
+
+  it('marks a dose snoozed on an earlier day as skipped too', () => {
+    const { db, doseRepo, doseId } = setUp(10);
+    doseRepo.snooze(doseId, '2026-09-13T11:00:00', '2026-09-13T08:00:00');
+    jest.setSystemTime(new Date('2026-09-14T09:00:00'));
+    generateUpcomingDoseEvents(db, 14, false);
+
+    expect(doseRepo.getById(doseId)?.status).toBe('skipped');
+  });
+
   it('deleting a taken dose that emptied the stock restores only what was removed', () => {
     const { db, doseRepo, medId, doseId } = setUp(1);
     markDoseAsTaken(db, doseId);
