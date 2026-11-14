@@ -30,6 +30,7 @@ import {
   adoptLegacyPublicData,
   resolveHealthOsDirectory,
   rewriteLegacyPhotoPaths,
+  rewriteRestoredPhotoPaths,
 } from '../src/core/storage/durableStorage';
 import { createTestDb } from './helpers/sqliteDb';
 import { MedicationRepository } from '../src/features/medications/medicationRepository';
@@ -91,5 +92,17 @@ describe('durable storage', () => {
 
     await adoptLegacyPublicData(PRIVATE_DIR);
     expect([...files.keys()].filter((key) => key.startsWith(PRIVATE_DIR))).toEqual([]);
+  });
+});
+
+describe('rewriteRestoredPhotoPaths', () => {
+  it('points photos from another app-data directory at this install', () => {
+    const db = createTestDb();
+    const other = medicationWithPhoto(db, 'file:///data/user/10/com.health.os/files/HealthOS/photos/a.jpg');
+    const same = medicationWithPhoto(db, `${PRIVATE_DIR}photos/b.jpg`);
+    rewriteRestoredPhotoPaths(db, PRIVATE_DIR);
+    const repo = new MedicationRepository(db);
+    expect(repo.getById(other)?.photoUri).toBe(`${PRIVATE_DIR}photos/a.jpg`);
+    expect(repo.getById(same)?.photoUri).toBe(`${PRIVATE_DIR}photos/b.jpg`);
   });
 });

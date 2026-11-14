@@ -62,6 +62,37 @@ export function rewriteLegacyPhotoPaths(db: SQLiteDatabase, privateDir: string):
   );
 }
 
+/**
+ * True when this install already has data, or an earlier release's public data is waiting to be
+ * adopted. That public file outlives an uninstall but a reinstall cannot read it, so only a file
+ * this install can actually read counts; an unreadable one is not data.
+ */
+export async function hasLocalData(privateDir: string): Promise<boolean> {
+  if ((await FileSystem.getInfoAsync(`${privateDir}${DB_FILENAME}`)).exists) return true;
+  if (Platform.OS !== 'android') return false;
+  return FileSystem.readAsStringAsync(`${LEGACY_PUBLIC_DIR}${DB_FILENAME}`, {
+    encoding: FileSystem.EncodingType.Base64,
+    length: 1,
+  }).then(
+    () => true,
+    () => false,
+  );
+}
+
+/**
+ * After a restore the stored photo paths may name another app-data directory (another Android user
+ * or device). Points any path under `.../HealthOS/photos/` at this install's photos folder.
+ */
+export function rewriteRestoredPhotoPaths(db: SQLiteDatabase, privateDir: string): void {
+  const photosDir = `${privateDir}${PHOTOS_FOLDER}/`;
+  const marker = `/${HEALTH_OS_FOLDER}/${PHOTOS_FOLDER}/`;
+  db.runSync(
+    `UPDATE medications SET photo_uri = ? || substr(photo_uri, instr(photo_uri, ?) + ?)
+     WHERE instr(photo_uri, ?) > 0 AND substr(photo_uri, 1, ?) != ?`,
+    [photosDir, marker, marker.length, marker, photosDir.length, photosDir],
+  );
+}
+
 export async function resolvePhotosDirectory(): Promise<string> {
   const dir = await resolveHealthOsDirectory();
   const photosDir = `${dir}${PHOTOS_FOLDER}/`;

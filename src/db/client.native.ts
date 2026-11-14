@@ -7,6 +7,7 @@ import {
   adoptLegacyPublicData,
   resolveHealthOsDirectory,
   rewriteLegacyPhotoPaths,
+  rewriteRestoredPhotoPaths,
   DB_FILENAME,
 } from '../core/storage/durableStorage';
 import type { DbBootstrapResult } from './clientTypes';
@@ -58,6 +59,7 @@ async function runBootstrap(): Promise<DbBootstrapResult> {
     // Photos moved with the database. Every launch, not only the one that copied: a launch killed
     // after the copy would otherwise leave the paths pointing at the public originals.
     rewriteLegacyPhotoPaths(db, directory);
+    rewriteRestoredPhotoPaths(db, directory);
 
     new CatalogCacheRepository(db).sweepExpired();
     // Dose generation and alarms are best effort: if they fail the user must still see their data.

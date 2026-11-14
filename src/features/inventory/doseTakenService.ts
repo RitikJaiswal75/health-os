@@ -6,12 +6,28 @@ import { canLogDoseForTodayOrPast } from '../medications/doseSlotUtils';
 import { InventoryService } from './inventoryService';
 import { notifyRefillIfNeeded } from './refillReminderService';
 import { reportError } from '@/src/core/observability/crashReporter';
+import { Platform } from 'react-native';
 import { rescheduleReminders } from '../reminders/reminderService';
 
 function services(db: SQLiteDatabase) {
   const medRepo = new MedicationRepository(db);
   const doseRepo = new DoseEventRepository(db);
   return { medRepo, doseRepo, inventory: new InventoryService(db, medRepo, doseRepo) };
+}
+
+/** Flushes the WAL into the main file (Auto Backup copies files, not pages), then asks for a backup. */
+function backupAfterDoseChange(db: SQLiteDatabase): void {
+  try {
+    db.execSync('PRAGMA wal_checkpoint(TRUNCATE);');
+  } catch (error) {
+    reportError('DOSE_MARK_FAILED', error);
+  }
+  if (Platform.OS !== 'android') return;
+  try {
+    void require('../../../modules/medication-alarm').requestBackup?.()?.catch(() => undefined);
+  } catch {
+    // Backup is best effort; the dose is already saved.
+  }
 }
 
 /**
@@ -52,6 +68,7 @@ export function markDoseAsTaken(
 
     // Cancel the alarm for a dose taken ahead of its scheduled time.
     void rescheduleReminders(db);
+    backupAfterDoseChange(db);
 
     return true;
   } catch (error) {
@@ -76,6 +93,7 @@ export function saveDoseEdit(db: SQLiteDatabase, dose: DoseEvent, status: DoseSt
     return false;
   }
   void rescheduleReminders(db);
+  backupAfterDoseChange(db);
   return true;
 }
 
@@ -92,5 +110,6 @@ export function deleteDose(db: SQLiteDatabase, dose: DoseEvent): boolean {
     return false;
   }
   void rescheduleReminders(db);
+  backupAfterDoseChange(db);
   return true;
 }
