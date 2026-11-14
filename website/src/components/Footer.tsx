@@ -19,6 +19,14 @@ export function Footer() {
             GitHub
           </a>
           <span className="hidden sm:inline">·</span>
+          <a href="/privacy" className="transition-colors hover:text-primary">
+            Privacy Policy
+          </a>
+          <span className="hidden sm:inline">·</span>
+          <a href="/terms" className="transition-colors hover:text-primary">
+            Terms of Service
+          </a>
+          <span className="hidden sm:inline">·</span>
           <span className="text-center text-xs sm:text-left">
             India drugs: NRCeS CDCI (CC BY 4.0) · US: NLM RxTerms · Supplements: NIH DSLD
           </span>

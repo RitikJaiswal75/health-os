@@ -1,7 +1,7 @@
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 const PRIVACY_POINTS = [
-  'No accounts and no cloud sync — everything stays on your device.',
+  'No accounts required — everything stays on your device. Optional Google sign-in backs up to your own Drive, only when you trigger it.',
   "Database and pill photos live in the app's private storage, where other apps can't read them.",
   "Data survives Android Clear cache. It's removed on Clear data or uninstall, unless your phone's own Google backup restores it.",
   'Catalog API queries (RxTerms, DSLD) are cached locally for 24 hours.',
