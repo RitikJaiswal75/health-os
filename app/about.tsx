@@ -19,6 +19,9 @@ export default function AboutScreen() {
       <Text variant="bodySmall" style={styles.section}>
         {t('about.usSource')}
       </Text>
+      <Button mode="outlined" onPress={() => router.push('/backup')} style={styles.section}>
+        {t('about.backup')}
+      </Button>
       <Button mode="outlined" onPress={() => router.push('/reliability')} style={styles.section}>
         {t('about.troubleshoot')}
       </Button>

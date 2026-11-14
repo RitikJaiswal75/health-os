@@ -112,6 +112,16 @@ class MedicationAlarmModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun requestBackup(promise: Promise) {
+        try {
+            android.app.backup.BackupManager(reactContext).dataChanged()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("BACKUP_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
     fun dismissReminderNotification(alarmId: String, promise: Promise) {
         try {
             MedicationAlarmReceiver.dismissNotification(reactContext, alarmId)

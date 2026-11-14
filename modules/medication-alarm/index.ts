@@ -51,6 +51,7 @@ const MedicationAlarmModule = NativeModules.MedicationAlarm ?? {
     overlay: Platform.OS !== 'android',
   }),
   requestPermission: async (_kind: string) => false,
+  requestBackup: async () => {},
 };
 
 export async function scheduleAlarms(occurrences: AlarmOccurrence[]): Promise<void> {
@@ -85,6 +86,11 @@ export async function consumeReminderLaunchIntent(): Promise<{
 
 export async function getPermissionState(): Promise<NativePermissionState> {
   return MedicationAlarmModule.getPermissionState();
+}
+
+/** Asks Android to schedule an Auto Backup run (the OS still picks the moment). */
+export async function requestBackup(): Promise<void> {
+  return MedicationAlarmModule.requestBackup();
 }
 
 export async function requestPermission(kind: string): Promise<boolean> {

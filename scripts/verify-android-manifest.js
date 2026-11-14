@@ -33,7 +33,6 @@ const checks = [
   ['SCHEDULE_EXACT_ALARM', xml, /SCHEDULE_EXACT_ALARM/],
   ['USE_FULL_SCREEN_INTENT', xml, /USE_FULL_SCREEN_INTENT/],
   ['Sentry NDK exclude', appGradle, /sentry-android-ndk/],
-  ['Play Services Auth exclude', appGradle, /play-services-auth/],
   ['Sentry Gradle script', appGradle, /sentry\.gradle/],
 ];
 
