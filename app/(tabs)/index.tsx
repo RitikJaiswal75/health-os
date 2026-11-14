@@ -42,7 +42,8 @@ export default function HomeScreen() {
     useCallback(() => {
       if (dbState.status !== 'ready') return;
       cleanupSnoozeConflicts(dbState.db);
-      generateUpcomingDoseEvents(dbState.db, 14);
+      // Startup already ran the whole-table cleanup; focus only tops up the horizon.
+      generateUpcomingDoseEvents(dbState.db, 14, false);
       void rescheduleReminders(dbState.db);
       setRefreshKey((key) => key + 1);
     }, [dbState]),
@@ -98,9 +99,12 @@ export default function HomeScreen() {
     const doseRepo = new DoseEventRepository(dbState.db);
     const snoozedUntil = formatLocalDateTime(snoozeUntil);
     const originalSlot = originalScheduledAt(snoozeDose);
-    doseRepo.snooze(snoozeDose.id, snoozedUntil, originalSlot);
-    deletePendingAtSlot(doseRepo, snoozeDose.scheduleId, originalSlot);
-    cleanupSnoozeConflicts(dbState.db);
+    // One transaction: a crash between the steps would leave the slot twice.
+    dbState.db.withTransactionSync(() => {
+      doseRepo.snooze(snoozeDose.id, snoozedUntil, originalSlot);
+      deletePendingAtSlot(doseRepo, snoozeDose.scheduleId, originalSlot);
+      cleanupSnoozeConflicts(dbState.db);
+    });
 
     await rescheduleReminders(dbState.db);
     setSnoozeDose(null);

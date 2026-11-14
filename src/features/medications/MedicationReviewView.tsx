@@ -191,7 +191,7 @@ export function MedicationReviewView() {
   const persistAfterSave = async () => {
     if (dbState.status !== 'ready') return;
 
-    generateUpcomingDoseEvents(dbState.db, 14);
+    generateUpcomingDoseEvents(dbState.db, 14, false);
     await rescheduleReminders(dbState.db);
   };
 

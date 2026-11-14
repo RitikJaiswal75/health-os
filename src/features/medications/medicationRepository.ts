@@ -337,8 +337,8 @@ export class DoseEventRepository {
     scheduleId?: string;
     scheduledAt: string;
     doseAmount?: number;
-    /** 'missed' is used when backfilling slots that were already in the past at creation. */
-    status?: 'pending' | 'missed';
+    /** 'skipped' is used when backfilling slots that were already in the past at creation. */
+    status?: 'pending' | 'skipped';
   }): DoseEvent {
     const id = uuidv4();
     const now = new Date().toISOString();
@@ -520,6 +520,14 @@ export class DoseEventRepository {
     return row ?? null;
   }
 
+  /** The dose an alarm offers: its own row while still open, else the pending dose at the same time. */
+  findAlarmDose(medicationId: string, doseEventId: string | undefined, slotAt: string): DoseEvent | null {
+    const own = doseEventId ? this.getById(doseEventId) : null;
+    // A dose already logged elsewhere (taken, skipped, missed) must not show up as due.
+    if (own && (own.status === 'pending' || own.status === 'snoozed')) return own;
+    return this.findPendingForMedication(medicationId, slotAt);
+  }
+
   /** All actionable doses at the same clock minute (for grouped reminder screen). */
   findPendingDosesAtMinute(scheduledAt: string): DoseEvent[] {
     const doses = this.db
@@ -561,8 +569,8 @@ export class DoseEventRepository {
     const now = new Date().toISOString();
     this.db.runSync(
       `UPDATE dose_events SET status = ?, variant_id = COALESCE(?, variant_id),
-        taken_at = COALESCE(?, taken_at), updated_at = ? WHERE id = ?`,
-      [status, options?.variantId ?? null, options?.takenAt ?? null, now, id],
+        taken_at = CASE WHEN ? = 'taken' THEN COALESCE(?, taken_at) END, updated_at = ? WHERE id = ?`,
+      [status, options?.variantId ?? null, status, options?.takenAt ?? null, now, id],
     );
     return this.getById(id)!;
   }

@@ -9,8 +9,8 @@ import android.os.Looper
 import android.os.PowerManager
 
 object AlarmSoundController {
-    /** A missed alarm rings this long, then goes quiet; the notification stays up. */
-    private const val RING_TIMEOUT_MS = 10 * 60 * 1000L
+    /** A missed alarm rings this long, then goes quiet; the notification and reminder screen stay up. */
+    private const val RING_TIMEOUT_MS = 2 * 60 * 1000L
 
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -18,14 +18,8 @@ object AlarmSoundController {
     private val timeout = Runnable { stop() }
 
     fun ensurePlaying(context: Context) {
-        if (mediaPlayer?.isPlaying == true) {
-            // A new alarm while one is ringing gets its own full ring time (and wake lock to match).
-            releaseWakeLock()
-            acquireWakeLock(context.applicationContext)
-            handler.removeCallbacks(timeout)
-            handler.postDelayed(timeout, RING_TIMEOUT_MS)
-            return
-        }
+        // Already ringing: keep the original timer so back-to-back alarms can't extend the ring.
+        if (mediaPlayer?.isPlaying == true) return
         start(context)
     }
 

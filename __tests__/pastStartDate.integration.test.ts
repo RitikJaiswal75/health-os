@@ -33,7 +33,7 @@ describe('medication with a past start date', () => {
   });
   afterEach(() => jest.useRealTimers());
 
-  it('adding one shows the past days in History and Home, as missed', () => {
+  it('adding one shows the past days in History and Home, as skipped', () => {
     const db = createDb();
     createMedicationAndBackfill(db, medicationStartingOn('2026-09-10'));
     generateUpcomingDoseEvents(db, 14);
@@ -41,7 +41,7 @@ describe('medication with a past start date', () => {
     const doseRepo = new DoseEventRepository(db);
     expect(doseRepo.getEarliestHistoryDateKey()).toBe('2026-09-10');
     for (const day of ['2026-09-10', '2026-09-11', '2026-09-12']) {
-      expect(doseRepo.getForDate(day).map((dose) => dose.status)).toEqual(['missed']);
+      expect(doseRepo.getForDate(day).map((dose) => dose.status)).toEqual(['skipped']);
     }
   });
 
@@ -135,7 +135,7 @@ describe('one-time repair for medications saved before past start dates were sup
 
     const doseRepo = new DoseEventRepository(db);
     expect(doseRepo.getEarliestHistoryDateKey()).toBe('2026-09-10');
-    expect(doseRepo.getForDate('2026-09-11').map((dose) => dose.status)).toEqual(['missed']);
+    expect(doseRepo.getForDate('2026-09-11').map((dose) => dose.status)).toEqual(['skipped']);
 
     // Deleting a repaired dose and starting the app again must not bring it back.
     doseRepo.delete(doseRepo.getForDate('2026-09-11')[0]!.id);

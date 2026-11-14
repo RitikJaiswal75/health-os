@@ -7,9 +7,11 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function isHttpsUrl(value: string): boolean {
+/** Only the Play Store listing: a tampered config must not send the update button anywhere else. */
+function isPlayStoreUrl(value: string): boolean {
   try {
-    return new URL(value).protocol === 'https:';
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'play.google.com';
   } catch {
     return false;
   }
@@ -34,7 +36,7 @@ function parsePlatformConfig(value: unknown): PlatformUpdateConfig | undefined {
   }
 
   if (record.storeUrl !== undefined) {
-    if (typeof record.storeUrl !== 'string' || !isHttpsUrl(record.storeUrl)) return undefined;
+    if (typeof record.storeUrl !== 'string' || !isPlayStoreUrl(record.storeUrl)) return undefined;
     config.storeUrl = record.storeUrl;
   }
 

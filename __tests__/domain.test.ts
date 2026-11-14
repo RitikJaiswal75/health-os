@@ -92,9 +92,9 @@ describe('dateUtils', () => {
     const { clampCalendarDate, formatDateKey } = require('../src/core/dates/dateUtils');
     const min = new Date('2026-01-01T12:00:00');
     const max = new Date('2026-09-08T08:00:00');
-    expect(formatDateKey(clampCalendarDate(new Date('2025-12-31'), min, max))).toBe('2026-01-01');
-    expect(formatDateKey(clampCalendarDate(new Date('2026-03-15'), min, max))).toBe('2026-03-15');
-    expect(formatDateKey(clampCalendarDate(new Date('2026-10-01'), min, max))).toBe('2026-09-08');
+    expect(formatDateKey(clampCalendarDate(new Date('2025-12-31T00:00:00'), min, max))).toBe('2026-01-01');
+    expect(formatDateKey(clampCalendarDate(new Date('2026-03-15T00:00:00'), min, max))).toBe('2026-03-15');
+    expect(formatDateKey(clampCalendarDate(new Date('2026-10-01T00:00:00'), min, max))).toBe('2026-09-08');
   });
 
   it('builds a past date strip ending on the selected day', () => {
@@ -996,7 +996,8 @@ describe('doseSlotUtils', () => {
       id: 'dose-local',
       medicationId: 'med-1',
       scheduleId: 'sched-1',
-      scheduledAt: '2026-09-08T13:52:00',
+      // The same instant in the machine's local time (13:52 in India, 08:22 on a UTC CI runner).
+      scheduledAt: require('date-fns').format(new Date(utcDose.scheduledAt), "yyyy-MM-dd'T'HH:mm:ss"),
       status: 'pending',
       createdAt: '2026-09-08T11:00:00Z',
     };
@@ -1103,7 +1104,7 @@ describe('doseSlotUtils', () => {
     const medicationOnlyRepo = new DoseEventRepository({
       getFirstSync: jest.fn((sql: string) => {
         if (sql.includes('dose_events')) return { min_scheduled: null };
-        if (sql.includes('medications')) return { min_created: '2026-01-05T10:00:00.000Z' };
+        if (sql.includes('medications')) return { min_created: new Date('2026-01-05T10:00:00').toISOString() };
         return null;
       }),
     });
@@ -1417,7 +1418,7 @@ describe('doseGenerationService', () => {
       new Date('2026-09-08T23:59:59'),
     );
 
-    pruneStalePendingDoses(doseRepo, 'sched-1', occurrences);
+    pruneStalePendingDoses(doseRepo, 'sched-1', occurrences, new Date('2026-09-08T00:00:00'));
     expect(deletedIds).toEqual(['old-dose']);
   });
 
@@ -1568,7 +1569,7 @@ describe('doseGenerationService', () => {
       const { count, created } = run('2026-09-12');
       expect(count).toBe(1);
       expect(created).toEqual([
-        expect.objectContaining({ scheduledAt: '2026-09-12T08:00:00', status: 'missed' }),
+        expect.objectContaining({ scheduledAt: '2026-09-12T08:00:00', status: 'skipped' }),
       ]);
     });
 

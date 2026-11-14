@@ -65,10 +65,7 @@ export default function ReminderScreen() {
     if (medicationId) {
       const medication = medRepo.getById(medicationId);
       if (!medication) return [];
-      let dose = doseEventId ? doseRepo.getById(doseEventId) : null;
-      if (!dose) {
-        dose = doseRepo.findPendingForMedication(medicationId, slotAt);
-      }
+      const dose = doseRepo.findAlarmDose(medicationId, doseEventId, slotAt);
       if (dose) return [{ medication, dose }];
     }
 

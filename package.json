@@ -1,7 +1,7 @@
 {
   "name": "health-os",
   "main": "expo-router/entry",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "scripts": {
     "start": "expo start --dev-client",
     "start:go": "expo start",
@@ -17,6 +17,9 @@
     "test:coverage": "jest --coverage",
     "ingest-cdci": "tsx scripts/ingest-cdci.ts",
     "export-india-d1": "tsx scripts/export-india-d1-seed.ts",
+    "version:patch": "tsx scripts/bump-version.ts patch",
+    "version:minor": "tsx scripts/bump-version.ts minor",
+    "version:major": "tsx scripts/bump-version.ts major",
     "generate:logo": "tsx scripts/generate-padded-logo.ts",
     "prebuild:android": "expo prebuild --platform android --clean",
     "prebuild:shareable": "SHAREABLE_APK=1 LOCAL_BUILD=1 expo prebuild --platform android --clean",

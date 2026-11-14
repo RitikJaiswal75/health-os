@@ -47,6 +47,13 @@ describe('bootstrapDatabase', () => {
     expect(reportError).toHaveBeenCalledWith('ALARM_SCHEDULE_FAILED', expect.any(Error));
   });
 
+  it('shares one setup between callers that arrive while it is running', async () => {
+    const [first, second] = await Promise.all([bootstrapDatabase(), bootstrapDatabase()]);
+
+    expect(openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+  });
+
   it('repairs photo paths on every launch, even when this launch copied nothing', async () => {
     const db = createTestDb();
     (openDatabaseSync as jest.Mock).mockReturnValueOnce(db);

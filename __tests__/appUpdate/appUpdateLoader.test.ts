@@ -51,6 +51,22 @@ describe('appUpdateLoader', () => {
     expect(appUpdateCache.writeCachedAppUpdateConfig).not.toHaveBeenCalled();
   });
 
+  it('refetches without the ETag when a 304 finds no usable cached config', async () => {
+    (appUpdateCache.readAppUpdateEtag as jest.Mock).mockReturnValue('"etag-1"');
+    (appUpdateCache.readCachedAppUpdateConfig as jest.Mock).mockReturnValue(null);
+    const fetchMock = jest
+      .fn()
+      .mockImplementationOnce(respond(304, {}))
+      .mockImplementationOnce(respond(200, REMOTE, '"etag-1"'));
+    global.fetch = fetchMock;
+
+    await expect(refreshAppUpdateConfig()).resolves.toEqual(REMOTE);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const retry = fetchMock.mock.calls[1][1] as RequestInit;
+    expect((retry.headers as Record<string, string>)['If-None-Match']).toBeUndefined();
+    expect(appUpdateCache.writeCachedAppUpdateConfig).toHaveBeenCalledWith(REMOTE);
+  });
+
   it('returns null and keeps the cache when the network fails', async () => {
     global.fetch = jest.fn(async () => {
       throw new Error('offline');

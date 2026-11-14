@@ -23,7 +23,7 @@ export const CONFIG_SCHEMA_HINTS: Record<keyof typeof CONFIG_KINDS, string> = {
   observability:
     'Required fields: version (>=1 integer), enabled, primary (sentry|crashlytics|none), fallback (sentry|crashlytics|none), captureNonFatal, sampleRate (0-1), sentryDsn (https DSN or empty string).',
   'app-update':
-    'Required fields: version (>=1 integer). Per platform (android/ios): latestVersion (x.y.z), optional minSupportedVersion (x.y.z, <= latestVersion), optional storeUrl (https).',
+    'Required fields: version (>=1 integer). Per platform (android/ios): latestVersion (x.y.z), optional minSupportedVersion (x.y.z, <= latestVersion), optional storeUrl (https://play.google.com/...).',
 };
 
 export const CONFIG_ROUTES: Record<string, ConfigRoute> = {

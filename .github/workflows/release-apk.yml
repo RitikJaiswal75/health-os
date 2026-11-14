@@ -47,6 +47,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Caches the Gradle distribution and dependencies, so a Maven Central / services.gradle.org
+      # outage doesn't fail the build. setup-java's `cache: gradle` can't key on android/, which
+      # prebuild only generates later in the job.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -55,6 +61,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Every push here can become a published release, so it must pass the same checks as the hook.
+      - name: Typecheck
+        run: npm run typecheck && npm run typecheck:tests
+
+      - name: Unit tests
+        run: npm test
 
       - name: Read app version
         id: version
@@ -85,7 +98,20 @@ jobs:
           # Without a token, skip source map upload instead of failing the build.
           # Branch builds never upload source maps, so they do not pollute Sentry releases.
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ (github.ref != 'refs/heads/main' || secrets.SENTRY_AUTH_TOKEN == '') && 'true' || 'false' }}
-        run: npm run android:apk
+        # services.gradle.org / Maven Central intermittently time out or return 5xx. Retry only those
+        # download failures (up to 3 attempts); a real compile error fails on the first attempt.
+        run: |
+          set +e
+          log="$RUNNER_TEMP/apk-build.log"
+          for attempt in 1 2 3; do
+            npm run android:apk 2>&1 | tee "$log"
+            status=${PIPESTATUS[0]}
+            [ "$status" -eq 0 ] && exit 0
+            grep -qE 'Could not (GET|HEAD|download|get resource)|response code: 5[0-9]{2}|status code 5[0-9]{2}|timeout \([0-9]+ms\)|Read timed out|Connection reset' "$log" || exit "$status"
+            echo "::warning::APK build attempt $attempt failed downloading build tools; retrying in 60s"
+            sleep 60
+          done
+          exit 1
 
       # Every push gets a downloadable APK from the run page (Actions > run > Artifacts).
       - name: Upload APK artifact

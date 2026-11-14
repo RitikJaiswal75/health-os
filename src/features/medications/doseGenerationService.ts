@@ -1,12 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { addDays, format, isAfter, isBefore, max, startOfDay } from 'date-fns';
+import { addDays, format, isAfter, isBefore, max, startOfDay, subHours } from 'date-fns';
 import type { Schedule } from '../../db/types';
 import {
   MedicationRepository,
   DoseEventRepository,
   type CreateMedicationInput,
 } from './medicationRepository';
-import { MAX_START_DATE_DAYS_BACK } from '../../core/dates/constants';
+import { MAX_START_DATE_DAYS_BACK, SKIP_UNLOGGED_AFTER_HOURS } from '../../core/dates/constants';
 import { mapDoseEventRow } from '../../db/rowMappers';
 import {
   doseBelongsToDateKey,
@@ -14,6 +14,7 @@ import {
   normalizeScheduledAtStorage,
   normalizedSlotKey,
   pendingDuplicatingResolved,
+  parseSnoozedFromNotes,
   pickCanonicalDose,
 } from './doseSlotUtils';
 import { formatDateKey, parseDateKey, parseScheduledAt, scheduledAtToDateKey } from '../../core/dates/dateUtils';
@@ -67,10 +68,35 @@ export function removePendingDuplicatingResolvedDoses(db: SQLiteDatabase): numbe
   return duplicates.size;
 }
 
+/**
+ * Any dose due on a day before `today` that was never taken (pending, snoozed or missed) becomes
+ * skipped once its alarm time is SKIP_UNLOGGED_AFTER_HOURS old. A snoozed dose is judged by, and moved
+ * back to, the time it was originally due, so History keeps it on that day.
+ */
+export function skipUnloggedPastDoses(db: SQLiteDatabase, today: Date): number {
+  const doseRepo = new DoseEventRepository(db);
+  const graceEnd = subHours(new Date(), SKIP_UNLOGGED_AFTER_HOURS);
+  const open = db.getAllSync<{ id: string; scheduled_at: string; status: string; notes: string | null }>(
+    // 'missed': what older versions wrote for backfilled days.
+    `SELECT id, scheduled_at, status, notes FROM dose_events WHERE status IN ('pending', 'snoozed', 'missed')`,
+  );
+  let skipped = 0;
+  for (const row of open) {
+    const dueAt = (row.status === 'snoozed' && parseSnoozedFromNotes(row.notes)) || row.scheduled_at;
+    if (!isBefore(parseScheduledAt(dueAt), today)) continue;
+    if (!isBefore(parseScheduledAt(row.scheduled_at), graceEnd)) continue;
+    if (dueAt !== row.scheduled_at) doseRepo.updateScheduledAt(row.id, dueAt);
+    doseRepo.updateStatus(row.id, 'skipped');
+    skipped += 1;
+  }
+  return skipped;
+}
+
 export function pruneStalePendingDoses(
   doseRepo: DoseEventRepository,
   scheduleId: string,
   occurrences: ReturnType<typeof expandOccurrences>,
+  from: Date,
 ): number {
   const validSlotKeys = new Set(
     occurrences.map((occ) => format(parseScheduledAt(occ.scheduledAt), 'yyyy-MM-dd-HH-mm')),
@@ -78,6 +104,7 @@ export function pruneStalePendingDoses(
 
   let removed = 0;
   for (const dose of doseRepo.getPendingForSchedule(scheduleId)) {
+    if (isBefore(parseScheduledAt(dose.scheduledAt), from)) continue;
     const key = format(parseScheduledAt(dose.scheduledAt), 'yyyy-MM-dd-HH-mm');
     if (!validSlotKeys.has(key)) {
       doseRepo.delete(dose.id);
@@ -193,7 +220,7 @@ export function purgeOrphanDoseEvents(db: SQLiteDatabase): number {
 
 /**
  * For a schedule that starts before today, record its past slots (start date up to yesterday, at
- * most MAX_START_DATE_DAYS_BACK back) as missed so they show in Home and History and can be edited. With
+ * most MAX_START_DATE_DAYS_BACK back) as skipped so they show in Home and History and can be edited. With
  * `beforeDateKey` only days earlier than it are filled, so existing history is never touched.
  */
 export function backfillMissedDoses(
@@ -214,7 +241,7 @@ export function backfillMissedDoses(
       scheduleId: occ.scheduleId,
       scheduledAt: occ.scheduledAt,
       doseAmount: occ.doseAmount,
-      status: 'missed',
+      status: 'skipped',
     });
     created += 1;
   }
@@ -304,25 +331,32 @@ function nextDoseDeadline(schedule: Schedule, from: Date): Date {
   return addDays(base, 1);
 }
 
-/** Generate pending dose_events for all active schedules within the horizon. Idempotent. */
+/**
+ * Generate pending dose_events for all active schedules within the horizon. Idempotent.
+ * `cleanup` also runs the whole-table repair passes (duplicates, orphans, out-of-window rows), which
+ * read every dose ever logged: leave it on at startup, turn it off for screen focus.
+ */
 export function generateUpcomingDoseEvents(
   db: SQLiteDatabase,
   horizonDays = DEFAULT_HORIZON_DAYS,
+  cleanup = true,
 ): number {
   let created = 0;
   // One transaction: one disk commit instead of one per insert/delete, and no half-applied cleanup.
   db.withTransactionSync(() => {
-    created = generateInsideTransaction(db, horizonDays);
+    created = generateInsideTransaction(db, horizonDays, cleanup);
   });
   return created;
 }
 
-function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): number {
-  purgeOrphanDoseEvents(db);
-  removeDuplicateDoseEvents(db);
-  cleanupSnoozeConflicts(db);
-  removePendingDuplicatingResolvedDoses(db);
-  removeDosesOutsideScheduleWindow(db);
+function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number, cleanup: boolean): number {
+  if (cleanup) {
+    purgeOrphanDoseEvents(db);
+    removeDuplicateDoseEvents(db);
+    cleanupSnoozeConflicts(db);
+    removePendingDuplicatingResolvedDoses(db);
+    removeDosesOutsideScheduleWindow(db);
+  }
 
   const medRepo = new MedicationRepository(db);
   const doseRepo = new DoseEventRepository(db);
@@ -330,12 +364,13 @@ function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): num
   const to = addDays(from, horizonDays);
   const todayKey = formatDateKey(from);
   let created = 0;
+  skipUnloggedPastDoses(db, from);
 
   for (const med of medRepo.getAll()) {
     for (const schedule of medRepo.getActiveSchedules(med.id)) {
       const occurrences = expandOccurrences(schedule, from, max([to, nextDoseDeadline(schedule, from)]));
       const times = parseTimesOfDay(schedule.timesOfDay);
-      pruneStalePendingDoses(doseRepo, schedule.id, occurrences);
+      pruneStalePendingDoses(doseRepo, schedule.id, occurrences, from);
       const remainingToday = trimExtraPendingDosesForDate(
         doseRepo,
         getDosesForMedicationOnDate(db, med.id, todayKey),
@@ -365,8 +400,10 @@ function generateInsideTransaction(db: SQLiteDatabase, horizonDays: number): num
     }
   }
 
-  removeDuplicateDoseEvents(db);
-  removePendingDuplicatingResolvedDoses(db);
+  if (cleanup) {
+    removeDuplicateDoseEvents(db);
+    removePendingDuplicatingResolvedDoses(db);
+  }
 
   return created;
 }
