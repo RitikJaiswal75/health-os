@@ -9,8 +9,8 @@ import android.os.Looper
 import android.os.PowerManager
 
 object AlarmSoundController {
-    /** A missed alarm rings this long, then goes quiet; the notification stays up. */
-    private const val RING_TIMEOUT_MS = 10 * 60 * 1000L
+    /** A missed alarm rings this long, then goes quiet; the notification and reminder screen stay up. */
+    private const val RING_TIMEOUT_MS = 2 * 60 * 1000L
 
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
