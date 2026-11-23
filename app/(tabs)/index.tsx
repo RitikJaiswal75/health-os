@@ -22,6 +22,7 @@ import {
 } from '@/src/features/reminders/reminderService';
 import { SnoozeTimeDialog } from '@/src/core/components/SnoozeTimeDialog';
 import { AppUpdateBanner } from '@/src/core/components/AppUpdateBanner';
+import { BackupNudge } from '@/src/features/backup/BackupNudge';
 import { ReminderPermissionBanner } from '@/src/core/components/ReminderPermissionBanner';
 import { healthOsTheme } from '@/src/core/theme/paperTheme';
 import { useT } from '@/src/i18n/useT';
@@ -171,6 +172,7 @@ export default function HomeScreen() {
       </Appbar.Header>
 
       <ReminderPermissionBanner />
+      <BackupNudge />
 
       <View style={styles.body}>
         <ScrollView contentContainerStyle={styles.content}>

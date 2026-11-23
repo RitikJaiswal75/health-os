@@ -7,7 +7,6 @@ const EXCLUDES = `
 configurations.configureEach {
     exclude group: "io.sentry", module: "sentry-android-ndk"
     exclude group: "io.sentry", module: "sentry-native-ndk"
-    exclude group: "com.google.android.gms", module: "play-services-auth"
 }
 `.trim();
 

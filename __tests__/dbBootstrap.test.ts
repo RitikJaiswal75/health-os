@@ -11,6 +11,7 @@ jest.mock('../src/core/storage/durableStorage', () => ({
   resolveHealthOsDirectory: jest.fn(() => Promise.resolve('file:///data/HealthOS/')),
   adoptLegacyPublicData: jest.fn(() => Promise.resolve()),
   rewriteLegacyPhotoPaths: jest.fn(),
+  rewriteRestoredPhotoPaths: jest.fn(),
 }));
 jest.mock('../src/features/catalog/catalogService', () => ({
   CatalogCacheRepository: jest.fn(() => ({ sweepExpired: jest.fn() })),

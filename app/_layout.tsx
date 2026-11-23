@@ -17,6 +17,9 @@ import { ObservabilityBootstrap } from '@/src/core/observability/ObservabilityBo
 import { initCrashReporting } from '@/src/core/observability/crashReporter';
 import { readCachedObservabilityConfig } from '@/src/core/observability/configStore';
 import { DbBootstrapGate } from '@/src/db/DbBootstrapGate';
+import '@/src/features/backup/backupTask';
+import { BackupBootstrap } from '@/src/features/backup/BackupBootstrap';
+import { RestoreGate } from '@/src/features/backup/RestoreGate';
 import { AppUpdateBootstrap } from '@/src/features/appUpdate/AppUpdateBootstrap';
 import { ReminderNotificationBootstrap } from '@/src/features/reminders/ReminderNotificationBootstrap';
 import { ReminderRouterReadyGate } from '@/src/features/reminders/ReminderRouterReadyGate';
@@ -33,6 +36,7 @@ function RootNavigation() {
   const { t } = useT();
 
   return (
+    <RestoreGate>
     <DbBootstrapGate>
       <Stack
         screenOptions={{
@@ -57,6 +61,10 @@ function RootNavigation() {
           options={{ presentation: 'modal', headerShown: true, title: t('reliability.title') }}
         />
         <Stack.Screen
+          name="backup"
+          options={{ presentation: 'modal', headerShown: true, title: t('backup.title') }}
+        />
+        <Stack.Screen
           name="language"
           options={{
             presentation: 'modal',
@@ -69,7 +77,9 @@ function RootNavigation() {
       <ForceUpdateOverlay />
       <ReminderRouterReadyGate />
       <ReminderNotificationBootstrap />
+      <BackupBootstrap />
     </DbBootstrapGate>
+    </RestoreGate>
   );
 }
 
